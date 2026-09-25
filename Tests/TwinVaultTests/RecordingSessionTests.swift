@@ -39,4 +39,16 @@ final class RecordingSessionTests: XCTestCase {
         XCTAssertEqual(session.meeting.importantMoments[0].meetingID, session.meeting.id)
         XCTAssertEqual(session.meeting.importantMoments[0].elapsedTime, 37.5)
     }
+
+    func testAudioChannelsAreIndependentAndReplaceSameChannel() {
+        var session = RecordingSession(title: "Planning")
+        let meetingID = session.meeting.id
+        session.attachAudio(AudioRecordingReference(meetingID: meetingID, relativePath: "mic-1.m4a"))
+        session.attachAudio(AudioRecordingReference(meetingID: meetingID, relativePath: "system.m4a", channel: .systemAudio))
+        session.attachAudio(AudioRecordingReference(meetingID: meetingID, relativePath: "mic-2.m4a"))
+
+        XCTAssertEqual(session.meeting.audioRecordings.count, 2)
+        XCTAssertEqual(session.meeting.audioRecording?.relativePath, "mic-2.m4a")
+        XCTAssertEqual(session.meeting.audioRecordings.first { $0.channel == .systemAudio }?.relativePath, "system.m4a")
+    }
 }

@@ -108,7 +108,13 @@ struct MeetingDetailView: View {
                 Text(meeting.title).font(.largeTitle.bold())
                 LabeledContent("Started", value: meeting.startDate.formatted(date: .long, time: .shortened))
                 LabeledContent("Duration", value: duration(meeting.duration))
-                LabeledContent("Audio", value: meeting.audioRecording?.relativePath ?? "Not available")
+                Text("Audio Channels").font(.title2.bold())
+                if meeting.audioRecordings.isEmpty {
+                    Text("Not available").foregroundStyle(.secondary)
+                }
+                ForEach(meeting.audioRecordings) { recording in
+                    LabeledContent(recording.channel.displayName, value: recording.relativePath)
+                }
                 Divider()
                 Text("Notes").font(.title2.bold())
                 Text(meeting.notes.first?.text.isEmpty == false ? meeting.notes.first!.text : "No notes")

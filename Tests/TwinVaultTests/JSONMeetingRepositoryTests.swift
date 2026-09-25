@@ -34,4 +34,38 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let titles = try await repository.meetings().map(\.title)
         XCTAssertEqual(titles, ["New", "Old"])
     }
+
+    func testLoadsPhaseOneAudioAndMigratesStoreOnSave() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let paths = VaultPaths(root: root)
+        try paths.prepare()
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let date = "2026-01-01T10:00:00Z"
+        let legacy = """
+        {
+          "schemaVersion": 1,
+          "meetings": [{
+            "id": "\(meetingID.uuidString)", "title": "Legacy",
+            "startDate": "\(date)", "notes": [], "importantMoments": [],
+            "audioRecording": {
+              "id": "\(recordingID.uuidString)", "meetingID": "\(meetingID.uuidString)",
+              "relativePath": "legacy.m4a", "format": "m4a", "createdAt": "\(date)"
+            },
+            "status": "completed", "createdAt": "\(date)", "updatedAt": "\(date)"
+          }]
+        }
+        """
+        try XCTUnwrap(legacy.data(using: .utf8)).write(to: paths.meetingStore)
+        let repository = try JSONMeetingRepository(paths: paths)
+
+        let storedMeeting = try await repository.meeting(id: meetingID)
+        let loaded = try XCTUnwrap(storedMeeting)
+        XCTAssertEqual(loaded.audioRecordings.first?.channel, .microphone)
+        try await repository.save(loaded)
+
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
+        XCTAssertEqual(object["schemaVersion"] as? Int, 2)
+    }
 }

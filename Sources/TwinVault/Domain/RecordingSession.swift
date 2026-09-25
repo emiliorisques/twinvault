@@ -29,7 +29,8 @@ struct RecordingSession: Equatable, Sendable {
 
     mutating func attachAudio(_ reference: AudioRecordingReference, now: Date = .now) {
         precondition(reference.meetingID == meeting.id)
-        meeting.audioRecording = reference
+        meeting.audioRecordings.removeAll { $0.channel == reference.channel }
+        meeting.audioRecordings.append(reference)
         meeting.updatedAt = now
     }
 

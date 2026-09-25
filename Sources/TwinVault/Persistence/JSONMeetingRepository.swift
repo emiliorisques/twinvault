@@ -2,7 +2,7 @@ import Foundation
 
 actor JSONMeetingRepository: MeetingRepository {
     private struct Store: Codable {
-        let schemaVersion: Int
+        var schemaVersion: Int
         var meetings: [Meeting]
     }
 
@@ -10,6 +10,7 @@ actor JSONMeetingRepository: MeetingRepository {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private static let currentSchemaVersion = 2
 
     init(paths: VaultPaths, fileManager: FileManager = .default) throws {
         self.paths = paths
@@ -30,6 +31,7 @@ actor JSONMeetingRepository: MeetingRepository {
 
     func save(_ meeting: Meeting) throws {
         var store = try load()
+        store.schemaVersion = Self.currentSchemaVersion
         if let index = store.meetings.firstIndex(where: { $0.id == meeting.id }) {
             store.meetings[index] = meeting
         } else {
@@ -40,17 +42,20 @@ actor JSONMeetingRepository: MeetingRepository {
 
     func delete(id: UUID) throws {
         var store = try load()
+        store.schemaVersion = Self.currentSchemaVersion
         store.meetings.removeAll { $0.id == id }
         try write(store)
     }
 
     private func load() throws -> Store {
         guard fileManager.fileExists(atPath: paths.meetingStore.path) else {
-            return Store(schemaVersion: 1, meetings: [])
+            return Store(schemaVersion: Self.currentSchemaVersion, meetings: [])
         }
         do {
             let store = try decoder.decode(Store.self, from: Data(contentsOf: paths.meetingStore))
-            guard store.schemaVersion == 1 else { throw MeetingRepositoryError.unsupportedSchema(store.schemaVersion) }
+            guard (1...Self.currentSchemaVersion).contains(store.schemaVersion) else {
+                throw MeetingRepositoryError.unsupportedSchema(store.schemaVersion)
+            }
             return store
         } catch let error as MeetingRepositoryError {
             throw error

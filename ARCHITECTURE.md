@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 1
+# TwinVault Architecture — Phase 2A foundation
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. No AI or network capability exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolves the data boundary for multiple audio channels and timestamped transcripts. No AI or network capability exists in the application.
 
 ## Boundaries
 
@@ -16,7 +16,7 @@ AppModel (use-case coordination)
              │
              ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
-        RecordingSession
+        RecordingSession, TranscriptSegment, provider protocols
 ```
 
 The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation, nor persistence format. UI mutation goes through `RecordingSession`, which owns meeting-state invariants. Actor-isolated persistence serializes all disk access. AVFoundation stays behind a main-actor service because microphone authorization and recording are UI-driven platform operations.
@@ -25,7 +25,7 @@ The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation
 
 Phase 1 has four small aggregate types and no relational query workload. A schema-versioned JSON document with atomic replacement is transparent, testable, backup-friendly, and avoids a dependency or premature migration system. Large audio files are never placed in metadata.
 
-The cost is whole-document reads/writes and weak multi-process support. `MeetingRepository` makes the choice reversible. Move to SQLite when transcript segments introduce volume, relational evidence queries, incremental updates, or migration needs. Domain/UI code must not change during that migration.
+The cost is whole-document reads/writes and weak multi-process support. `MeetingRepository` makes the choice reversible. Schema 2 migrates Phase 1's single microphone reference into a channel-aware array when the meeting is next saved. Move to SQLite before transcript segments are persisted at production volume. Domain/UI code must not change during that migration.
 
 ## Data integrity and provenance
 
@@ -46,12 +46,12 @@ There is no networking code. Microphone access is requested only when the user s
 
 Types crossing boundaries conform to `Sendable`. The repository is an actor. Presentation and AVFoundation services are `@MainActor`. Async repository calls prevent disk work APIs from leaking callbacks into views. Strict Swift 6 checking is enabled by the toolchain.
 
-## Phase 2 proposal (not implemented)
+## Phase 2 next increment (not implemented)
 
-1. Add system-audio capture and explicit channel/source metadata.
-2. Introduce model-neutral `SpeechToTextProvider` and timestamped `TranscriptSegment` domain types.
-3. Benchmark an on-device transcription adapter behind that protocol.
-4. Stream or batch transcript persistence in SQLite once volume justifies migration.
-5. Add fixtures and tests for channel synchronization, provider cancellation, timestamps, and transcript provenance.
+1. Implement `SystemAudioCaptureService` with ScreenCaptureKit's `.audio` output and explicit screen/audio-recording permission UX.
+2. Write the system channel to its own local file; never capture or persist video frames.
+3. Add cancellation, interruption, and channel-clock synchronization tests.
+4. Benchmark an on-device transcription adapter behind `SpeechToTextProvider`.
+5. Move metadata and transcript persistence to SQLite before storing production transcripts.
 
 Speaker diarization and speaker identification remain distinct future boundaries and are not part of Phase 2 unless separately approved.

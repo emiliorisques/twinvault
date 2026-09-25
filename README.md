@@ -26,8 +26,10 @@ TwinVault/
 
 Metadata writes are atomic. Audio never leaves the device. Removing the application does not currently erase the vault; export and verified deletion workflows are future security work.
 
+Phase 2A adds a backward-compatible multi-channel audio model and model-neutral transcript/provider contracts. It does not yet capture system audio or run transcription.
+
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Structured memory, transcripts, twins, external integrations, and all AI providers are deliberately absent from Phase 1.
+`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. `SpeechToTextProvider`, `DiarizationProvider`, and `SpeakerIdentificationProvider` are separate contracts; no implementation or model is selected. Structured memory, twins, external integrations, and AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
