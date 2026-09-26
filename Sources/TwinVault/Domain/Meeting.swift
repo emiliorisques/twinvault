@@ -10,6 +10,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
     var notes: [MeetingNote]
     var importantMoments: [ImportantMoment]
     var audioRecordings: [AudioRecordingReference]
+    var transcriptSegments: [TranscriptSegment]
     var status: Status
     let createdAt: Date
     var updatedAt: Date
@@ -19,6 +20,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         endDate: Date? = nil, notes: [MeetingNote] = [],
         importantMoments: [ImportantMoment] = [],
         audioRecordings: [AudioRecordingReference] = [],
+        transcriptSegments: [TranscriptSegment] = [],
         status: Status = .recording, createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -29,6 +31,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         self.notes = notes
         self.importantMoments = importantMoments
         self.audioRecordings = audioRecordings
+        self.transcriptSegments = transcriptSegments
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -47,7 +50,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startDate, endDate, notes, importantMoments
-        case audioRecordings, audioRecording, status, createdAt, updatedAt
+        case audioRecordings, audioRecording, transcriptSegments, status, createdAt, updatedAt
     }
 
     init(from decoder: any Decoder) throws {
@@ -65,6 +68,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         } else {
             audioRecordings = []
         }
+        transcriptSegments = try container.decodeIfPresent([TranscriptSegment].self, forKey: .transcriptSegments) ?? []
         status = try container.decode(Status.self, forKey: .status)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
@@ -79,6 +83,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         try container.encode(notes, forKey: .notes)
         try container.encode(importantMoments, forKey: .importantMoments)
         try container.encode(audioRecordings, forKey: .audioRecordings)
+        try container.encode(transcriptSegments, forKey: .transcriptSegments)
         try container.encode(status, forKey: .status)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)

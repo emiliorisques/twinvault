@@ -9,11 +9,18 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     let temporarySpeakerID: String?
     let text: String
     let confidence: Double?
+    /// Exact local recording used to derive this segment.
+    let sourceRecordingID: UUID?
+    /// Replaceable provider identifier; never treated as source evidence itself.
+    let providerIdentifier: String?
+    let localeIdentifier: String?
 
     init(
         id: UUID = UUID(), meetingID: UUID, startTime: TimeInterval,
         endTime: TimeInterval, temporarySpeakerID: String? = nil,
-        text: String, confidence: Double? = nil
+        text: String, confidence: Double? = nil,
+        sourceRecordingID: UUID? = nil, providerIdentifier: String? = nil,
+        localeIdentifier: String? = nil
     ) {
         self.id = id
         self.meetingID = meetingID
@@ -22,6 +29,9 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
         self.temporarySpeakerID = temporarySpeakerID
         self.text = text
         self.confidence = confidence.map { min(1, max(0, $0)) }
+        self.sourceRecordingID = sourceRecordingID
+        self.providerIdentifier = providerIdentifier
+        self.localeIdentifier = localeIdentifier
     }
 }
 

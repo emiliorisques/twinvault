@@ -66,6 +66,28 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 2)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 3)
+    }
+
+    func testPersistsTranscriptWithRecordingProvenance() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let repository = try JSONMeetingRepository(paths: VaultPaths(root: root))
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID, startTime: 3, endTime: 5, text: "Budget Friday",
+            sourceRecordingID: recordingID, providerIdentifier: "test.provider",
+            localeIdentifier: "en-US"
+        )
+        let meeting = Meeting(
+            id: meetingID, title: "Stored transcript",
+            transcriptSegments: [segment], status: .completed
+        )
+
+        try await repository.save(meeting)
+        let loaded = try await repository.meeting(id: meetingID)
+
+        XCTAssertEqual(loaded?.transcriptSegments, [segment])
     }
 }

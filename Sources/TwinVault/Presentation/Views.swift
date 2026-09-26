@@ -133,6 +133,39 @@ struct MeetingDetailView: View {
                         ) {
                             Task { await model.togglePlayback(recording) }
                         }
+                        if model.transcribingRecordingID == recording.id {
+                            ProgressView().controlSize(.small)
+                            Text("Transcribing…").foregroundStyle(.secondary)
+                        } else {
+                            Button(
+                                meeting.transcriptSegments.contains { $0.sourceRecordingID == recording.id }
+                                    ? "Transcribe Again" : "Transcribe",
+                                systemImage: "text.bubble"
+                            ) {
+                                Task { await model.transcribe(meetingID: meeting.id, recordingID: recording.id) }
+                            }
+                            .disabled(model.transcribingRecordingID != nil)
+                        }
+                    }
+                }
+                Divider()
+                Text("Transcript").font(.title2.bold())
+                if meeting.transcriptSegments.isEmpty {
+                    Text("Not transcribed").foregroundStyle(.secondary)
+                } else {
+                    ForEach(meeting.transcriptSegments) { segment in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 8) {
+                                Text(duration(segment.startTime)).monospacedDigit()
+                                if let recordingID = segment.sourceRecordingID,
+                                   let channel = meeting.audioRecordings.first(where: { $0.id == recordingID })?.channel {
+                                    Text(channel.displayName)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            Text(segment.text).textSelection(.enabled)
+                        }
                     }
                 }
                 Divider()

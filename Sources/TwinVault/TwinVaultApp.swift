@@ -11,11 +11,13 @@ struct TwinVaultApplication: App {
             let audio = LocalAudioRecordingService(audioDirectory: paths.audioDirectory)
             let systemAudio = ScreenCaptureSystemAudioService(audioDirectory: paths.audioDirectory)
             let playback = LocalAudioPlaybackService()
+            let speechToText = AppleSpeechTranscriptionProvider(audioDirectory: paths.audioDirectory)
             _model = State(initialValue: AppModel(
                 repository: repository,
                 audio: audio,
                 systemAudio: systemAudio,
                 playback: playback,
+                speechToText: speechToText,
                 audioDirectory: paths.audioDirectory
             ))
         } catch {

@@ -23,6 +23,7 @@
 		A10000000000000000000014 /* TranscriptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* TranscriptTests.swift */; };
 		A10000000000000000000015 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* AppModelTests.swift */; };
 		A10000000000000000000016 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* AudioPlaybackService.swift */; };
+		A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -55,6 +56,7 @@
 		B10000000000000000000017 /* TranscriptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000018 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* AudioPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackService.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -91,6 +93,7 @@
 				G10000000000000000000003 /* Domain */,
 				G10000000000000000000004 /* Persistence */,
 				G10000000000000000000005 /* Audio */,
+				G10000000000000000000010 /* AI */,
 				G10000000000000000000006 /* Presentation */,
 				B10000000000000000000009 /* TwinVaultApp.swift */,
 			);
@@ -135,6 +138,14 @@
 				B10000000000000000000008 /* Views.swift */,
 			);
 			path = Presentation;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000010 /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */,
+			);
+			path = AI;
 			sourceTree = "<group>";
 		};
 		G10000000000000000000007 /* Sources/TwinVault/Resources */ = {
@@ -275,6 +286,7 @@
 				A10000000000000000000012 /* Transcript.swift in Sources */,
 				A10000000000000000000013 /* SystemAudioCaptureService.swift in Sources */,
 				A10000000000000000000016 /* AudioPlaybackService.swift in Sources */,
+				A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

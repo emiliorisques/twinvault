@@ -32,4 +32,42 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(turn.endTime, 5)
         XCTAssertEqual(turn.temporarySpeakerID, "speaker-3")
     }
+
+    func testSegmentRetainsAudioAndProviderProvenance() {
+        let recordingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: UUID(), startTime: 1, endTime: 2, text: "Hello",
+            sourceRecordingID: recordingID,
+            providerIdentifier: "local.provider",
+            localeIdentifier: "es-ES"
+        )
+
+        XCTAssertEqual(segment.sourceRecordingID, recordingID)
+        XCTAssertEqual(segment.providerIdentifier, "local.provider")
+        XCTAssertEqual(segment.localeIdentifier, "es-ES")
+    }
+
+    func testAppleProviderRejectsPathTraversal() async {
+        let provider = AppleSpeechTranscriptionProvider(
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "../outside.m4a"
+        )
+
+        do {
+            _ = try await provider.transcribe(TranscriptionRequest(
+                meetingID: meetingID,
+                recordings: [recording],
+                localeIdentifier: "es-ES"
+            ))
+            XCTFail("Path traversal must be rejected")
+        } catch LocalTranscriptionError.invalidRecordingReference {
+            // Expected.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
 }

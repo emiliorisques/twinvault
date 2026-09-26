@@ -13,6 +13,7 @@ final class AppModelTests: XCTestCase {
             audio: microphone,
             systemAudio: systemAudio,
             playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
             audioDirectory: FileManager.default.temporaryDirectory
         )
 
@@ -40,6 +41,7 @@ final class AppModelTests: XCTestCase {
             audio: FakeMicrophoneService(),
             systemAudio: FailingSystemAudioService(),
             playback: playback,
+            speechToText: FakeSpeechToTextProvider(),
             audioDirectory: directory
         )
         let recording = AudioRecordingReference(meetingID: UUID(), relativePath: "recording.m4a")
@@ -58,6 +60,7 @@ final class AppModelTests: XCTestCase {
             audio: FakeMicrophoneService(),
             systemAudio: FailingSystemAudioService(),
             playback: playback,
+            speechToText: FakeSpeechToTextProvider(),
             audioDirectory: FileManager.default.temporaryDirectory
         )
         let recording = AudioRecordingReference(meetingID: UUID(), relativePath: "../outside.m4a")
@@ -66,6 +69,37 @@ final class AppModelTests: XCTestCase {
 
         XCTAssertNil(playback.playedURL)
         XCTAssertNotNil(model.errorMessage)
+    }
+
+    func testTranscriptionIsPersistedWithRecordingProvenance() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+        let meeting = Meeting(
+            id: meetingID,
+            title: "Transcription",
+            audioRecordings: [recording],
+            status: .completed
+        )
+        await repository.save(meeting)
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.transcribe(meetingID: meetingID, recordingID: recording.id)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments.count, 1)
+        XCTAssertEqual(stored?.transcriptSegments.first?.sourceRecordingID, recording.id)
+        XCTAssertEqual(stored?.transcriptSegments.first?.providerIdentifier, "test.speech")
+        XCTAssertNil(model.transcribingRecordingID)
+        XCTAssertNil(model.errorMessage)
     }
 }
 
@@ -121,4 +155,21 @@ private final class FakePlaybackService: AudioPlaybackService {
     }
 
     func stop() { isPlaying = false }
+}
+
+private struct FakeSpeechToTextProvider: SpeechToTextProvider {
+    let identifier = "test.speech"
+
+    func transcribe(_ request: TranscriptionRequest) async throws -> [TranscriptSegment] {
+        let recording = try XCTUnwrap(request.recordings.first)
+        return [TranscriptSegment(
+            meetingID: request.meetingID,
+            startTime: 1,
+            endTime: 2,
+            text: "Test transcript",
+            sourceRecordingID: recording.id,
+            providerIdentifier: identifier,
+            localeIdentifier: request.localeIdentifier
+        )]
+    }
 }

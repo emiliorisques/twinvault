@@ -7,10 +7,12 @@ final class AppModel {
     private let audio: any AudioRecordingService
     private let systemAudio: any SystemAudioCaptureService
     private let playback: any AudioPlaybackService
+    private let speechToText: any SpeechToTextProvider
     private let audioDirectory: URL
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
+    private(set) var transcribingRecordingID: UUID?
     var errorMessage: String?
 
     init(
@@ -18,12 +20,14 @@ final class AppModel {
         audio: any AudioRecordingService,
         systemAudio: any SystemAudioCaptureService,
         playback: any AudioPlaybackService,
+        speechToText: any SpeechToTextProvider,
         audioDirectory: URL
     ) {
         self.repository = repository
         self.audio = audio
         self.systemAudio = systemAudio
         self.playback = playback
+        self.speechToText = speechToText
         self.audioDirectory = audioDirectory
     }
 
@@ -107,6 +111,38 @@ final class AppModel {
     func stopPlayback() {
         playback.stop()
         playingRecordingID = nil
+    }
+
+    func transcribe(meetingID: UUID, recordingID: UUID) async {
+        guard transcribingRecordingID == nil else { return }
+        guard var meeting = meetings.first(where: { $0.id == meetingID }),
+              let recording = meeting.audioRecordings.first(where: { $0.id == recordingID }) else {
+            errorMessage = LocalTranscriptionError.noRecording.localizedDescription
+            return
+        }
+
+        transcribingRecordingID = recordingID
+        defer { transcribingRecordingID = nil }
+        do {
+            let segments = try await speechToText.transcribe(TranscriptionRequest(
+                meetingID: meetingID,
+                recordings: [recording],
+                localeIdentifier: Locale.current.identifier
+            ))
+            meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
+            meeting.transcriptSegments.append(contentsOf: segments)
+            meeting.transcriptSegments.sort {
+                if $0.startTime == $1.startTime {
+                    return $0.endTime < $1.endTime
+                }
+                return $0.startTime < $1.startTime
+            }
+            meeting.updatedAt = .now
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func validatedAudioURL(for recording: AudioRecordingReference) throws -> URL {

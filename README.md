@@ -1,8 +1,8 @@
 # TwinVault
 
-TwinVault is a native, local-first macOS meeting memory application. Phase 1 records microphone audio locally and keeps meeting notes and important timestamps inspectable on-device. It has no AI, cloud, analytics, transcription, or network dependency.
+TwinVault is a native, local-first macOS meeting memory application. It records meeting audio, keeps notes and important timestamps inspectable on-device, and can transcribe a selected local audio channel using Apple's on-device speech model. It has no cloud AI, analytics, or audio upload.
 
-## Phase 1 capabilities
+## Current capabilities
 
 - Create and record a meeting with explicit microphone permission.
 - Show recording duration and state.
@@ -27,12 +27,14 @@ TwinVault/
 
 Metadata writes are atomic. Audio never leaves the device. Removing the application does not currently erase the vault; export and verified deletion workflows are future security work.
 
-Phase 2B adds opt-in system audio capture through ScreenCaptureKit. System audio is written to a separate local M4A file; no screen output is registered and no video frames are stored. A permission or capture failure falls back to microphone-only recording. Transcription is not yet implemented.
+Phase 2B adds opt-in system audio capture through ScreenCaptureKit. System audio is written to a separate local M4A file; no screen output is registered and no video frames are stored. A permission or capture failure falls back to microphone-only recording.
 
 Meeting details provide local Play/Stop controls for each captured channel. Playback resolves only safe filenames inside the vault audio directory and never uploads media.
 
+Phase 2C adds post-meeting transcription through `SpeechAnalyzer` and `SpeechTranscriber` on macOS 26+. The user explicitly chooses the microphone or system-audio recording to transcribe. Apple may download the selected language model once through the system-managed `AssetInventory`; recorded audio remains on-device. Timestamped segments persist with the source recording ID, provider ID, and locale.
+
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. `SpeechToTextProvider`, `DiarizationProvider`, and `SpeakerIdentificationProvider` are separate contracts; no implementation or model is selected. Structured memory, twins, external integrations, and AI inference remain absent.
+`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech is one replaceable implementation of `SpeechToTextProvider`; diarization and speaker identification remain separate unimplemented contracts. Structured memory, twins, external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
