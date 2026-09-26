@@ -43,7 +43,7 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
         self.fileManager = fileManager
     }
 
-    func transcribe(_ request: TranscriptionRequest) async throws -> [TranscriptSegment] {
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
         guard #available(macOS 26.0, *) else {
             throw LocalTranscriptionError.unavailableOnThisMac
         }
@@ -64,59 +64,55 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
                 unsupportedIdentifiers.append(identifier)
             }
         }
-        guard unsupportedIdentifiers.isEmpty else {
+        guard !resolvedLocales.isEmpty else {
             throw LocalTranscriptionError.localeUnsupported(unsupportedIdentifiers.joined(separator: ", "))
         }
-        guard !resolvedLocales.isEmpty else { throw LocalTranscriptionError.localeUnsupported("requested") }
 
-        let transcribers = resolvedLocales.map { locale in
-            (
+        // Open once before per-locale recovery so a damaged audio file is not
+        // misreported as three unavailable language models.
+        _ = try AVAudioFile(forReading: fileURL)
+
+        var candidates: [TranscriptSegment] = []
+        var unavailableIdentifiers = unsupportedIdentifiers
+        var completedAnalyses = 0
+        for locale in resolvedLocales {
+            try Task.checkCancellation()
+            let transcriber = SpeechTranscriber(
                 locale: locale,
-                transcriber: SpeechTranscriber(
-                    locale: locale,
-                    transcriptionOptions: [],
-                    reportingOptions: [],
-                    attributeOptions: [.audioTimeRange, .transcriptionConfidence]
-                )
+                transcriptionOptions: [],
+                reportingOptions: [],
+                attributeOptions: [.audioTimeRange, .transcriptionConfidence]
             )
-        }
-        try await ensureModels(for: transcribers.map(\.transcriber), locales: resolvedLocales)
-
-        let audioFile = try AVAudioFile(forReading: fileURL)
-        let analyzer = SpeechAnalyzer(modules: transcribers.map(\.transcriber))
-        let collectionTasks = transcribers.map { configuration in
-            Task {
-                try await Self.collectResults(
-                    from: configuration.transcriber,
+            do {
+                try await ensureModel(for: transcriber, locale: locale)
+                candidates.append(contentsOf: try await analyze(
+                    fileURL: fileURL,
+                    transcriber: transcriber,
                     meetingID: request.meetingID,
                     recordingID: recording.id,
-                    providerIdentifier: identifier,
-                    localeIdentifier: configuration.locale.identifier
-                )
+                    localeIdentifier: locale.identifier
+                ))
+                completedAnalyses += 1
+            } catch {
+                if error is CancellationError { throw error }
+                unavailableIdentifiers.append(locale.identifier)
             }
         }
 
-        do {
-            if let finalTime = try await analyzer.analyzeSequence(from: audioFile) {
-                try await analyzer.finalizeAndFinish(through: finalTime)
-            } else {
-                await analyzer.cancelAndFinishNow()
-            }
-            var candidates: [TranscriptSegment] = []
-            for task in collectionTasks {
-                candidates.append(contentsOf: try await task.value)
-            }
-            let selected = MultilingualTranscriptSelector.select(
-                candidates: candidates,
-                preferredLocaleIdentifiers: resolvedLocales.map(\.identifier)
+        guard completedAnalyses > 0 else {
+            throw LocalTranscriptionError.modelUnavailable(
+                unavailableIdentifiers.joined(separator: ", ")
             )
-            guard !selected.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
-            return selected
-        } catch {
-            await analyzer.cancelAndFinishNow()
-            collectionTasks.forEach { $0.cancel() }
-            throw error
         }
+        let selected = MultilingualTranscriptSelector.select(
+            candidates: candidates,
+            preferredLocaleIdentifiers: resolvedLocales.map(\.identifier)
+        )
+        guard !selected.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
+        return TranscriptionOutput(
+            segments: selected,
+            unavailableLocaleIdentifiers: Array(Set(unavailableIdentifiers)).sorted()
+        )
     }
 
     private func validatedURL(for recording: AudioRecordingReference) throws -> URL {
@@ -135,15 +131,68 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
     }
 
     @available(macOS 26.0, *)
-    private func ensureModels(for transcribers: [SpeechTranscriber], locales: [Locale]) async throws {
-        let modules: [any SpeechModule] = transcribers
+    private func ensureModel(for transcriber: SpeechTranscriber, locale: Locale) async throws {
+        let modules: [any SpeechModule] = [transcriber]
         if await AssetInventory.status(forModules: modules) == .installed { return }
 
+        do {
+            try await installModel(for: modules, locale: locale)
+        } catch {
+            // A failed system download can leave a stale locale reservation.
+            // Clear it and retry exactly once before reporting this locale.
+            await AssetInventory.release(reservedLocale: locale)
+            do {
+                try await installModel(for: modules, locale: locale)
+            } catch {
+                await AssetInventory.release(reservedLocale: locale)
+                throw error
+            }
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private func installModel(for modules: [any SpeechModule], locale: Locale) async throws {
+        try await AssetInventory.reserve(locale: locale)
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: modules) {
             try await installation.downloadAndInstall()
         }
         guard await AssetInventory.status(forModules: modules) == .installed else {
-            throw LocalTranscriptionError.modelUnavailable(locales.map(\.identifier).joined(separator: ", "))
+            throw LocalTranscriptionError.modelUnavailable(locale.identifier)
+        }
+    }
+
+    @available(macOS 26.0, *)
+    private func analyze(
+        fileURL: URL,
+        transcriber: SpeechTranscriber,
+        meetingID: UUID,
+        recordingID: UUID,
+        localeIdentifier: String
+    ) async throws -> [TranscriptSegment] {
+        let audioFile = try AVAudioFile(forReading: fileURL)
+        let analyzer = SpeechAnalyzer(modules: [transcriber])
+        let collectionTask = Task {
+            try await Self.collectResults(
+                from: transcriber,
+                meetingID: meetingID,
+                recordingID: recordingID,
+                providerIdentifier: identifier,
+                localeIdentifier: localeIdentifier
+            )
+        }
+
+        do {
+            if let finalTime = try await analyzer.analyzeSequence(from: audioFile) {
+                try await analyzer.finalizeAndFinish(through: finalTime)
+            } else {
+                await analyzer.cancelAndFinishNow()
+            }
+            return try await collectionTask.value
+        } catch {
+            await analyzer.cancelAndFinishNow()
+            collectionTask.cancel()
+            _ = try? await collectionTask.value
+            throw error
         }
     }
 

@@ -124,13 +124,13 @@ final class AppModel {
         transcribingRecordingID = recordingID
         defer { transcribingRecordingID = nil }
         do {
-            let segments = try await speechToText.transcribe(TranscriptionRequest(
+            let output = try await speechToText.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
                 recordings: [recording],
                 localeIdentifiers: meeting.transcriptionLocaleIdentifiers
             ))
             meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
-            meeting.transcriptSegments.append(contentsOf: segments)
+            meeting.transcriptSegments.append(contentsOf: output.segments)
             meeting.transcriptSegments.sort {
                 if $0.startTime == $1.startTime {
                     return $0.endTime < $1.endTime
@@ -140,6 +140,10 @@ final class AppModel {
             meeting.updatedAt = .now
             try await repository.save(meeting)
             await load()
+            if !output.unavailableLocaleIdentifiers.isEmpty {
+                let labels = output.unavailableLocaleIdentifiers.map(Self.languageLabel).joined(separator: ", ")
+                errorMessage = "Transcription completed, but these language models were unavailable: \(labels). You can try again later."
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -159,5 +163,9 @@ final class AppModel {
             throw AudioPlaybackError.fileMissing
         }
         return fileURL
+    }
+
+    private static func languageLabel(_ identifier: String) -> String {
+        identifier.split(separator: "-").first.map { String($0).uppercased() } ?? identifier
     }
 }

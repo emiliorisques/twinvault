@@ -51,9 +51,23 @@ struct TranscriptionRequest: Sendable {
     }
 }
 
+struct TranscriptionOutput: Equatable, Sendable {
+    let segments: [TranscriptSegment]
+    /// Requested locales that the provider could not use for this run.
+    let unavailableLocaleIdentifiers: [String]
+
+    init(
+        segments: [TranscriptSegment],
+        unavailableLocaleIdentifiers: [String] = []
+    ) {
+        self.segments = segments
+        self.unavailableLocaleIdentifiers = unavailableLocaleIdentifiers
+    }
+}
+
 protocol SpeechToTextProvider: Sendable {
     var identifier: String { get }
-    func transcribe(_ request: TranscriptionRequest) async throws -> [TranscriptSegment]
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput
 }
 
 struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {

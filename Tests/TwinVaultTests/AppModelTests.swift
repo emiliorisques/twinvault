@@ -101,6 +101,33 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.transcribingRecordingID)
         XCTAssertNil(model.errorMessage)
     }
+
+    func testPartialMultilingualTranscriptionIsSavedAndWarnsUser() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Partial transcription",
+            audioRecordings: [recording],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(unavailableLocaleIdentifiers: ["ca-ES"]),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.transcribe(meetingID: meetingID, recordingID: recording.id)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments.count, 1)
+        XCTAssertEqual(model.errorMessage, "Transcription completed, but these language models were unavailable: CA. You can try again later.")
+    }
 }
 
 private actor InMemoryMeetingRepository: MeetingRepository {
@@ -159,10 +186,11 @@ private final class FakePlaybackService: AudioPlaybackService {
 
 private struct FakeSpeechToTextProvider: SpeechToTextProvider {
     let identifier = "test.speech"
+    var unavailableLocaleIdentifiers: [String] = []
 
-    func transcribe(_ request: TranscriptionRequest) async throws -> [TranscriptSegment] {
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
         let recording = try XCTUnwrap(request.recordings.first)
-        return [TranscriptSegment(
+        return TranscriptionOutput(segments: [TranscriptSegment(
             meetingID: request.meetingID,
             startTime: 1,
             endTime: 2,
@@ -170,6 +198,6 @@ private struct FakeSpeechToTextProvider: SpeechToTextProvider {
             sourceRecordingID: recording.id,
             providerIdentifier: identifier,
             localeIdentifier: request.localeIdentifiers.first
-        )]
+        )], unavailableLocaleIdentifiers: unavailableLocaleIdentifiers)
     }
 }
