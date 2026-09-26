@@ -38,17 +38,23 @@ final class AppModel {
 
     func startMeeting(title: String, captureSystemAudio: Bool = false) async {
         stopPlayback()
-        var session = RecordingSession(title: title)
         guard await audio.requestPermission() == .granted else {
             errorMessage = AudioRecordingError.permissionDenied.localizedDescription
             return
         }
+        var session = RecordingSession(title: title)
         do {
-            let reference = try audio.start(meetingID: session.meeting.id)
+            let reference = try audio.start(
+                meetingID: session.meeting.id,
+                meetingStartDate: session.meeting.startDate
+            )
             session.attachAudio(reference)
             if captureSystemAudio {
                 do {
-                    let systemReference = try await systemAudio.startSystemAudioCapture(meetingID: session.meeting.id)
+                    let systemReference = try await systemAudio.startSystemAudioCapture(
+                        meetingID: session.meeting.id,
+                        meetingStartDate: session.meeting.startDate
+                    )
                     session.attachAudio(systemReference)
                 } catch {
                     errorMessage = "The meeting started with microphone only. \(error.localizedDescription)"

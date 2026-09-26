@@ -63,11 +63,12 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let storedMeeting = try await repository.meeting(id: meetingID)
         let loaded = try XCTUnwrap(storedMeeting)
         XCTAssertEqual(loaded.audioRecordings.first?.channel, .microphone)
+        XCTAssertNil(loaded.audioRecordings.first?.meetingTimelineOffset)
         XCTAssertEqual(loaded.transcriptionLocaleIdentifiers, ["es-ES", "ca-ES", "en-US"])
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 4)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 5)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -76,6 +77,12 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let repository = try JSONMeetingRepository(paths: VaultPaths(root: root))
         let meetingID = UUID()
         let recordingID = UUID()
+        let recording = AudioRecordingReference(
+            id: recordingID,
+            meetingID: meetingID,
+            relativePath: "meeting.m4a",
+            meetingTimelineOffset: 1.25
+        )
         let segment = TranscriptSegment(
             meetingID: meetingID, startTime: 3, endTime: 5, text: "Budget Friday",
             sourceRecordingID: recordingID, providerIdentifier: "test.provider",
@@ -83,6 +90,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         )
         let meeting = Meeting(
             id: meetingID, title: "Stored transcript",
+            audioRecordings: [recording],
             transcriptSegments: [segment],
             transcriptionLocaleIdentifiers: ["ca-ES", "en-US"],
             status: .completed
@@ -92,6 +100,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let loaded = try await repository.meeting(id: meetingID)
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
+        XCTAssertEqual(loaded?.audioRecordings.first?.meetingTimelineOffset, 1.25)
         XCTAssertEqual(loaded?.transcriptionLocaleIdentifiers, ["ca-ES", "en-US"])
     }
 }

@@ -51,4 +51,22 @@ final class RecordingSessionTests: XCTestCase {
         XCTAssertEqual(session.meeting.audioRecording?.relativePath, "mic-2.m4a")
         XCTAssertEqual(session.meeting.audioRecordings.first { $0.channel == .systemAudio }?.relativePath, "system.m4a")
     }
+
+    func testAudioRecordingMapsFileTimeOntoMeetingTimeline() {
+        let recording = AudioRecordingReference(
+            meetingID: UUID(),
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 2.5
+        )
+
+        XCTAssertEqual(recording.meetingTimelineTime(forRecordingTime: 10), 12.5)
+        XCTAssertEqual(recording.meetingTimelineTime(forRecordingTime: -4), 2.5)
+    }
+
+    func testLegacyAudioWithoutTimelineAnchorRemainsUnknown() {
+        let recording = AudioRecordingReference(meetingID: UUID(), relativePath: "legacy.m4a")
+
+        XCTAssertNil(recording.meetingTimelineTime(forRecordingTime: 10))
+    }
 }

@@ -10,6 +10,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Store audio separately from versioned meeting metadata.
 - Browse previous meetings and inspect notes, timestamps, and audio status.
 - Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
+- Anchor newly recorded microphone and system-audio files to the meeting timeline.
 
 ## Development
 
@@ -35,6 +36,8 @@ Meeting details provide local Play/Stop controls for each captured channel. Play
 Phase 2C adds post-meeting transcription through `SpeechAnalyzer` and `SpeechTranscriber` on macOS 26+. The user explicitly chooses the microphone or system-audio recording to transcribe. Apple may download the selected language models once through the system-managed `AssetInventory`; recorded audio remains on-device. Timestamped segments persist with the source recording ID, provider ID, and locale.
 
 Phase 2D enables `es-ES`, `ca-ES`, and `en-US` for every meeting by default. Apple Speech exposes one locale per transcriber, so the current adapter processes the same audio sequentially with three locale-specific transcribers and retains the strongest non-overlapping hypotheses using Apple's confidence metadata. Language assets are installed independently. A failed installation gets one clean retry after its stale reservation is released; if Apple still cannot install that model, TwinVault saves results from the available languages and tells the user which language was skipped. This is a replaceable, deliberately isolated heuristic; mixed-language accuracy and energy use must be benchmarked with consented fixtures before production use.
+
+Phase 2E gives each new audio reference a meeting-timeline offset measured when its capture service reports that recording has started. The meeting itself now begins after microphone permission is resolved, so permission dialogs do not inflate its duration. This wall-clock service boundary is an initial alignment anchor, not sample-accurate synchronization; buffer host-time calibration is still required before automatic cross-channel deduplication.
 
 ## Current boundaries
 

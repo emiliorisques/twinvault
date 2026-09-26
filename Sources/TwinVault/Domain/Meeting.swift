@@ -149,11 +149,14 @@ struct AudioRecordingReference: Identifiable, Codable, Equatable, Sendable {
     let relativePath: String
     let format: String
     let channel: Channel
+    /// Approximate start of this file on the meeting timeline. Legacy files have no anchor.
+    let meetingTimelineOffset: TimeInterval?
     let createdAt: Date
 
     init(
         id: UUID = UUID(), meetingID: UUID, relativePath: String,
         format: String = "m4a", channel: Channel = .microphone,
+        meetingTimelineOffset: TimeInterval? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -161,10 +164,17 @@ struct AudioRecordingReference: Identifiable, Codable, Equatable, Sendable {
         self.relativePath = relativePath
         self.format = format
         self.channel = channel
+        self.meetingTimelineOffset = meetingTimelineOffset.map { max(0, $0) }
         self.createdAt = createdAt
     }
 
-    private enum CodingKeys: String, CodingKey { case id, meetingID, relativePath, format, channel, createdAt }
+    func meetingTimelineTime(forRecordingTime recordingTime: TimeInterval) -> TimeInterval? {
+        meetingTimelineOffset.map { $0 + max(0, recordingTime) }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, meetingID, relativePath, format, channel, meetingTimelineOffset, createdAt
+    }
 
     init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -173,6 +183,8 @@ struct AudioRecordingReference: Identifiable, Codable, Equatable, Sendable {
         relativePath = try container.decode(String.self, forKey: .relativePath)
         format = try container.decode(String.self, forKey: .format)
         channel = try container.decodeIfPresent(Channel.self, forKey: .channel) ?? .microphone
+        meetingTimelineOffset = try container.decodeIfPresent(TimeInterval.self, forKey: .meetingTimelineOffset)
+            .map { max(0, $0) }
         createdAt = try container.decode(Date.self, forKey: .createdAt)
     }
 }

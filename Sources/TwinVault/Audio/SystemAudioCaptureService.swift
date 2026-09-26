@@ -7,7 +7,7 @@ import ScreenCaptureKit
 protocol SystemAudioCaptureService: AnyObject {
     var isCapturing: Bool { get }
     func authorizationStatus() -> CaptureAuthorizationStatus
-    func startSystemAudioCapture(meetingID: UUID) async throws -> AudioRecordingReference
+    func startSystemAudioCapture(meetingID: UUID, meetingStartDate: Date) async throws -> AudioRecordingReference
     func stopSystemAudioCapture() async throws
 }
 
@@ -51,7 +51,7 @@ final class ScreenCaptureSystemAudioService: SystemAudioCaptureService {
         CGPreflightScreenCaptureAccess() ? .authorized : .notDetermined
     }
 
-    func startSystemAudioCapture(meetingID: UUID) async throws -> AudioRecordingReference {
+    func startSystemAudioCapture(meetingID: UUID, meetingStartDate: Date) async throws -> AudioRecordingReference {
         guard stream == nil else { throw SystemAudioCaptureError.alreadyCapturing }
 
         try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
@@ -85,12 +85,15 @@ final class ScreenCaptureSystemAudioService: SystemAudioCaptureService {
         do {
             try stream.addStreamOutput(writer, type: .audio, sampleHandlerQueue: writer.sampleQueue)
             try await stream.startCapture()
+            let recordingStartedAt = Date.now
             sampleWriter = writer
             self.stream = stream
             return AudioRecordingReference(
                 meetingID: meetingID,
                 relativePath: fileName,
-                channel: .systemAudio
+                channel: .systemAudio,
+                meetingTimelineOffset: recordingStartedAt.timeIntervalSince(meetingStartDate),
+                createdAt: recordingStartedAt
             )
         } catch {
             try? FileManager.default.removeItem(at: outputURL)

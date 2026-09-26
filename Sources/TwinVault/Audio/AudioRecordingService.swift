@@ -20,7 +20,7 @@ protocol AudioRecordingService: AnyObject {
     var permission: MicrophonePermission { get }
     var isRecording: Bool { get }
     func requestPermission() async -> MicrophonePermission
-    func start(meetingID: UUID) throws -> AudioRecordingReference
+    func start(meetingID: UUID, meetingStartDate: Date) throws -> AudioRecordingReference
     func stop()
 }
 
@@ -47,7 +47,7 @@ final class LocalAudioRecordingService: NSObject, AudioRecordingService, AVAudio
         return granted ? .granted : .denied
     }
 
-    func start(meetingID: UUID) throws -> AudioRecordingReference {
+    func start(meetingID: UUID, meetingStartDate: Date) throws -> AudioRecordingReference {
         guard permission == .granted else { throw AudioRecordingError.permissionDenied }
         try FileManager.default.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
         let fileName = "\(meetingID.uuidString).m4a"
@@ -62,8 +62,14 @@ final class LocalAudioRecordingService: NSObject, AudioRecordingService, AVAudio
         recorder.delegate = self
         recorder.isMeteringEnabled = true
         guard recorder.record() else { throw AudioRecordingError.couldNotStart }
+        let recordingStartedAt = Date.now
         self.recorder = recorder
-        return AudioRecordingReference(meetingID: meetingID, relativePath: fileName)
+        return AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: fileName,
+            meetingTimelineOffset: recordingStartedAt.timeIntervalSince(meetingStartDate),
+            createdAt: recordingStartedAt
+        )
     }
 
     func stop() {

@@ -148,9 +148,14 @@ private final class FakeMicrophoneService: AudioRecordingService {
     var isRecording = false
 
     func requestPermission() async -> MicrophonePermission { permission }
-    func start(meetingID: UUID) throws -> AudioRecordingReference {
+    func start(meetingID: UUID, meetingStartDate: Date) throws -> AudioRecordingReference {
         isRecording = true
-        return AudioRecordingReference(meetingID: meetingID, relativePath: "microphone.m4a")
+        return AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0,
+            createdAt: meetingStartDate
+        )
     }
     func stop() { isRecording = false }
 }
@@ -159,7 +164,7 @@ private final class FakeMicrophoneService: AudioRecordingService {
 private final class FailingSystemAudioService: SystemAudioCaptureService {
     var isCapturing = false
     func authorizationStatus() -> CaptureAuthorizationStatus { .denied }
-    func startSystemAudioCapture(meetingID: UUID) async throws -> AudioRecordingReference {
+    func startSystemAudioCapture(meetingID: UUID, meetingStartDate: Date) async throws -> AudioRecordingReference {
         throw StubError.denied
     }
     func stopSystemAudioCapture() async throws { isCapturing = false }

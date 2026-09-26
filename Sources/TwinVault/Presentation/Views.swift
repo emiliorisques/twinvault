@@ -129,6 +129,11 @@ struct MeetingDetailView: View {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(recording.channel.displayName).fontWeight(.medium)
                             Text(recording.relativePath).font(.caption).foregroundStyle(.secondary)
+                            if let offset = recording.meetingTimelineOffset {
+                                Text("Timeline +\(duration(offset))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                         Spacer()
                         Button(
