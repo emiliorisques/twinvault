@@ -6,18 +6,25 @@ final class AppModel {
     private let repository: any MeetingRepository
     private let audio: any AudioRecordingService
     private let systemAudio: any SystemAudioCaptureService
+    private let playback: any AudioPlaybackService
+    private let audioDirectory: URL
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
+    private(set) var playingRecordingID: UUID?
     var errorMessage: String?
 
     init(
         repository: any MeetingRepository,
         audio: any AudioRecordingService,
-        systemAudio: any SystemAudioCaptureService
+        systemAudio: any SystemAudioCaptureService,
+        playback: any AudioPlaybackService,
+        audioDirectory: URL
     ) {
         self.repository = repository
         self.audio = audio
         self.systemAudio = systemAudio
+        self.playback = playback
+        self.audioDirectory = audioDirectory
     }
 
     func load() async {
@@ -26,6 +33,7 @@ final class AppModel {
     }
 
     func startMeeting(title: String, captureSystemAudio: Bool = false) async {
+        stopPlayback()
         var session = RecordingSession(title: title)
         guard await audio.requestPermission() == .granted else {
             errorMessage = AudioRecordingError.permissionDenied.localizedDescription
@@ -74,5 +82,46 @@ final class AppModel {
             activeSession = nil
             await load()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    func togglePlayback(_ recording: AudioRecordingReference) async {
+        if playingRecordingID == recording.id {
+            stopPlayback()
+            return
+        }
+
+        playback.stop()
+        do {
+            let fileURL = try validatedAudioURL(for: recording)
+            playingRecordingID = recording.id
+            defer {
+                if playingRecordingID == recording.id { playingRecordingID = nil }
+            }
+            try await playback.play(fileURL: fileURL)
+        } catch {
+            playingRecordingID = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func stopPlayback() {
+        playback.stop()
+        playingRecordingID = nil
+    }
+
+    private func validatedAudioURL(for recording: AudioRecordingReference) throws -> URL {
+        let component = recording.relativePath
+        guard !component.isEmpty, (component as NSString).lastPathComponent == component else {
+            throw AudioPlaybackError.invalidReference
+        }
+        let directory = audioDirectory.standardizedFileURL
+        let fileURL = directory.appending(path: component).standardizedFileURL
+        guard fileURL.deletingLastPathComponent() == directory else {
+            throw AudioPlaybackError.invalidReference
+        }
+        guard FileManager.default.fileExists(atPath: fileURL.path) else {
+            throw AudioPlaybackError.fileMissing
+        }
+        return fileURL
     }
 }

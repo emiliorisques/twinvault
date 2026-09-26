@@ -10,10 +10,13 @@ struct TwinVaultApplication: App {
             let repository = try JSONMeetingRepository(paths: paths)
             let audio = LocalAudioRecordingService(audioDirectory: paths.audioDirectory)
             let systemAudio = ScreenCaptureSystemAudioService(audioDirectory: paths.audioDirectory)
+            let playback = LocalAudioPlaybackService()
             _model = State(initialValue: AppModel(
                 repository: repository,
                 audio: audio,
-                systemAudio: systemAudio
+                systemAudio: systemAudio,
+                playback: playback,
+                audioDirectory: paths.audioDirectory
             ))
         } catch {
             fatalError("Unable to initialize local vault: \(error)")

@@ -13,7 +13,8 @@ SwiftUI Views
 AppModel (use-case coordination)
     ├── MeetingRepository protocol ── JSONMeetingRepository
     ├── AudioRecordingService ── LocalAudioRecordingService
-    └── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
+    ├── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
+    └── AudioPlaybackService ── LocalAudioPlaybackService
                     │
                     ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
@@ -23,6 +24,8 @@ Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
 The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation, nor persistence format. UI mutation goes through `RecordingSession`, which owns meeting-state invariants. Actor-isolated persistence serializes all disk access. AVFoundation stays behind a main-actor service because microphone authorization and recording are UI-driven platform operations.
 
 System audio uses ScreenCaptureKit with only an `.audio` stream output. TwinVault does not register a `.screen` output, so captured video frames never enter the process or vault. The current application is excluded from its own audio capture. Audio is encoded as 48 kHz stereo AAC in a channel-specific M4A file. If ScreenCaptureKit authorization or startup fails, the meeting continues with microphone audio and surfaces a warning.
+
+Playback uses `AVAudioPlayer` behind an async service boundary. Stored paths must be a single relative filename and are resolved only inside the vault audio directory; traversal and missing files are rejected before AVFoundation receives a URL.
 
 ## ADR-001: versioned JSON before SQLite
 

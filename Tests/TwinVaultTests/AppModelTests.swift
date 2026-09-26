@@ -8,7 +8,13 @@ final class AppModelTests: XCTestCase {
         let repository = InMemoryMeetingRepository()
         let microphone = FakeMicrophoneService()
         let systemAudio = FailingSystemAudioService()
-        let model = AppModel(repository: repository, audio: microphone, systemAudio: systemAudio)
+        let model = AppModel(
+            repository: repository,
+            audio: microphone,
+            systemAudio: systemAudio,
+            playback: FakePlaybackService(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
 
         await model.startMeeting(title: "Fallback", captureSystemAudio: true)
 
@@ -20,6 +26,46 @@ final class AppModelTests: XCTestCase {
         let storedMeetings = await repository.meetings()
         XCTAssertEqual(storedMeetings.first?.status, .completed)
         XCTAssertFalse(microphone.isRecording)
+    }
+
+    func testPlaybackResolvesFileInsideAudioDirectory() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "recording.m4a")
+        try Data([0]).write(to: fileURL)
+        let playback = FakePlaybackService()
+        let model = AppModel(
+            repository: InMemoryMeetingRepository(),
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: playback,
+            audioDirectory: directory
+        )
+        let recording = AudioRecordingReference(meetingID: UUID(), relativePath: "recording.m4a")
+
+        await model.togglePlayback(recording)
+
+        XCTAssertEqual(playback.playedURL, fileURL)
+        XCTAssertNil(model.errorMessage)
+        XCTAssertNil(model.playingRecordingID)
+    }
+
+    func testPlaybackRejectsPathTraversal() async {
+        let playback = FakePlaybackService()
+        let model = AppModel(
+            repository: InMemoryMeetingRepository(),
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: playback,
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        let recording = AudioRecordingReference(meetingID: UUID(), relativePath: "../outside.m4a")
+
+        await model.togglePlayback(recording)
+
+        XCTAssertNil(playback.playedURL)
+        XCTAssertNotNil(model.errorMessage)
     }
 }
 
@@ -61,4 +107,18 @@ private final class FailingSystemAudioService: SystemAudioCaptureService {
         case denied
         var errorDescription: String? { "System audio permission denied." }
     }
+}
+
+@MainActor
+private final class FakePlaybackService: AudioPlaybackService {
+    var isPlaying = false
+    var playedURL: URL?
+
+    func play(fileURL: URL) async throws {
+        playedURL = fileURL
+        isPlaying = true
+        isPlaying = false
+    }
+
+    func stop() { isPlaying = false }
 }

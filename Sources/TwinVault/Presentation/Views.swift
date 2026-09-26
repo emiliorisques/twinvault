@@ -107,6 +107,7 @@ struct RecordingView: View {
 }
 
 struct MeetingDetailView: View {
+    @Environment(AppModel.self) private var model
     let meeting: Meeting
 
     var body: some View {
@@ -120,7 +121,19 @@ struct MeetingDetailView: View {
                     Text("Not available").foregroundStyle(.secondary)
                 }
                 ForEach(meeting.audioRecordings) { recording in
-                    LabeledContent(recording.channel.displayName, value: recording.relativePath)
+                    HStack {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(recording.channel.displayName).fontWeight(.medium)
+                            Text(recording.relativePath).font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button(
+                            model.playingRecordingID == recording.id ? "Stop" : "Play",
+                            systemImage: model.playingRecordingID == recording.id ? "stop.fill" : "play.fill"
+                        ) {
+                            Task { await model.togglePlayback(recording) }
+                        }
+                    }
                 }
                 Divider()
                 Text("Notes").font(.title2.bold())

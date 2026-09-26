@@ -29,6 +29,8 @@ Metadata writes are atomic. Audio never leaves the device. Removing the applicat
 
 Phase 2B adds opt-in system audio capture through ScreenCaptureKit. System audio is written to a separate local M4A file; no screen output is registered and no video frames are stored. A permission or capture failure falls back to microphone-only recording. Transcription is not yet implemented.
 
+Meeting details provide local Play/Stop controls for each captured channel. Playback resolves only safe filenames inside the vault audio directory and never uploads media.
+
 ## Current boundaries
 
 `MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. `SpeechToTextProvider`, `DiarizationProvider`, and `SpeakerIdentificationProvider` are separate contracts; no implementation or model is selected. Structured memory, twins, external integrations, and AI inference remain absent.
