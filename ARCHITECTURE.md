@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2A foundation
+# TwinVault Architecture — Phase 2B system audio
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolves the data boundary for multiple audio channels and timestamped transcripts. No AI or network capability exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. No AI or network capability exists in the application.
 
 ## Boundaries
 
@@ -12,14 +12,17 @@ SwiftUI Views
     ▼
 AppModel (use-case coordination)
     ├── MeetingRepository protocol ── JSONMeetingRepository
-    └── AudioRecordingService protocol ── LocalAudioRecordingService
-             │
-             ▼
+    ├── AudioRecordingService ── LocalAudioRecordingService
+    └── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
+                    │
+                    ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
         RecordingSession, TranscriptSegment, provider protocols
 ```
 
 The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation, nor persistence format. UI mutation goes through `RecordingSession`, which owns meeting-state invariants. Actor-isolated persistence serializes all disk access. AVFoundation stays behind a main-actor service because microphone authorization and recording are UI-driven platform operations.
+
+System audio uses ScreenCaptureKit with only an `.audio` stream output. TwinVault does not register a `.screen` output, so captured video frames never enter the process or vault. The current application is excluded from its own audio capture. Audio is encoded as 48 kHz stereo AAC in a channel-specific M4A file. If ScreenCaptureKit authorization or startup fails, the meeting continues with microphone audio and surfaces a warning.
 
 ## ADR-001: versioned JSON before SQLite
 
@@ -48,10 +51,10 @@ Types crossing boundaries conform to `Sendable`. The repository is an actor. Pre
 
 ## Phase 2 next increment (not implemented)
 
-1. Implement `SystemAudioCaptureService` with ScreenCaptureKit's `.audio` output and explicit screen/audio-recording permission UX.
-2. Write the system channel to its own local file; never capture or persist video frames.
-3. Add cancellation, interruption, and channel-clock synchronization tests.
+1. Add capture interruption reporting and recoverable partial-file handling.
+2. Measure and persist the microphone/system channel clock offset.
+3. Add manual hardware fixtures for conferencing apps and multi-output devices.
 4. Benchmark an on-device transcription adapter behind `SpeechToTextProvider`.
 5. Move metadata and transcript persistence to SQLite before storing production transcripts.
 
-Speaker diarization and speaker identification remain distinct future boundaries and are not part of Phase 2 unless separately approved.
+Speaker diarization and speaker identification remain distinct boundaries. Only their contracts exist; model implementations are not part of this phase.

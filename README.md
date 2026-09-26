@@ -21,12 +21,13 @@ Runtime data is stored below `~/Library/Application Support/TwinVault/`:
 ```text
 TwinVault/
 ├── database/meetings-v1.json
-└── audio/<meeting UUID>.m4a
+├── audio/<meeting UUID>.m4a
+└── audio/<meeting UUID>-system.m4a
 ```
 
 Metadata writes are atomic. Audio never leaves the device. Removing the application does not currently erase the vault; export and verified deletion workflows are future security work.
 
-Phase 2A adds a backward-compatible multi-channel audio model and model-neutral transcript/provider contracts. It does not yet capture system audio or run transcription.
+Phase 2B adds opt-in system audio capture through ScreenCaptureKit. System audio is written to a separate local M4A file; no screen output is registered and no video frames are stored. A permission or capture failure falls back to microphone-only recording. Transcription is not yet implemented.
 
 ## Current boundaries
 

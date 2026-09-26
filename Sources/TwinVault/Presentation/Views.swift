@@ -48,17 +48,24 @@ struct NewMeetingView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
+    @State private var captureSystemAudio = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("New Meeting").font(.title2.bold())
             TextField("Meeting title", text: $title).textFieldStyle(.roundedBorder)
+            Toggle("Capture system audio", isOn: $captureSystemAudio)
+            if captureSystemAudio {
+                Text("macOS may request Screen & System Audio Recording permission. TwinVault does not capture or store video frames.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             HStack {
                 Spacer()
                 Button("Cancel") { dismiss() }
                 Button("Start Recording") {
                     dismiss()
-                    Task { await model.startMeeting(title: title) }
+                    Task { await model.startMeeting(title: title, captureSystemAudio: captureSystemAudio) }
                 }.buttonStyle(.borderedProminent)
             }
         }.padding(24).frame(width: 420)
