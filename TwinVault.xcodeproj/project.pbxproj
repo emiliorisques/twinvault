@@ -1,7 +1,8 @@
 // !$*UTF8*$!
 {
 	archiveVersion = 1;
-	classes = {};
+	classes = {
+	};
 	objectVersion = 56;
 	objects = {
 
@@ -25,7 +26,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
-		C10000000000000000000001 = {isa = PBXContainerItemProxy; containerPortal = D10000000000000000000001 /* Project object */; proxyType = 1; remoteGlobalIDString = E10000000000000000000001; remoteInfo = TwinVault; };
+		C10000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000000000000000000001;
+			remoteInfo = TwinVault;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -51,58 +58,364 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		F10000000000000000000001 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		F10000000000000000000002 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		F10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F10000000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		G10000000000000000000001 = {isa = PBXGroup; children = (G10000000000000000000002, G10000000000000000000007, G10000000000000000000008); sourceTree = "<group>"; };
-		G10000000000000000000002 /* TwinVault */ = {isa = PBXGroup; children = (G10000000000000000000003, G10000000000000000000004, G10000000000000000000005, G10000000000000000000006, B10000000000000000000009); name = TwinVault; path = Sources/TwinVault; sourceTree = "<group>"; };
-		G10000000000000000000003 /* Domain */ = {isa = PBXGroup; children = (B10000000000000000000001, B10000000000000000000002, B10000000000000000000003, B10000000000000000000015); path = Domain; sourceTree = "<group>"; };
-		G10000000000000000000004 /* Persistence */ = {isa = PBXGroup; children = (B10000000000000000000004, B10000000000000000000005); path = Persistence; sourceTree = "<group>"; };
-		G10000000000000000000005 /* Audio */ = {isa = PBXGroup; children = (B10000000000000000000006, B10000000000000000000016, B10000000000000000000019); path = Audio; sourceTree = "<group>"; };
-		G10000000000000000000006 /* Presentation */ = {isa = PBXGroup; children = (B10000000000000000000007, B10000000000000000000008); path = Presentation; sourceTree = "<group>"; };
-		G10000000000000000000007 /* Resources */ = {isa = PBXGroup; children = (B10000000000000000000012); path = Sources/TwinVault/Resources; sourceTree = "<group>"; };
-		G10000000000000000000008 /* Tests */ = {isa = PBXGroup; children = (B10000000000000000000010, B10000000000000000000011, B10000000000000000000017, B10000000000000000000018); path = Tests/TwinVaultTests; sourceTree = "<group>"; };
-		G10000000000000000000009 /* Products */ = {isa = PBXGroup; children = (B10000000000000000000013, B10000000000000000000014); name = Products; sourceTree = "<group>"; };
+		G10000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				G10000000000000000000002 /* TwinVault */,
+				G10000000000000000000007 /* Sources/TwinVault/Resources */,
+				G10000000000000000000008 /* Tests/TwinVaultTests */,
+				G10000000000000000000009 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		G10000000000000000000002 /* TwinVault */ = {
+			isa = PBXGroup;
+			children = (
+				G10000000000000000000003 /* Domain */,
+				G10000000000000000000004 /* Persistence */,
+				G10000000000000000000005 /* Audio */,
+				G10000000000000000000006 /* Presentation */,
+				B10000000000000000000009 /* TwinVaultApp.swift */,
+			);
+			name = TwinVault;
+			path = Sources/TwinVault;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000003 /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* Meeting.swift */,
+				B10000000000000000000002 /* MeetingRepository.swift */,
+				B10000000000000000000003 /* RecordingSession.swift */,
+				B10000000000000000000015 /* Transcript.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000004 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000004 /* VaultPaths.swift */,
+				B10000000000000000000005 /* JSONMeetingRepository.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000005 /* Audio */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000006 /* AudioRecordingService.swift */,
+				B10000000000000000000016 /* SystemAudioCaptureService.swift */,
+				B10000000000000000000019 /* AudioPlaybackService.swift */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000006 /* Presentation */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000007 /* AppModel.swift */,
+				B10000000000000000000008 /* Views.swift */,
+			);
+			path = Presentation;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000007 /* Sources/TwinVault/Resources */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000012 /* Info.plist */,
+			);
+			path = Sources/TwinVault/Resources;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000008 /* Tests/TwinVaultTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000010 /* RecordingSessionTests.swift */,
+				B10000000000000000000011 /* JSONMeetingRepositoryTests.swift */,
+				B10000000000000000000017 /* TranscriptTests.swift */,
+				B10000000000000000000018 /* AppModelTests.swift */,
+			);
+			path = Tests/TwinVaultTests;
+			sourceTree = "<group>";
+		};
+		G10000000000000000000009 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000013 /* TwinVault.app */,
+				B10000000000000000000014 /* TwinVaultTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		E10000000000000000000001 /* TwinVault */ = {isa = PBXNativeTarget; buildConfigurationList = H10000000000000000000002; buildPhases = (I10000000000000000000001, F10000000000000000000001, J10000000000000000000001); buildRules = (); dependencies = (); name = TwinVault; productName = TwinVault; productReference = B10000000000000000000013; productType = "com.apple.product-type.application"; };
-		E10000000000000000000002 /* TwinVaultTests */ = {isa = PBXNativeTarget; buildConfigurationList = H10000000000000000000003; buildPhases = (I10000000000000000000002, F10000000000000000000002, J10000000000000000000002); buildRules = (); dependencies = (K10000000000000000000001); name = TwinVaultTests; productName = TwinVaultTests; productReference = B10000000000000000000014; productType = "com.apple.product-type.bundle.unit-test"; };
+		E10000000000000000000001 /* TwinVault */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H10000000000000000000002 /* Build configuration list for PBXNativeTarget "TwinVault" */;
+			buildPhases = (
+				I10000000000000000000001 /* Sources */,
+				F10000000000000000000001 /* Frameworks */,
+				J10000000000000000000001 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = TwinVault;
+			productName = TwinVault;
+			productReference = B10000000000000000000013 /* TwinVault.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E10000000000000000000002 /* TwinVaultTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H10000000000000000000003 /* Build configuration list for PBXNativeTarget "TwinVaultTests" */;
+			buildPhases = (
+				I10000000000000000000002 /* Sources */,
+				F10000000000000000000002 /* Frameworks */,
+				J10000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				K10000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = TwinVaultTests;
+			productName = TwinVaultTests;
+			productReference = B10000000000000000000014 /* TwinVaultTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		D10000000000000000000001 /* Project object */ = {isa = PBXProject; attributes = {BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2700; LastUpgradeCheck = 2700; TargetAttributes = {E10000000000000000000001 = {CreatedOnToolsVersion = 27.0; }; E10000000000000000000002 = {CreatedOnToolsVersion = 27.0; TestTargetID = E10000000000000000000001; }; }; }; buildConfigurationList = H10000000000000000000001; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base); mainGroup = G10000000000000000000001; productRefGroup = G10000000000000000000009; projectDirPath = ""; projectRoot = ""; targets = (E10000000000000000000001, E10000000000000000000002); };
+		D10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					E10000000000000000000001 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					E10000000000000000000002 = {
+						CreatedOnToolsVersion = 27.0;
+						TestTargetID = E10000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = H10000000000000000000001 /* Build configuration list for PBXProject "TwinVault" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = G10000000000000000000001;
+			productRefGroup = G10000000000000000000009 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000000000000000000001 /* TwinVault */,
+				E10000000000000000000002 /* TwinVaultTests */,
+			);
+		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		J10000000000000000000001 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
-		J10000000000000000000002 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		J10000000000000000000001 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		J10000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		I10000000000000000000001 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000001, A10000000000000000000002, A10000000000000000000003, A10000000000000000000004, A10000000000000000000005, A10000000000000000000006, A10000000000000000000007, A10000000000000000000008, A10000000000000000000009, A10000000000000000000012, A10000000000000000000013, A10000000000000000000016); runOnlyForDeploymentPostprocessing = 0; };
-		I10000000000000000000002 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000010, A10000000000000000000011, A10000000000000000000014, A10000000000000000000015); runOnlyForDeploymentPostprocessing = 0; };
+		I10000000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* Meeting.swift in Sources */,
+				A10000000000000000000002 /* MeetingRepository.swift in Sources */,
+				A10000000000000000000003 /* RecordingSession.swift in Sources */,
+				A10000000000000000000004 /* VaultPaths.swift in Sources */,
+				A10000000000000000000005 /* JSONMeetingRepository.swift in Sources */,
+				A10000000000000000000006 /* AudioRecordingService.swift in Sources */,
+				A10000000000000000000007 /* AppModel.swift in Sources */,
+				A10000000000000000000008 /* Views.swift in Sources */,
+				A10000000000000000000009 /* TwinVaultApp.swift in Sources */,
+				A10000000000000000000012 /* Transcript.swift in Sources */,
+				A10000000000000000000013 /* SystemAudioCaptureService.swift in Sources */,
+				A10000000000000000000016 /* AudioPlaybackService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		I10000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000010 /* RecordingSessionTests.swift in Sources */,
+				A10000000000000000000011 /* JSONMeetingRepositoryTests.swift in Sources */,
+				A10000000000000000000014 /* TranscriptTests.swift in Sources */,
+				A10000000000000000000015 /* AppModelTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
-		K10000000000000000000001 = {isa = PBXTargetDependency; target = E10000000000000000000001; targetProxy = C10000000000000000000001; };
+		K10000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000000000000000000001 /* TwinVault */;
+			targetProxy = C10000000000000000000001 /* PBXContainerItemProxy */;
+		};
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
-		L10000000000000000000001 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; SWIFT_VERSION = 6.0; }; name = Debug; };
-		L10000000000000000000002 = {isa = XCBuildConfiguration; buildSettings = {CLANG_ENABLE_MODULES = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; SDKROOT = macosx; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; SWIFT_VERSION = 6.0; }; name = Release; };
-		L10000000000000000000003 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; CURRENT_PROJECT_VERSION = 1; ENABLE_TESTABILITY = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Sources/TwinVault/Resources/Info.plist; MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_OPTIMIZATION_LEVEL = "-Onone"; }; name = Debug; };
-		L10000000000000000000004 = {isa = XCBuildConfiguration; buildSettings = {CODE_SIGN_STYLE = Automatic; COMBINE_HIDPI_IMAGES = YES; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = Sources/TwinVault/Resources/Info.plist; MARKETING_VERSION = 0.1.0; CURRENT_PROJECT_VERSION = 1; PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_EMIT_LOC_STRINGS = YES; }; name = Release; };
-		L10000000000000000000005 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TwinVault.app/Contents/MacOS/TwinVault"; }; name = Debug; };
-		L10000000000000000000006 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; CODE_SIGN_STYLE = Automatic; GENERATE_INFOPLIST_FILE = YES; MACOSX_DEPLOYMENT_TARGET = 15.0; PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TwinVault.app/Contents/MacOS/TwinVault"; }; name = Release; };
+		L10000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		L10000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		L10000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LWZCX9MK4M;
+				ENABLE_TESTABILITY = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/TwinVault/Resources/Info.plist;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		L10000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = LWZCX9MK4M;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/TwinVault/Resources/Info.plist;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+			};
+			name = Release;
+		};
+		L10000000000000000000005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = LWZCX9MK4M;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TwinVault.app/Contents/MacOS/TwinVault";
+			};
+			name = Debug;
+		};
+		L10000000000000000000006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = LWZCX9MK4M;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.twinvault.app.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TwinVault.app/Contents/MacOS/TwinVault";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		H10000000000000000000001 = {isa = XCConfigurationList; buildConfigurations = (L10000000000000000000001, L10000000000000000000002); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		H10000000000000000000002 = {isa = XCConfigurationList; buildConfigurations = (L10000000000000000000003, L10000000000000000000004); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
-		H10000000000000000000003 = {isa = XCConfigurationList; buildConfigurations = (L10000000000000000000005, L10000000000000000000006); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		H10000000000000000000001 /* Build configuration list for PBXProject "TwinVault" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				L10000000000000000000001 /* Debug */,
+				L10000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H10000000000000000000002 /* Build configuration list for PBXNativeTarget "TwinVault" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				L10000000000000000000003 /* Debug */,
+				L10000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H10000000000000000000003 /* Build configuration list for PBXNativeTarget "TwinVaultTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				L10000000000000000000005 /* Debug */,
+				L10000000000000000000006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 	};
 	rootObject = D10000000000000000000001 /* Project object */;
