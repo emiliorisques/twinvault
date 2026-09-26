@@ -61,7 +61,7 @@ final class TranscriptTests: XCTestCase {
             _ = try await provider.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
                 recordings: [recording],
-                localeIdentifier: "es-ES"
+                localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
             ))
             XCTFail("Path traversal must be rejected")
         } catch LocalTranscriptionError.invalidRecordingReference {
@@ -69,5 +69,62 @@ final class TranscriptTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error: \(error)")
         }
+    }
+
+    func testDefaultMeetingLanguagesAreSpanishCatalanAndEnglish() {
+        XCTAssertEqual(
+            Meeting(title: "Languages").transcriptionLocaleIdentifiers,
+            ["es-ES", "ca-ES", "en-US"]
+        )
+    }
+
+    func testMultilingualSelectorKeepsHighestConfidenceForOverlappingAudio() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let candidates = [
+            candidate(meetingID, recordingID, 0, 1, "Buenos días", 0.71, "es-ES"),
+            candidate(meetingID, recordingID, 0.05, 1.05, "Bon dia", 0.94, "ca-ES"),
+            candidate(meetingID, recordingID, 0, 1, "Good morning", 0.42, "en-US"),
+            candidate(meetingID, recordingID, 2, 3, "Next point", 0.90, "en-US")
+        ]
+
+        let selected = MultilingualTranscriptSelector.select(
+            candidates: candidates,
+            preferredLocaleIdentifiers: Meeting.defaultTranscriptionLocaleIdentifiers
+        )
+
+        XCTAssertEqual(selected.map(\.text), ["Bon dia", "Next point"])
+        XCTAssertEqual(selected.map(\.localeIdentifier), ["ca-ES", "en-US"])
+    }
+
+    func testMultilingualSelectorCoalescesAdjacentSameLanguage() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let selected = MultilingualTranscriptSelector.select(
+            candidates: [
+                candidate(meetingID, recordingID, 0, 1, "Hello", 0.9, "en-US"),
+                candidate(meetingID, recordingID, 1.2, 2, "everyone.", 0.8, "en-US")
+            ],
+            preferredLocaleIdentifiers: Meeting.defaultTranscriptionLocaleIdentifiers
+        )
+
+        XCTAssertEqual(selected.count, 1)
+        XCTAssertEqual(selected.first?.text, "Hello everyone.")
+        XCTAssertEqual(selected.first?.startTime, 0)
+        XCTAssertEqual(selected.first?.endTime, 2)
+    }
+
+    private func candidate(
+        _ meetingID: UUID, _ recordingID: UUID,
+        _ start: TimeInterval, _ end: TimeInterval,
+        _ text: String, _ confidence: Double, _ locale: String
+    ) -> TranscriptSegment {
+        TranscriptSegment(
+            meetingID: meetingID, startTime: start, endTime: end,
+            text: text, confidence: confidence,
+            sourceRecordingID: recordingID,
+            providerIdentifier: "test.multilingual",
+            localeIdentifier: locale
+        )
     }
 }

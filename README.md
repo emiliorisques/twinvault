@@ -1,6 +1,6 @@
 # TwinVault
 
-TwinVault is a native, local-first macOS meeting memory application. It records meeting audio, keeps notes and important timestamps inspectable on-device, and can transcribe a selected local audio channel using Apple's on-device speech model. It has no cloud AI, analytics, or audio upload.
+TwinVault is a native, local-first macOS meeting memory application. It records meeting audio, keeps notes and important timestamps inspectable on-device, and can transcribe a selected local audio channel using Apple's on-device speech models. It has no cloud AI, analytics, or audio upload.
 
 ## Current capabilities
 
@@ -9,6 +9,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Capture a simple note and important moments while recording.
 - Store audio separately from versioned meeting metadata.
 - Browse previous meetings and inspect notes, timestamps, and audio status.
+- Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
 
 ## Development
 
@@ -31,7 +32,9 @@ Phase 2B adds opt-in system audio capture through ScreenCaptureKit. System audio
 
 Meeting details provide local Play/Stop controls for each captured channel. Playback resolves only safe filenames inside the vault audio directory and never uploads media.
 
-Phase 2C adds post-meeting transcription through `SpeechAnalyzer` and `SpeechTranscriber` on macOS 26+. The user explicitly chooses the microphone or system-audio recording to transcribe. Apple may download the selected language model once through the system-managed `AssetInventory`; recorded audio remains on-device. Timestamped segments persist with the source recording ID, provider ID, and locale.
+Phase 2C adds post-meeting transcription through `SpeechAnalyzer` and `SpeechTranscriber` on macOS 26+. The user explicitly chooses the microphone or system-audio recording to transcribe. Apple may download the selected language models once through the system-managed `AssetInventory`; recorded audio remains on-device. Timestamped segments persist with the source recording ID, provider ID, and locale.
+
+Phase 2D enables `es-ES`, `ca-ES`, and `en-US` for every meeting by default. Apple Speech exposes one locale per transcriber, so the current adapter processes the same audio with three locale-specific transcribers and retains the strongest non-overlapping hypotheses using Apple's confidence metadata. This is a replaceable, deliberately isolated heuristic: mixed-language accuracy and energy use must be benchmarked with consented fixtures before production use. If any required locale is unavailable on the current macOS installation, TwinVault reports the unsupported locale rather than silently dropping a language.
 
 ## Current boundaries
 

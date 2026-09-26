@@ -169,7 +169,7 @@ private struct FakeSpeechToTextProvider: SpeechToTextProvider {
             text: "Test transcript",
             sourceRecordingID: recording.id,
             providerIdentifier: identifier,
-            localeIdentifier: request.localeIdentifier
+            localeIdentifier: request.localeIdentifiers.first
         )]
     }
 }

@@ -116,6 +116,10 @@ struct MeetingDetailView: View {
                 Text(meeting.title).font(.largeTitle.bold())
                 LabeledContent("Started", value: meeting.startDate.formatted(date: .long, time: .shortened))
                 LabeledContent("Duration", value: duration(meeting.duration))
+                LabeledContent(
+                    "Transcription Languages",
+                    value: meeting.transcriptionLocaleIdentifiers.map(languageLabel).joined(separator: " · ")
+                )
                 Text("Audio Channels").font(.title2.bold())
                 if meeting.audioRecordings.isEmpty {
                     Text("Not available").foregroundStyle(.secondary)
@@ -161,6 +165,9 @@ struct MeetingDetailView: View {
                                    let channel = meeting.audioRecordings.first(where: { $0.id == recordingID })?.channel {
                                     Text(channel.displayName)
                                 }
+                                if let localeIdentifier = segment.localeIdentifier {
+                                    Text(languageLabel(localeIdentifier)).fontWeight(.semibold)
+                                }
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -186,4 +193,8 @@ struct MeetingDetailView: View {
 private func duration(_ interval: TimeInterval) -> String {
     let seconds = max(0, Int(interval))
     return String(format: "%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+}
+
+private func languageLabel(_ localeIdentifier: String) -> String {
+    localeIdentifier.split(separator: "-").first.map { String($0).uppercased() } ?? localeIdentifier
 }

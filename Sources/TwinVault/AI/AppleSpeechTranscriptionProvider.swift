@@ -52,28 +52,49 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
         }
 
         let fileURL = try validatedURL(for: recording)
-        let requestedLocale = Locale(identifier: request.localeIdentifier ?? Locale.current.identifier)
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) else {
-            throw LocalTranscriptionError.localeUnsupported(requestedLocale.identifier)
+        var resolvedLocales: [Locale] = []
+        var unsupportedIdentifiers: [String] = []
+        for identifier in request.localeIdentifiers {
+            let requestedLocale = Locale(identifier: identifier)
+            if let locale = await SpeechTranscriber.supportedLocale(equivalentTo: requestedLocale) {
+                if !resolvedLocales.contains(where: { $0.identifier == locale.identifier }) {
+                    resolvedLocales.append(locale)
+                }
+            } else {
+                unsupportedIdentifiers.append(identifier)
+            }
         }
+        guard unsupportedIdentifiers.isEmpty else {
+            throw LocalTranscriptionError.localeUnsupported(unsupportedIdentifiers.joined(separator: ", "))
+        }
+        guard !resolvedLocales.isEmpty else { throw LocalTranscriptionError.localeUnsupported("requested") }
 
-        let transcriber = SpeechTranscriber(
-            locale: locale,
-            transcriptionOptions: [],
-            reportingOptions: [],
-            attributeOptions: [.audioTimeRange, .transcriptionConfidence]
-        )
-        try await ensureModel(for: transcriber, locale: locale)
+        let transcribers = resolvedLocales.map { locale in
+            (
+                locale: locale,
+                transcriber: SpeechTranscriber(
+                    locale: locale,
+                    transcriptionOptions: [],
+                    reportingOptions: [],
+                    attributeOptions: [.audioTimeRange, .transcriptionConfidence]
+                )
+            )
+        }
+        try await ensureModels(for: transcribers.map(\.transcriber), locales: resolvedLocales)
 
         let audioFile = try AVAudioFile(forReading: fileURL)
-        let analyzer = SpeechAnalyzer(modules: [transcriber])
-        async let collected = Self.collectResults(
-            from: transcriber,
-            meetingID: request.meetingID,
-            recordingID: recording.id,
-            providerIdentifier: identifier,
-            localeIdentifier: locale.identifier
-        )
+        let analyzer = SpeechAnalyzer(modules: transcribers.map(\.transcriber))
+        let collectionTasks = transcribers.map { configuration in
+            Task {
+                try await Self.collectResults(
+                    from: configuration.transcriber,
+                    meetingID: request.meetingID,
+                    recordingID: recording.id,
+                    providerIdentifier: identifier,
+                    localeIdentifier: configuration.locale.identifier
+                )
+            }
+        }
 
         do {
             if let finalTime = try await analyzer.analyzeSequence(from: audioFile) {
@@ -81,12 +102,19 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
             } else {
                 await analyzer.cancelAndFinishNow()
             }
-            let segments = try await collected
-            guard !segments.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
-            return segments
+            var candidates: [TranscriptSegment] = []
+            for task in collectionTasks {
+                candidates.append(contentsOf: try await task.value)
+            }
+            let selected = MultilingualTranscriptSelector.select(
+                candidates: candidates,
+                preferredLocaleIdentifiers: resolvedLocales.map(\.identifier)
+            )
+            guard !selected.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
+            return selected
         } catch {
             await analyzer.cancelAndFinishNow()
-            _ = try? await collected
+            collectionTasks.forEach { $0.cancel() }
             throw error
         }
     }
@@ -107,15 +135,15 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
     }
 
     @available(macOS 26.0, *)
-    private func ensureModel(for transcriber: SpeechTranscriber, locale: Locale) async throws {
-        let modules: [any SpeechModule] = [transcriber]
+    private func ensureModels(for transcribers: [SpeechTranscriber], locales: [Locale]) async throws {
+        let modules: [any SpeechModule] = transcribers
         if await AssetInventory.status(forModules: modules) == .installed { return }
 
         if let installation = try await AssetInventory.assetInstallationRequest(supporting: modules) {
             try await installation.downloadAndInstall()
         }
         guard await AssetInventory.status(forModules: modules) == .installed else {
-            throw LocalTranscriptionError.modelUnavailable(locale.identifier)
+            throw LocalTranscriptionError.modelUnavailable(locales.map(\.identifier).joined(separator: ", "))
         }
     }
 
@@ -131,13 +159,15 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
         for try await result in transcriber.results {
             let text = String(result.text.characters).trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { continue }
-            let start = result.range.start.seconds
-            let end = result.range.end.seconds
+            let attributedRange = result.text.audioTimeRange ?? result.range
+            let start = attributedRange.start.seconds
+            let end = attributedRange.end.seconds
             segments.append(TranscriptSegment(
                 meetingID: meetingID,
                 startTime: start.isFinite ? start : 0,
                 endTime: end.isFinite ? end : 0,
                 text: text,
+                confidence: result.text.transcriptionConfidence,
                 sourceRecordingID: recordingID,
                 providerIdentifier: providerIdentifier,
                 localeIdentifier: localeIdentifier

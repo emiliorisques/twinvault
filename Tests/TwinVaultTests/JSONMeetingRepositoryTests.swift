@@ -63,10 +63,11 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let storedMeeting = try await repository.meeting(id: meetingID)
         let loaded = try XCTUnwrap(storedMeeting)
         XCTAssertEqual(loaded.audioRecordings.first?.channel, .microphone)
+        XCTAssertEqual(loaded.transcriptionLocaleIdentifiers, ["es-ES", "ca-ES", "en-US"])
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 3)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 4)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -82,12 +83,15 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         )
         let meeting = Meeting(
             id: meetingID, title: "Stored transcript",
-            transcriptSegments: [segment], status: .completed
+            transcriptSegments: [segment],
+            transcriptionLocaleIdentifiers: ["ca-ES", "en-US"],
+            status: .completed
         )
 
         try await repository.save(meeting)
         let loaded = try await repository.meeting(id: meetingID)
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
+        XCTAssertEqual(loaded?.transcriptionLocaleIdentifiers, ["ca-ES", "en-US"])
     }
 }

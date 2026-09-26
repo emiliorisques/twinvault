@@ -38,7 +38,17 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
 struct TranscriptionRequest: Sendable {
     let meetingID: UUID
     let recordings: [AudioRecordingReference]
-    let localeIdentifier: String?
+    let localeIdentifiers: [String]
+
+    init(
+        meetingID: UUID,
+        recordings: [AudioRecordingReference],
+        localeIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers
+    ) {
+        self.meetingID = meetingID
+        self.recordings = recordings
+        self.localeIdentifiers = localeIdentifiers
+    }
 }
 
 protocol SpeechToTextProvider: Sendable {

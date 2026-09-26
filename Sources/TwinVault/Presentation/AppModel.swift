@@ -127,7 +127,7 @@ final class AppModel {
             let segments = try await speechToText.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
                 recordings: [recording],
-                localeIdentifier: Locale.current.identifier
+                localeIdentifiers: meeting.transcriptionLocaleIdentifiers
             ))
             meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
             meeting.transcriptSegments.append(contentsOf: segments)

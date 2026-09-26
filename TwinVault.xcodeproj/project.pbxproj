@@ -24,6 +24,7 @@
 		A10000000000000000000015 /* AppModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* AppModelTests.swift */; };
 		A10000000000000000000016 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* AudioPlaybackService.swift */; };
 		A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */; };
+		A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MultilingualTranscriptSelector.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -57,6 +58,7 @@
 		B10000000000000000000018 /* AppModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModelTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* AudioPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackService.swift; sourceTree = "<group>"; };
 		B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* MultilingualTranscriptSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultilingualTranscriptSelector.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -144,6 +146,7 @@
 			isa = PBXGroup;
 			children = (
 				B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */,
+				B10000000000000000000021 /* MultilingualTranscriptSelector.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -287,6 +290,7 @@
 				A10000000000000000000013 /* SystemAudioCaptureService.swift in Sources */,
 				A10000000000000000000016 /* AudioPlaybackService.swift in Sources */,
 				A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */,
+				A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
