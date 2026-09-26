@@ -166,6 +166,7 @@ final class AppModel {
     }
 
     private static func languageLabel(_ identifier: String) -> String {
-        identifier.split(separator: "-").first.map { String($0).uppercased() } ?? identifier
+        identifier.split(whereSeparator: { $0 == "-" || $0 == "_" })
+            .first.map { String($0).uppercased() } ?? identifier
     }
 }

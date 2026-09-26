@@ -8,7 +8,8 @@ enum MultilingualTranscriptSelector {
         preferredLocaleIdentifiers: [String]
     ) -> [TranscriptSegment] {
         let priority = preferredLocaleIdentifiers.enumerated().reduce(into: [String: Int]()) {
-            $0[$1.element, default: $1.offset] = min($0[$1.element, default: $1.offset], $1.offset)
+            let identifier = canonicalLocaleIdentifier($1.element)
+            $0[identifier, default: $1.offset] = min($0[identifier, default: $1.offset], $1.offset)
         }
         let ranked = candidates
             .filter { !$0.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -16,8 +17,8 @@ enum MultilingualTranscriptSelector {
                 let leftConfidence = $0.confidence ?? 0
                 let rightConfidence = $1.confidence ?? 0
                 if leftConfidence != rightConfidence { return leftConfidence > rightConfidence }
-                return (priority[$0.localeIdentifier ?? ""] ?? .max)
-                    < (priority[$1.localeIdentifier ?? ""] ?? .max)
+                return (priority[canonicalLocaleIdentifier($0.localeIdentifier ?? "")] ?? .max)
+                    < (priority[canonicalLocaleIdentifier($1.localeIdentifier ?? "")] ?? .max)
             }
 
         var selected: [TranscriptSegment] = []
@@ -81,5 +82,9 @@ enum MultilingualTranscriptSelector {
         guard let first = right.first else { return left }
         let noLeadingSpace = first.isPunctuation || first == "’" || first == "'"
         return left + (noLeadingSpace ? "" : " ") + right
+    }
+
+    private static func canonicalLocaleIdentifier(_ identifier: String) -> String {
+        identifier.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 }

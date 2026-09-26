@@ -117,7 +117,7 @@ final class AppModelTests: XCTestCase {
             audio: FakeMicrophoneService(),
             systemAudio: FailingSystemAudioService(),
             playback: FakePlaybackService(),
-            speechToText: FakeSpeechToTextProvider(unavailableLocaleIdentifiers: ["ca-ES"]),
+            speechToText: FakeSpeechToTextProvider(unavailableLocaleIdentifiers: ["ca_ES"]),
             audioDirectory: FileManager.default.temporaryDirectory
         )
         await model.load()

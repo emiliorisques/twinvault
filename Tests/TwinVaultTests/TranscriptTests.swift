@@ -83,7 +83,7 @@ final class TranscriptTests: XCTestCase {
         let recordingID = UUID()
         let candidates = [
             candidate(meetingID, recordingID, 0, 1, "Buenos días", 0.71, "es-ES"),
-            candidate(meetingID, recordingID, 0.05, 1.05, "Bon dia", 0.94, "ca-ES"),
+            candidate(meetingID, recordingID, 0.05, 1.05, "Bon dia", 0.94, "ca_ES"),
             candidate(meetingID, recordingID, 0, 1, "Good morning", 0.42, "en-US"),
             candidate(meetingID, recordingID, 2, 3, "Next point", 0.90, "en-US")
         ]
@@ -94,7 +94,7 @@ final class TranscriptTests: XCTestCase {
         )
 
         XCTAssertEqual(selected.map(\.text), ["Bon dia", "Next point"])
-        XCTAssertEqual(selected.map(\.localeIdentifier), ["ca-ES", "en-US"])
+        XCTAssertEqual(selected.map(\.localeIdentifier), ["ca_ES", "en-US"])
     }
 
     func testMultilingualSelectorCoalescesAdjacentSameLanguage() {

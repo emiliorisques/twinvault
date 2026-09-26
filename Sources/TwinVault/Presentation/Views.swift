@@ -196,5 +196,6 @@ private func duration(_ interval: TimeInterval) -> String {
 }
 
 private func languageLabel(_ localeIdentifier: String) -> String {
-    localeIdentifier.split(separator: "-").first.map { String($0).uppercased() } ?? localeIdentifier
+    localeIdentifier.split(whereSeparator: { $0 == "-" || $0 == "_" })
+        .first.map { String($0).uppercased() } ?? localeIdentifier
 }
