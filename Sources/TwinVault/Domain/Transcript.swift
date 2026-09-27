@@ -67,7 +67,17 @@ struct TranscriptionOutput: Equatable, Sendable {
 
 protocol SpeechToTextProvider: Sendable {
     var identifier: String { get }
+    var displayName: String { get }
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput
+}
+
+extension SpeechToTextProvider {
+    var displayName: String { identifier }
+}
+
+struct SpeechToTextProviderOption: Identifiable, Equatable, Sendable {
+    let id: String
+    let displayName: String
 }
 
 struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {

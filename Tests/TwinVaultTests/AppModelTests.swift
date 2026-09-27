@@ -128,6 +128,39 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments.count, 1)
         XCTAssertEqual(model.errorMessage, "Transcription completed, but these language models were unavailable: CA. You can try again later.")
     }
+
+    func testExplicitlySelectedTranscriptionProviderIsUsed() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Provider selection",
+            audioRecordings: [recording],
+            status: .completed
+        ))
+        let first = FakeSpeechToTextProvider(identifier: "test.first", transcript: "First")
+        let selected = FakeSpeechToTextProvider(identifier: "test.selected", transcript: "Selected")
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToTextProviders: [first, selected],
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.transcribe(
+            meetingID: meetingID,
+            recordingID: recording.id,
+            providerIdentifier: selected.identifier
+        )
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments.first?.text, "Selected")
+        XCTAssertEqual(stored?.transcriptSegments.first?.providerIdentifier, "test.selected")
+    }
 }
 
 private actor InMemoryMeetingRepository: MeetingRepository {
@@ -190,8 +223,19 @@ private final class FakePlaybackService: AudioPlaybackService {
 }
 
 private struct FakeSpeechToTextProvider: SpeechToTextProvider {
-    let identifier = "test.speech"
-    var unavailableLocaleIdentifiers: [String] = []
+    let identifier: String
+    let transcript: String
+    let unavailableLocaleIdentifiers: [String]
+
+    init(
+        identifier: String = "test.speech",
+        transcript: String = "Test transcript",
+        unavailableLocaleIdentifiers: [String] = []
+    ) {
+        self.identifier = identifier
+        self.transcript = transcript
+        self.unavailableLocaleIdentifiers = unavailableLocaleIdentifiers
+    }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
         let recording = try XCTUnwrap(request.recordings.first)
@@ -199,7 +243,7 @@ private struct FakeSpeechToTextProvider: SpeechToTextProvider {
             meetingID: request.meetingID,
             startTime: 1,
             endTime: 2,
-            text: "Test transcript",
+            text: transcript,
             sourceRecordingID: recording.id,
             providerIdentifier: identifier,
             localeIdentifier: request.localeIdentifiers.first

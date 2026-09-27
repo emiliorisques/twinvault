@@ -11,13 +11,17 @@ struct TwinVaultApplication: App {
             let audio = LocalAudioRecordingService(audioDirectory: paths.audioDirectory)
             let systemAudio = ScreenCaptureSystemAudioService(audioDirectory: paths.audioDirectory)
             let playback = LocalAudioPlaybackService()
-            let speechToText = AppleSpeechTranscriptionProvider(audioDirectory: paths.audioDirectory)
+            let whisperKit = WhisperKitSpeechToTextProvider(
+                audioDirectory: paths.audioDirectory,
+                modelsDirectory: paths.modelsDirectory
+            )
+            let appleSpeech = AppleSpeechTranscriptionProvider(audioDirectory: paths.audioDirectory)
             _model = State(initialValue: AppModel(
                 repository: repository,
                 audio: audio,
                 systemAudio: systemAudio,
                 playback: playback,
-                speechToText: speechToText,
+                speechToTextProviders: [whisperKit, appleSpeech],
                 audioDirectory: paths.audioDirectory
             ))
         } catch {

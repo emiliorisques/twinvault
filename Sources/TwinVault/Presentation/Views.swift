@@ -146,14 +146,27 @@ struct MeetingDetailView: View {
                             ProgressView().controlSize(.small)
                             Text("Transcribing…").foregroundStyle(.secondary)
                         } else {
-                            Button(
-                                meeting.transcriptSegments.contains { $0.sourceRecordingID == recording.id }
-                                    ? "Transcribe Again" : "Transcribe",
-                                systemImage: "text.bubble"
-                            ) {
-                                Task { await model.transcribe(meetingID: meeting.id, recordingID: recording.id) }
+                            Menu {
+                                ForEach(model.transcriptionProviderOptions) { provider in
+                                    Button(provider.displayName) {
+                                        Task {
+                                            await model.transcribe(
+                                                meetingID: meeting.id,
+                                                recordingID: recording.id,
+                                                providerIdentifier: provider.id
+                                            )
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Label(
+                                    meeting.transcriptSegments.contains { $0.sourceRecordingID == recording.id }
+                                        ? "Transcribe Again" : "Transcribe",
+                                    systemImage: "text.bubble"
+                                )
                             }
                             .disabled(model.transcribingRecordingID != nil)
+                            .help("WhisperKit downloads its local multilingual model on first use; Apple Speech uses system-managed language assets.")
                         }
                     }
                 }

@@ -35,6 +35,7 @@ enum LocalTranscriptionError: LocalizedError {
 /// Audio never leaves the device. Apple may download and manage a language model.
 actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
     nonisolated let identifier = "apple.speech-transcriber"
+    nonisolated let displayName = "Apple Speech"
     private let audioDirectory: URL
     private let fileManager: FileManager
 

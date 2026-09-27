@@ -7,12 +7,13 @@ final class AppModel {
     private let audio: any AudioRecordingService
     private let systemAudio: any SystemAudioCaptureService
     private let playback: any AudioPlaybackService
-    private let speechToText: any SpeechToTextProvider
+    private let speechToTextProviders: [String: any SpeechToTextProvider]
     private let audioDirectory: URL
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
     private(set) var transcribingRecordingID: UUID?
+    let transcriptionProviderOptions: [SpeechToTextProviderOption]
     var errorMessage: String?
 
     init(
@@ -27,7 +28,34 @@ final class AppModel {
         self.audio = audio
         self.systemAudio = systemAudio
         self.playback = playback
-        self.speechToText = speechToText
+        self.speechToTextProviders = [speechToText.identifier: speechToText]
+        self.transcriptionProviderOptions = [SpeechToTextProviderOption(
+            id: speechToText.identifier,
+            displayName: speechToText.displayName
+        )]
+        self.audioDirectory = audioDirectory
+    }
+
+    init(
+        repository: any MeetingRepository,
+        audio: any AudioRecordingService,
+        systemAudio: any SystemAudioCaptureService,
+        playback: any AudioPlaybackService,
+        speechToTextProviders: [any SpeechToTextProvider],
+        audioDirectory: URL
+    ) {
+        precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
+        self.repository = repository
+        self.audio = audio
+        self.systemAudio = systemAudio
+        self.playback = playback
+        self.speechToTextProviders = Dictionary(
+            speechToTextProviders.map { ($0.identifier, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        self.transcriptionProviderOptions = speechToTextProviders.map {
+            SpeechToTextProviderOption(id: $0.identifier, displayName: $0.displayName)
+        }
         self.audioDirectory = audioDirectory
     }
 
@@ -119,11 +147,21 @@ final class AppModel {
         playingRecordingID = nil
     }
 
-    func transcribe(meetingID: UUID, recordingID: UUID) async {
+    func transcribe(
+        meetingID: UUID,
+        recordingID: UUID,
+        providerIdentifier: String? = nil
+    ) async {
         guard transcribingRecordingID == nil else { return }
         guard var meeting = meetings.first(where: { $0.id == meetingID }),
               let recording = meeting.audioRecordings.first(where: { $0.id == recordingID }) else {
             errorMessage = LocalTranscriptionError.noRecording.localizedDescription
+            return
+        }
+
+        let selectedIdentifier = providerIdentifier ?? transcriptionProviderOptions[0].id
+        guard let speechToText = speechToTextProviders[selectedIdentifier] else {
+            errorMessage = "The selected transcription provider is unavailable."
             return
         }
 

@@ -4,6 +4,7 @@ struct VaultPaths: Sendable {
     let root: URL
     var databaseDirectory: URL { root.appending(path: "database", directoryHint: .isDirectory) }
     var audioDirectory: URL { root.appending(path: "audio", directoryHint: .isDirectory) }
+    var modelsDirectory: URL { root.appending(path: "models", directoryHint: .isDirectory) }
     var meetingStore: URL { databaseDirectory.appending(path: "meetings-v1.json") }
 
     static func applicationDefault(fileManager: FileManager = .default) throws -> VaultPaths {
@@ -19,5 +20,6 @@ struct VaultPaths: Sendable {
     func prepare(fileManager: FileManager = .default) throws {
         try fileManager.createDirectory(at: databaseDirectory, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: audioDirectory, withIntermediateDirectories: true)
+        try fileManager.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
     }
 }

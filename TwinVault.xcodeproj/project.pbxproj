@@ -25,6 +25,9 @@
 		A10000000000000000000016 /* AudioPlaybackService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* AudioPlaybackService.swift */; };
 		A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */; };
 		A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000021 /* MultilingualTranscriptSelector.swift */; };
+		A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */; };
+		A10000000000000000000020 /* WhisperKitSpeechToTextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */; };
+		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +62,8 @@
 		B10000000000000000000019 /* AudioPlaybackService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlaybackService.swift; sourceTree = "<group>"; };
 		B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSpeechTranscriptionProvider.swift; sourceTree = "<group>"; };
 		B10000000000000000000021 /* MultilingualTranscriptSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MultilingualTranscriptSelector.swift; sourceTree = "<group>"; };
+		B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitSpeechToTextProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitSpeechToTextProviderTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -66,6 +71,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A20000000000000000000001 /* WhisperKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -147,6 +153,7 @@
 			children = (
 				B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */,
 				B10000000000000000000021 /* MultilingualTranscriptSelector.swift */,
+				B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -166,6 +173,7 @@
 				B10000000000000000000011 /* JSONMeetingRepositoryTests.swift */,
 				B10000000000000000000017 /* TranscriptTests.swift */,
 				B10000000000000000000018 /* AppModelTests.swift */,
+				B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */,
 			);
 			path = Tests/TwinVaultTests;
 			sourceTree = "<group>";
@@ -195,6 +203,9 @@
 			dependencies = (
 			);
 			name = TwinVault;
+			packageProductDependencies = (
+				N20000000000000000000001 /* WhisperKit */,
+			);
 			productName = TwinVault;
 			productReference = B10000000000000000000013 /* TwinVault.app */;
 			productType = "com.apple.product-type.application";
@@ -245,6 +256,9 @@
 				Base,
 			);
 			mainGroup = G10000000000000000000001;
+			packageReferences = (
+				M20000000000000000000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+			);
 			productRefGroup = G10000000000000000000009 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -291,6 +305,7 @@
 				A10000000000000000000016 /* AudioPlaybackService.swift in Sources */,
 				A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */,
 				A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */,
+				A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -302,6 +317,7 @@
 				A10000000000000000000011 /* JSONMeetingRepositoryTests.swift in Sources */,
 				A10000000000000000000014 /* TranscriptTests.swift in Sources */,
 				A10000000000000000000015 /* AppModelTests.swift in Sources */,
+				A10000000000000000000020 /* WhisperKitSpeechToTextProviderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -433,6 +449,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		M20000000000000000000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/argmaxinc/argmax-oss-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 1.1.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		N20000000000000000000001 /* WhisperKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = M20000000000000000000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
+			productName = WhisperKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = D10000000000000000000001 /* Project object */;
 }

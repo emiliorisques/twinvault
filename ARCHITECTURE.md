@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2E audio timeline anchors
+# TwinVault Architecture — Phase 2F local multilingual provider
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. No cloud AI or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -15,7 +15,8 @@ AppModel (use-case coordination)
     ├── AudioRecordingService ── LocalAudioRecordingService
     ├── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
     ├── AudioPlaybackService ── LocalAudioPlaybackService
-    └── SpeechToTextProvider ── AppleSpeechTranscriptionProvider
+    └── SpeechToTextProvider ─┬─ AppleSpeechTranscriptionProvider
+                              └─ WhisperKitSpeechToTextProvider
                     │
                     ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
@@ -33,6 +34,10 @@ Playback uses `AVAudioPlayer` behind an async service boundary. Stored paths mus
 Transcription uses Apple's `SpeechAnalyzer` and `SpeechTranscriber` behind the domain-owned `SpeechToTextProvider` protocol. Every meeting stores its requested locales, defaulting to `es-ES`, `ca-ES`, and `en-US`. Because each Apple transcriber accepts one locale, the adapter resolves all three locales at runtime, installs each asset independently, and analyzes the same local audio sequentially. Sequential processing isolates asset and analyzer failures: successful languages still produce a persisted transcript and the output reports any skipped locale to the user. A pure selector keeps the highest-confidence hypothesis where locale results overlap and coalesces adjacent same-language segments. Each persisted segment records its audio time range, source recording UUID, provider identifier, and selected locale. Re-transcribing one channel replaces only segments derived from that recording.
 
 The selection rule is a first implementation, not an assertion that confidence scores are perfectly calibrated across languages. Its boundary and deterministic tests allow replacement without changing the domain or UI. Production readiness requires consented code-switching fixtures covering Spanish/Catalan, Spanish/English, Catalan/English, accents, overlapping speech, and silence, plus energy and latency measurements on supported Apple Silicon hardware.
+
+WhisperKit 1.1.0 is pinned for reproducible builds and only its transcription product is linked. `WhisperKitSpeechToTextProvider` validates vault-relative audio paths and maps timestamps, detected language codes, source recording IDs, and its stable provider ID into domain segments. `LocalWhisperKitEngine` owns the non-`Sendable` runtime inside an actor. It lazily downloads and loads Argmax's recommended `large-v3-v20240930_626MB` multilingual model only after explicit user selection, then reuses it for the process lifetime. Incremental file loading bounds memory for long meetings and uses VAD only for chunk boundaries; this is not speaker diarization.
+
+The third-party runtime is isolated behind an internal engine protocol. Unit tests substitute a deterministic fake, so CI neither accesses the network nor downloads model weights. Apple Speech remains available in the same UI for comparison and fallback. A successful new run replaces only transcript segments for the selected recording; provider provenance remains on every segment.
 
 ## ADR-001: versioned JSON before SQLite
 
@@ -55,7 +60,7 @@ This is provenance scaffolding, not the future Memory model. Facts, inferences, 
 
 ## Privacy and security posture
 
-There is no application networking or external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first transcription request; SpeechAnalyzer does not send recorded voice data to Apple. Metadata and audio live under Application Support. Metadata uses atomic writes and platform data-protection options. This is not a claim of full encryption at rest: Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
+There is no external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first Apple Speech request. Choosing WhisperKit for the first time downloads public Core ML model assets from the configured Argmax/Hugging Face repository into the local vault. Neither provider uploads meeting audio. Metadata and audio live under Application Support. Metadata uses atomic writes and platform data-protection options. This is not a claim of full encryption at rest: Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
 
 ## Concurrency
 
@@ -63,10 +68,10 @@ Types crossing boundaries conform to `Sendable`. The repository is an actor. Pre
 
 ## Phase 2 next increment (not implemented)
 
-1. Add buffer-level host-time calibration and measure microphone/system drift.
-2. Build consented multilingual and cross-channel evaluation fixtures.
-3. Add a replaceable WhisperKit provider and explicit local-model management.
-4. Add VAD, then transcribe both channels while retaining independent evidence.
+1. Add visible WhisperKit model download/readiness progress and cancellation.
+2. Build consented multilingual and cross-channel evaluation fixtures and compare both providers.
+3. Add buffer-level host-time calibration and measure microphone/system drift.
+4. Transcribe both channels while retaining independent evidence.
 5. Deduplicate overlapping channel hypotheses only after timing accuracy is measured.
 6. Add diarization independently and align turns through the common meeting timeline.
 7. Move metadata and transcript persistence to SQLite before production-volume transcripts.
