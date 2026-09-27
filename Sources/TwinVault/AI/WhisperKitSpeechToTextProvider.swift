@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import WhisperKit
 
@@ -61,13 +62,68 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
             )
         )
 
-        return results.flatMap { result in
+        var segments = map(results, offset: 0)
+        let audioFile = try AVAudioFile(forReading: URL(fileURLWithPath: audioPath))
+        let duration = TimeInterval(audioFile.length) / audioFile.fileFormat.sampleRate
+        let gaps = TranscriptGapRepairPlanner.gaps(
+            in: segments,
+            audioDuration: duration
+        )
+        for gap in gaps {
+            try Task.checkCancellation()
+            if let repaired = try? await repair(gap, audioPath: audioPath, using: pipeline) {
+                segments.append(contentsOf: repaired)
+            }
+        }
+        return segments.sorted { $0.startTime < $1.startTime }
+    }
+
+    private func repair(
+        _ gap: TranscriptGap,
+        audioPath: String,
+        using pipeline: WhisperKit
+    ) async throws -> [WhisperEngineSegment] {
+        let padding: TimeInterval = 2
+        let sliceStart = max(0, gap.startTime - padding)
+        let sliceEnd = gap.endTime + padding
+        let buffer = try AudioProcessor.loadAudio(
+            fromPath: audioPath,
+            channelMode: .sumChannels(nil),
+            startTime: sliceStart,
+            endTime: sliceEnd
+        )
+        guard let samples = buffer.floatChannelData?[0] else { return [] }
+        let audio = Array(UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength)))
+        let activity = EnergyVAD(energyThreshold: 0.015).voiceActivity(in: audio)
+        guard activity.filter({ $0 }).count >= 3 else { return [] }
+
+        let results = try await pipeline.transcribe(
+            audioArray: audio,
+            decodeOptions: DecodingOptions(
+                task: .transcribe,
+                language: nil,
+                detectLanguage: true,
+                skipSpecialTokens: true,
+                chunkingStrategy: .vad
+            )
+        )
+        return map(results, offset: sliceStart).filter { segment in
+            let midpoint = (segment.startTime + segment.endTime) / 2
+            return midpoint >= gap.startTime && midpoint <= gap.endTime
+        }
+    }
+
+    private func map(
+        _ results: [TranscriptionResult],
+        offset: TimeInterval
+    ) -> [WhisperEngineSegment] {
+        results.flatMap { result in
             result.segments.compactMap { segment in
                 let text = WhisperTranscriptSanitizer.clean(segment.text)
                 guard !text.isEmpty else { return nil }
                 return WhisperEngineSegment(
-                    startTime: TimeInterval(segment.start),
-                    endTime: TimeInterval(segment.end),
+                    startTime: offset + TimeInterval(segment.start),
+                    endTime: offset + TimeInterval(segment.end),
                     text: text,
                     // WhisperKit reports language for a decoding result, not a
                     // verified language label for every individual segment.
@@ -91,6 +147,47 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
         let loaded = try await WhisperKit(config)
         pipeline = loaded
         return loaded
+    }
+}
+
+struct TranscriptGap: Equatable, Sendable {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+}
+
+enum TranscriptGapRepairPlanner {
+    static let minimumGapDuration: TimeInterval = 8
+    static let maximumRepairDuration: TimeInterval = 90
+
+    static func gaps(
+        in segments: [WhisperEngineSegment],
+        audioDuration: TimeInterval
+    ) -> [TranscriptGap] {
+        guard audioDuration > 0 else { return [] }
+        let sorted = segments.sorted { $0.startTime < $1.startTime }
+        var gaps: [TranscriptGap] = []
+        var coveredUntil: TimeInterval = 0
+
+        for segment in sorted {
+            appendGap(from: coveredUntil, to: min(audioDuration, segment.startTime), into: &gaps)
+            coveredUntil = max(coveredUntil, min(audioDuration, segment.endTime))
+        }
+        appendGap(from: coveredUntil, to: audioDuration, into: &gaps)
+        return gaps
+    }
+
+    private static func appendGap(
+        from start: TimeInterval,
+        to end: TimeInterval,
+        into gaps: inout [TranscriptGap]
+    ) {
+        guard end - start >= minimumGapDuration else { return }
+        var cursor = start
+        while cursor < end {
+            let repairEnd = min(end, cursor + maximumRepairDuration)
+            gaps.append(TranscriptGap(startTime: cursor, endTime: repairEnd))
+            cursor = repairEnd
+        }
     }
 }
 
@@ -155,7 +252,22 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
         guard !segments.isEmpty else {
             throw WhisperKitTranscriptionError.noSpeechDetected
         }
-        return TranscriptionOutput(segments: segments)
+        let audioDuration = try? AVAudioFile(forReading: fileURL).duration
+        let reviewIntervals = TranscriptGapRepairPlanner.gaps(
+            in: engineSegments,
+            audioDuration: audioDuration ?? 0
+        ).map {
+            TranscriptReviewInterval(
+                meetingID: request.meetingID,
+                sourceRecordingID: recording.id,
+                startTime: $0.startTime,
+                endTime: $0.endTime
+            )
+        }
+        return TranscriptionOutput(
+            segments: segments,
+            reviewIntervals: reviewIntervals
+        )
     }
 
     private func validatedURL(for recording: AudioRecordingReference) throws -> URL {
@@ -171,5 +283,11 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
             throw WhisperKitTranscriptionError.recordingMissing
         }
         return fileURL
+    }
+}
+
+private extension AVAudioFile {
+    var duration: TimeInterval {
+        TimeInterval(length) / fileFormat.sampleRate
     }
 }

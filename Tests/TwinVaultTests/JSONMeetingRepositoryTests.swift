@@ -4,7 +4,7 @@ import XCTest
 
 final class JSONMeetingRepositoryTests: XCTestCase {
     func testSaveReloadUpdateAndDelete() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = testRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let paths = VaultPaths(root: root)
         let repository = try JSONMeetingRepository(paths: paths)
@@ -26,7 +26,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
     }
 
     func testMeetingsAreNewestFirst() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = testRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = try JSONMeetingRepository(paths: VaultPaths(root: root))
         try await repository.save(Meeting(title: "Old", startDate: Date(timeIntervalSince1970: 1)))
@@ -36,7 +36,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
     }
 
     func testLoadsPhaseOneAudioAndMigratesStoreOnSave() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = testRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let paths = VaultPaths(root: root)
         try paths.prepare()
@@ -68,11 +68,11 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 5)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 6)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
-        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        let root = testRoot()
         defer { try? FileManager.default.removeItem(at: root) }
         let repository = try JSONMeetingRepository(paths: VaultPaths(root: root))
         let meetingID = UUID()
@@ -88,10 +88,17 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             sourceRecordingID: recordingID, providerIdentifier: "test.provider",
             localeIdentifier: "en-US"
         )
+        let reviewInterval = TranscriptReviewInterval(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            startTime: 12,
+            endTime: 24
+        )
         let meeting = Meeting(
             id: meetingID, title: "Stored transcript",
             audioRecordings: [recording],
             transcriptSegments: [segment],
+            transcriptReviewIntervals: [reviewInterval],
             transcriptionLocaleIdentifiers: ["ca-ES", "en-US"],
             status: .completed
         )
@@ -100,7 +107,13 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let loaded = try await repository.meeting(id: meetingID)
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
+        XCTAssertEqual(loaded?.transcriptReviewIntervals, [reviewInterval])
         XCTAssertEqual(loaded?.audioRecordings.first?.meetingTimelineOffset, 1.25)
         XCTAssertEqual(loaded?.transcriptionLocaleIdentifiers, ["ca-ES", "en-US"])
     }
+}
+
+private func testRoot() -> URL {
+    URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+        .appending(path: "TwinVaultTests-\(UUID().uuidString)")
 }

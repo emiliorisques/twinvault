@@ -24,3 +24,11 @@ Before diarization or cross-channel fusion, the next accuracy increment should:
 5. retain each raw provider output and configuration with the report.
 
 The opt-in `LocalTranscriptionBenchmarkTests` harness is skipped during normal tests unless explicit private-fixture environment variables are provided.
+
+### Gap-recovery experiments
+
+Three follow-up strategies were measured on the same private fixture. Fixed overlapping windows regressed approximate WER to 28.7%; longer windows with VAD regressed it to 28.2%. Both were rejected and removed from the product. A bounded retry of only long, acoustically active gaps preserved the stronger incremental configuration and, in one run, recovered part of the 00:45–01:30 omission with approximate WER of 21.2%. A repeated run demonstrated model nondeterminism and did not recover that interval, so gap recovery is not considered a completeness guarantee.
+
+The accepted safeguard retries a gap at most once and persists any remaining interval for review. The release gate remains unmet: this fixture is not fully human-corrected, code-switched English is not consistently preserved, and the best directional WER is still roughly 21%. No transcript-derived item may become a confirmed Twin fact automatically.
+
+Target quality gates for the future memory pipeline are: no unexplained missing speech, human-corrected multilingual WER at or below 10% on representative fixtures, at least 95% accuracy for names/numbers/dates/commitments or explicit uncertainty flags, reliable timestamps, and mandatory provenance plus user confirmation for consequential memories.

@@ -9,6 +9,7 @@ final class AppModel {
     private let playback: any AudioPlaybackService
     private let speechToTextProviders: [String: any SpeechToTextProvider]
     private let audioDirectory: URL
+    private var systemAudioMonitoringTask: Task<Void, Never>?
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
@@ -84,6 +85,7 @@ final class AppModel {
                         meetingStartDate: session.meeting.startDate
                     )
                     session.attachAudio(systemReference)
+                    monitorSystemAudioInterruptions()
                 } catch {
                     errorMessage = "The meeting started with microphone only. \(error.localizedDescription)"
                 }
@@ -109,6 +111,8 @@ final class AppModel {
     func stopMeeting() async {
         guard var session = activeSession else { return }
         audio.stop()
+        systemAudioMonitoringTask?.cancel()
+        systemAudioMonitoringTask = nil
         do {
             try await systemAudio.stopSystemAudioCapture()
         } catch {
@@ -181,12 +185,16 @@ final class AppModel {
                 }
                 return $0.startTime < $1.startTime
             }
+            meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recordingID }
+            meeting.transcriptReviewIntervals.append(contentsOf: output.reviewIntervals)
             meeting.updatedAt = .now
             try await repository.save(meeting)
             await load()
             if !output.unavailableLocaleIdentifiers.isEmpty {
                 let labels = output.unavailableLocaleIdentifiers.map(Self.languageLabel).joined(separator: ", ")
                 errorMessage = "Transcription completed, but these language models were unavailable: \(labels). You can try again later."
+            } else if !output.reviewIntervals.isEmpty {
+                errorMessage = "Transcription completed, but some long audio intervals contain no transcript. They are marked for review and must not be treated as complete evidence."
             }
         } catch {
             errorMessage = error.localizedDescription
@@ -207,6 +215,17 @@ final class AppModel {
             throw AudioPlaybackError.fileMissing
         }
         return fileURL
+    }
+
+    private func monitorSystemAudioInterruptions() {
+        systemAudioMonitoringTask?.cancel()
+        let events = systemAudio.interruptionEvents
+        systemAudioMonitoringTask = Task { [weak self] in
+            for await event in events {
+                guard !Task.isCancelled else { return }
+                self?.errorMessage = "System audio recording stopped early. The microphone is still recording. \(event.message)"
+            }
+        }
     }
 
     private static func languageLabel(_ identifier: String) -> String {

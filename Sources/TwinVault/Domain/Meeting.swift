@@ -12,6 +12,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
     var importantMoments: [ImportantMoment]
     var audioRecordings: [AudioRecordingReference]
     var transcriptSegments: [TranscriptSegment]
+    var transcriptReviewIntervals: [TranscriptReviewInterval]
     var transcriptionLocaleIdentifiers: [String]
     var status: Status
     let createdAt: Date
@@ -23,6 +24,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         importantMoments: [ImportantMoment] = [],
         audioRecordings: [AudioRecordingReference] = [],
         transcriptSegments: [TranscriptSegment] = [],
+        transcriptReviewIntervals: [TranscriptReviewInterval] = [],
         transcriptionLocaleIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers,
         status: Status = .recording, createdAt: Date = .now,
         updatedAt: Date = .now
@@ -35,6 +37,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         self.importantMoments = importantMoments
         self.audioRecordings = audioRecordings
         self.transcriptSegments = transcriptSegments
+        self.transcriptReviewIntervals = transcriptReviewIntervals
         self.transcriptionLocaleIdentifiers = transcriptionLocaleIdentifiers
         self.status = status
         self.createdAt = createdAt
@@ -54,7 +57,8 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startDate, endDate, notes, importantMoments
-        case audioRecordings, audioRecording, transcriptSegments, transcriptionLocaleIdentifiers
+        case audioRecordings, audioRecording, transcriptSegments, transcriptReviewIntervals
+        case transcriptionLocaleIdentifiers
         case status, createdAt, updatedAt
     }
 
@@ -74,6 +78,10 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
             audioRecordings = []
         }
         transcriptSegments = try container.decodeIfPresent([TranscriptSegment].self, forKey: .transcriptSegments) ?? []
+        transcriptReviewIntervals = try container.decodeIfPresent(
+            [TranscriptReviewInterval].self,
+            forKey: .transcriptReviewIntervals
+        ) ?? []
         transcriptionLocaleIdentifiers = try container.decodeIfPresent(
             [String].self,
             forKey: .transcriptionLocaleIdentifiers
@@ -93,6 +101,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         try container.encode(importantMoments, forKey: .importantMoments)
         try container.encode(audioRecordings, forKey: .audioRecordings)
         try container.encode(transcriptSegments, forKey: .transcriptSegments)
+        try container.encode(transcriptReviewIntervals, forKey: .transcriptReviewIntervals)
         try container.encode(transcriptionLocaleIdentifiers, forKey: .transcriptionLocaleIdentifiers)
         try container.encode(status, forKey: .status)
         try container.encode(createdAt, forKey: .createdAt)

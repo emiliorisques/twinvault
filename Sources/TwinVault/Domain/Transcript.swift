@@ -53,15 +53,47 @@ struct TranscriptionRequest: Sendable {
 
 struct TranscriptionOutput: Equatable, Sendable {
     let segments: [TranscriptSegment]
+    let reviewIntervals: [TranscriptReviewInterval]
     /// Requested locales that the provider could not use for this run.
     let unavailableLocaleIdentifiers: [String]
 
     init(
         segments: [TranscriptSegment],
+        reviewIntervals: [TranscriptReviewInterval] = [],
         unavailableLocaleIdentifiers: [String] = []
     ) {
         self.segments = segments
+        self.reviewIntervals = reviewIntervals
         self.unavailableLocaleIdentifiers = unavailableLocaleIdentifiers
+    }
+}
+
+struct TranscriptReviewInterval: Identifiable, Codable, Equatable, Sendable {
+    enum Reason: String, Codable, Sendable {
+        case longUntranscribedInterval
+    }
+
+    let id: UUID
+    let meetingID: UUID
+    let sourceRecordingID: UUID
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+    let reason: Reason
+
+    init(
+        id: UUID = UUID(),
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        startTime: TimeInterval,
+        endTime: TimeInterval,
+        reason: Reason = .longUntranscribedInterval
+    ) {
+        self.id = id
+        self.meetingID = meetingID
+        self.sourceRecordingID = sourceRecordingID
+        self.startTime = max(0, startTime)
+        self.endTime = max(max(0, startTime), endTime)
+        self.reason = reason
     }
 }
 

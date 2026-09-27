@@ -175,6 +175,17 @@ struct MeetingDetailView: View {
                 if meeting.transcriptSegments.isEmpty {
                     Text("Not transcribed").foregroundStyle(.secondary)
                 } else {
+                    if !meeting.transcriptReviewIntervals.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Label("Review transcript coverage", systemImage: "exclamationmark.triangle.fill")
+                                .fontWeight(.semibold)
+                            ForEach(meeting.transcriptReviewIntervals) { interval in
+                                Text("No transcript from \(duration(interval.startTime)) to \(duration(interval.endTime)); this may be silence or missed speech.")
+                                    .font(.caption)
+                            }
+                        }
+                        .foregroundStyle(.orange)
+                    }
                     ForEach(meeting.transcriptSegments) { segment in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {

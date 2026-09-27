@@ -3,6 +3,30 @@ import XCTest
 @testable import TwinVault
 
 final class WhisperKitSpeechToTextProviderTests: XCTestCase {
+    func testGapRepairPlannerFindsOnlyLongUncoveredIntervals() {
+        let segments = [
+            WhisperEngineSegment(startTime: 2, endTime: 10, text: "A", languageCode: nil),
+            WhisperEngineSegment(startTime: 15, endTime: 20, text: "B", languageCode: nil),
+            WhisperEngineSegment(startTime: 45, endTime: 55, text: "C", languageCode: nil)
+        ]
+
+        XCTAssertEqual(
+            TranscriptGapRepairPlanner.gaps(in: segments, audioDuration: 60),
+            [TranscriptGap(startTime: 20, endTime: 45)]
+        )
+    }
+
+    func testGapRepairPlannerBoundsVeryLongRepairs() {
+        XCTAssertEqual(
+            TranscriptGapRepairPlanner.gaps(in: [], audioDuration: 200),
+            [
+                TranscriptGap(startTime: 0, endTime: 90),
+                TranscriptGap(startTime: 90, endTime: 180),
+                TranscriptGap(startTime: 180, endTime: 200)
+            ]
+        )
+    }
+
     func testSanitizerRemovesWhisperControlTokens() {
         XCTAssertEqual(
             WhisperTranscriptSanitizer.clean(
