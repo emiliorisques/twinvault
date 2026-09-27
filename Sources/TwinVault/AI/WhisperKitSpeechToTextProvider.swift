@@ -56,19 +56,22 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
                 task: .transcribe,
                 language: nil,
                 detectLanguage: true,
+                skipSpecialTokens: true,
                 chunkingStrategy: .vad
             )
         )
 
         return results.flatMap { result in
             result.segments.compactMap { segment in
-                let text = segment.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                let text = WhisperTranscriptSanitizer.clean(segment.text)
                 guard !text.isEmpty else { return nil }
                 return WhisperEngineSegment(
                     startTime: TimeInterval(segment.start),
                     endTime: TimeInterval(segment.end),
                     text: text,
-                    languageCode: result.language.isEmpty ? nil : result.language
+                    // WhisperKit reports language for a decoding result, not a
+                    // verified language label for every individual segment.
+                    languageCode: nil
                 )
             }
         }
@@ -88,6 +91,17 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
         let loaded = try await WhisperKit(config)
         pipeline = loaded
         return loaded
+    }
+}
+
+enum WhisperTranscriptSanitizer {
+    static func clean(_ text: String) -> String {
+        text.replacingOccurrences(
+            of: #"<\|[^|>]+\|>"#,
+            with: "",
+            options: .regularExpression
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 

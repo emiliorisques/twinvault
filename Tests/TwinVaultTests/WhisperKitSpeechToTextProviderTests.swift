@@ -3,6 +3,15 @@ import XCTest
 @testable import TwinVault
 
 final class WhisperKitSpeechToTextProviderTests: XCTestCase {
+    func testSanitizerRemovesWhisperControlTokens() {
+        XCTAssertEqual(
+            WhisperTranscriptSanitizer.clean(
+                "<|startoftranscript|><|ca|><|transcribe|><|0.00|> Bon dia.<|2.50|>"
+            ),
+            "Bon dia."
+        )
+    }
+
     func testMapsEngineSegmentsWithRecordingProvenance() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

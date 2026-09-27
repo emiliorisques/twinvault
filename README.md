@@ -50,3 +50,4 @@ WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` pack
 `MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech and WhisperKit are replaceable implementations of `SpeechToTextProvider`; diarization and speaker identification remain separate unimplemented contracts. Structured memory, twins, external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
+Aggregate local evaluation results are recorded in [BENCHMARKS.md](BENCHMARKS.md); private fixtures and raw transcripts are excluded.
