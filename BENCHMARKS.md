@@ -33,6 +33,19 @@ With whole-file decoding, WhisperKit retained only Catalan/Spanish-like hypothes
 
 Conclusion: pause-based turns materially improve short code-switch coverage and are accepted as pipeline infrastructure, but they do not meet the accuracy release gate. WhisperKit remains the stronger multilingual candidate on this fixture; English wording and Apple model availability remain unresolved. The next fair comparison requires the exact three spoken sentences and several human-verified repetitions with different pause lengths and speakers.
 
+### Long-form speech-turn regression
+
+The same pause-based implementation was then rerun on the 1,299.7-second Radioteca fixture using the original reference and normalization procedure.
+
+| Provider | Strategy | Runtime | Segments | Approx. WER |
+|---|---|---:|---:|---:|
+| Apple Speech | whole file | 29.1 s | 4 | 63.8% |
+| Apple Speech | 253 speech turns | 68.9 s | 250 | 60.9% |
+| WhisperKit large-v3 turbo | whole file | 140.3 s | 440 | 21.8% |
+| WhisperKit large-v3 turbo | 253 speech turns | 275.0 s | 371 | 36.4% |
+
+Apple gained timestamp granularity but only 2.9 absolute WER points, remained unusable for this mostly Catalan fixture, and took more than twice as long. Its Catalan `SpeechTranscriber` asset was unavailable on the tested system. WhisperKit's per-turn decoding lost too much linguistic context: WER regressed by 14.6 points and runtime nearly doubled. Applying every acoustic turn as an independent decode is therefore rejected for long-form Whisper transcription. The detector remains useful infrastructure for targeted recovery and short code-switch experiments, but the product should restore whole-file incremental Whisper decoding as the long-form baseline before further accuracy work.
+
 ### Gap-recovery experiments
 
 Three follow-up strategies were measured on the same private fixture. Fixed overlapping windows regressed approximate WER to 28.7%; longer windows with VAD regressed it to 28.2%. Both were rejected and removed from the product. A bounded retry of only long, acoustically active gaps preserved the stronger incremental configuration and, in one run, recovered part of the 00:45–01:30 omission with approximate WER of 21.2%. A repeated run demonstrated model nondeterminism and did not recover that interval, so gap recovery is not considered a completeness guarantee.
