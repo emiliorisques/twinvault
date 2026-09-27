@@ -211,25 +211,35 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
     private let audioDirectory: URL
     private let fileManager: FileManager
     private let engine: any WhisperTranscribingEngine
+    private let turnDetector: any SpeechTurnDetecting
+    private let turnSlicer: LocalAudioTurnSlicer
 
     init(
         audioDirectory: URL,
         modelsDirectory: URL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
+        turnSlicer: LocalAudioTurnSlicer = .init()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = LocalWhisperKitEngine(modelsDirectory: modelsDirectory)
+        self.turnDetector = turnDetector
+        self.turnSlicer = turnSlicer
     }
 
     init(
         audioDirectory: URL,
         fileManager: FileManager = .default,
-        engine: any WhisperTranscribingEngine
+        engine: any WhisperTranscribingEngine,
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
+        turnSlicer: LocalAudioTurnSlicer = .init()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = engine
+        self.turnDetector = turnDetector
+        self.turnSlicer = turnSlicer
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
@@ -237,7 +247,25 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
             throw WhisperKitTranscriptionError.noRecording
         }
         let fileURL = try validatedURL(for: recording)
-        let engineSegments = try await engine.transcribe(audioPath: fileURL.path)
+        let turns = try turnDetector.detectTurns(in: fileURL)
+        guard !turns.isEmpty else { throw WhisperKitTranscriptionError.noSpeechDetected }
+        let prepared = try turnSlicer.prepare(fileURL: fileURL, turns: turns)
+        defer { try? fileManager.removeItem(at: prepared.directoryURL) }
+
+        var engineSegments: [WhisperEngineSegment] = []
+        for slice in prepared.turns {
+            try Task.checkCancellation()
+            let localSegments = try await engine.transcribe(audioPath: slice.fileURL.path)
+            engineSegments.append(contentsOf: localSegments.map {
+                WhisperEngineSegment(
+                    startTime: slice.turn.startTime + $0.startTime,
+                    endTime: slice.turn.startTime + $0.endTime,
+                    text: $0.text,
+                    languageCode: $0.languageCode
+                )
+            })
+        }
+        engineSegments.sort { $0.startTime < $1.startTime }
         let segments = engineSegments.map { segment in
             TranscriptSegment(
                 meetingID: request.meetingID,

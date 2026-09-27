@@ -1,5 +1,22 @@
 import Foundation
 
+/// A speech interval separated from adjacent speech by an acoustic pause.
+/// It deliberately contains no speaker identity: turn detection and
+/// diarization are different stages of the pipeline.
+struct SpeechTurn: Codable, Equatable, Sendable {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+
+    init(startTime: TimeInterval, endTime: TimeInterval) {
+        self.startTime = max(0, startTime)
+        self.endTime = max(max(0, startTime), endTime)
+    }
+}
+
+protocol SpeechTurnDetecting: Sendable {
+    func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn]
+}
+
 struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let meetingID: UUID

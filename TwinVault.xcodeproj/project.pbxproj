@@ -28,6 +28,7 @@
 		A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */; };
 		A10000000000000000000020 /* WhisperKitSpeechToTextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */; };
 		A10000000000000000000021 /* LocalTranscriptionBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */; };
+		A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* LocalSpeechTurnDetector.swift */; };
 		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
 /* End PBXBuildFile section */
 
@@ -66,6 +67,7 @@
 		B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitSpeechToTextProvider.swift; sourceTree = "<group>"; };
 		B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitSpeechToTextProviderTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionBenchmarkTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000025 /* LocalSpeechTurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeechTurnDetector.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -156,6 +158,7 @@
 				B10000000000000000000020 /* AppleSpeechTranscriptionProvider.swift */,
 				B10000000000000000000021 /* MultilingualTranscriptSelector.swift */,
 				B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */,
+				B10000000000000000000025 /* LocalSpeechTurnDetector.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -309,6 +312,7 @@
 				A10000000000000000000017 /* AppleSpeechTranscriptionProvider.swift in Sources */,
 				A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */,
 				A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */,
+				A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

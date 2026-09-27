@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2G capture and transcript integrity
+# TwinVault Architecture — Phase 2H multilingual speech turns
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -18,6 +18,8 @@ AppModel (use-case coordination)
     └── SpeechToTextProvider ─┬─ AppleSpeechTranscriptionProvider
                               └─ WhisperKitSpeechToTextProvider
                     │
+                    └── SpeechTurnDetecting ── LocalEnergySpeechTurnDetector
+                    │
                     ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
         RecordingSession, TranscriptSegment, provider protocols
@@ -31,11 +33,13 @@ New microphone and system-audio references persist `meetingTimelineOffset`, meas
 
 Playback uses `AVAudioPlayer` behind an async service boundary. Stored paths must be a single relative filename and are resolved only inside the vault audio directory; traversal and missing files are rejected before AVFoundation receives a URL.
 
-Transcription uses Apple's `SpeechAnalyzer` and `SpeechTranscriber` behind the domain-owned `SpeechToTextProvider` protocol. Every meeting stores its requested locales, defaulting to `es-ES`, `ca-ES`, and `en-US`. Because each Apple transcriber accepts one locale, the adapter resolves all three locales at runtime, installs each asset independently, and analyzes the same local audio sequentially. Sequential processing isolates asset and analyzer failures: successful languages still produce a persisted transcript and the output reports any skipped locale to the user. A pure selector keeps the highest-confidence hypothesis where locale results overlap and coalesces adjacent same-language segments. Each persisted segment records its audio time range, source recording UUID, provider identifier, and selected locale. Re-transcribing one channel replaces only segments derived from that recording.
+Before transcription, `LocalEnergySpeechTurnDetector` streams 50 ms PCM windows, estimates a local noise floor, and groups active regions across pauses of at most 500 ms. This is intentionally a small replaceable VAD-like boundary, not a language detector, diarization model, or speaker identity. `LocalAudioTurnSlicer` writes lossless temporary CAF files outside the vault and deletes the whole run directory after success, failure, or cancellation. Both providers translate slice-relative results back onto the original recording timeline.
+
+Transcription uses Apple's `SpeechAnalyzer` and `SpeechTranscriber` behind the domain-owned `SpeechToTextProvider` protocol. Every meeting stores its requested locales, defaulting to `es-ES`, `ca-ES`, and `en-US`. Because each Apple transcriber accepts one locale, the adapter resolves all three locales at runtime, installs each asset independently, and analyzes every detected speech turn with each available locale. Per-turn processing prevents one long dominant-language hypothesis from suppressing a later short language change. Successful languages still produce a persisted transcript and the output reports any skipped locale to the user. A pure selector keeps the highest-confidence hypothesis where locale results overlap. Each persisted segment records its original audio time range, source recording UUID, provider identifier, and selected locale. Re-transcribing one channel replaces only segments derived from that recording.
 
 The selection rule is a first implementation, not an assertion that confidence scores are perfectly calibrated across languages. Its boundary and deterministic tests allow replacement without changing the domain or UI. Production readiness requires consented code-switching fixtures covering Spanish/Catalan, Spanish/English, Catalan/English, accents, overlapping speech, and silence, plus energy and latency measurements on supported Apple Silicon hardware.
 
-WhisperKit 1.1.0 is pinned for reproducible builds and only its transcription product is linked. `WhisperKitSpeechToTextProvider` validates vault-relative audio paths and maps timestamps, source recording IDs, and its stable provider ID into domain segments. `LocalWhisperKitEngine` owns the non-`Sendable` runtime inside an actor. It lazily downloads and loads Argmax's recommended `large-v3-v20240930_626MB` multilingual model only after explicit user selection, then reuses it for the process lifetime. Incremental file loading bounds memory for long meetings and uses VAD only for chunk boundaries; this is not speaker diarization.
+WhisperKit 1.1.0 is pinned for reproducible builds and only its transcription product is linked. `WhisperKitSpeechToTextProvider` validates vault-relative audio paths and independently decodes each shared speech turn before restoring its original timestamp. `LocalWhisperKitEngine` owns the non-`Sendable` runtime inside an actor. It lazily downloads and loads Argmax's recommended `large-v3-v20240930_626MB` multilingual model only after explicit user selection, then reuses it for the process lifetime. Incremental file loading still bounds memory inside each turn. Neither Whisper's VAD chunking nor the shared turn detector is speaker diarization.
 
 Whisper control tokens are removed before text enters the domain. The current WhisperKit result-level language is deliberately not persisted as a segment language: mixed-language evaluation showed that it is not reliable evidence for every segment. Language labels may return later only behind a separately evaluated per-segment boundary.
 

@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import XCTest
 @testable import TwinVault
@@ -40,8 +41,8 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        let fileURL = directory.appending(path: "meeting.m4a")
-        try Data([0]).write(to: fileURL)
+        let fileURL = directory.appending(path: "meeting.caf")
+        try makeSilentAudio(at: fileURL, duration: 16)
         let engine = FakeWhisperEngine(segments: [WhisperEngineSegment(
             startTime: 2.5,
             endTime: 4,
@@ -50,7 +51,10 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         )])
         let provider = WhisperKitSpeechToTextProvider(
             audioDirectory: directory,
-            engine: engine
+            engine: engine,
+            turnDetector: FixedSpeechTurnDetector(turns: [
+                SpeechTurn(startTime: 10, endTime: 15)
+            ])
         )
         let meetingID = UUID()
         let recording = AudioRecordingReference(
@@ -65,13 +69,14 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
 
         XCTAssertEqual(output.segments.count, 1)
         XCTAssertEqual(output.segments[0].text, "Bon dia")
-        XCTAssertEqual(output.segments[0].startTime, 2.5)
-        XCTAssertEqual(output.segments[0].endTime, 4)
+        XCTAssertEqual(output.segments[0].startTime, 12.5)
+        XCTAssertEqual(output.segments[0].endTime, 14)
         XCTAssertEqual(output.segments[0].sourceRecordingID, recording.id)
         XCTAssertEqual(output.segments[0].providerIdentifier, provider.identifier)
         XCTAssertEqual(output.segments[0].localeIdentifier, "ca")
         let receivedPath = await engine.receivedPath()
-        XCTAssertEqual(receivedPath, fileURL.path)
+        XCTAssertNotEqual(receivedPath, fileURL.path)
+        XCTAssertEqual(URL(fileURLWithPath: receivedPath ?? "").pathExtension, "caf")
     }
 
     func testRejectsPathTraversalBeforeCallingEngine() async {
@@ -100,6 +105,22 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         let receivedPath = await engine.receivedPath()
         XCTAssertNil(receivedPath)
     }
+
+    private func makeSilentAudio(at url: URL, duration: TimeInterval) throws {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        let frameCount = AVAudioFrameCount(duration * format.sampleRate)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
+        memset(buffer.floatChannelData![0], 0, Int(frameCount) * MemoryLayout<Float>.size)
+        try file.write(from: buffer)
+    }
+}
+
+private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
+    let turns: [SpeechTurn]
+
+    func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn] { turns }
 }
 
 private actor FakeWhisperEngine: WhisperTranscribingEngine {

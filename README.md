@@ -11,6 +11,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Browse previous meetings and inspect notes, timestamps, and audio status.
 - Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
 - Choose WhisperKit for stronger multilingual transcription or Apple Speech as the system-native alternative.
+- Split speech at local acoustic pauses before either engine processes a language hypothesis.
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
 - Mark long transcript intervals without text for human review instead of presenting the transcript as complete.
@@ -46,6 +47,8 @@ Phase 2E gives each new audio reference a meeting-timeline offset measured when 
 Phase 2F adds WhisperKit 1.1.0 as a pinned Swift Package dependency and keeps it behind `SpeechToTextProvider`. The post-meeting Transcribe menu makes engine choice explicit. WhisperKit uses Argmax's recommended `large-v3-v20240930_626MB` multilingual Core ML model, incremental audio loading, and VAD chunk boundaries. The first WhisperKit transcription downloads the model into `TwinVault/models/`; later runs reuse the local assets. This download contacts the model host, but meeting audio is never uploaded. Tests inject a fake engine and neither download a model nor require private recordings.
 
 Phase 2G adds a bounded quality safeguard. WhisperKit examines long timestamp gaps, retries an acoustically active gap at most once, and persists any remaining interval as `TranscriptReviewInterval`. The meeting detail view labels those intervals explicitly. A transcript with review intervals is incomplete evidence and must not feed future automatic facts or commitments without verification.
+
+Phase 2H adds one shared, local speech-turn detector before both providers. It measures short PCM energy windows, joins brief internal pauses, and creates lossless temporary CAF slices. Apple evaluates its available locale models per turn; WhisperKit detects language independently per turn. Segment timestamps are translated back to the original recording timeline and retain their recording/provider provenance. Temporary slices are removed after each run and are never stored in the vault. A `SpeechTurn` is only an acoustic interval: it contains no speaker identity and is not diarization.
 
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment.
 

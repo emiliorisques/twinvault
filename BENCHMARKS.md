@@ -15,7 +15,7 @@ The first WhisperKit run, including model download and Core ML preparation, took
 
 WhisperKit reduced normalized word edits by about 66% and produced useful timestamps. It is the stronger primary candidate, not yet a production decision. One warm run omitted a substantial interval around 00:45–01:30, and passages audible as English were rendered semantically in Catalan or Spanish rather than preserved verbatim. The supplied reference also contains suspected automatic translations and transcription errors, so a human-corrected reference is still required.
 
-Before diarization or cross-channel fusion, the next accuracy increment should:
+The initial follow-up plan before diarization or cross-channel fusion was to:
 
 1. split audio into bounded, overlapping VAD chunks;
 2. detect and reject unexplained timestamp gaps;
@@ -24,6 +24,14 @@ Before diarization or cross-channel fusion, the next accuracy increment should:
 5. retain each raw provider output and configuration with the report.
 
 The opt-in `LocalTranscriptionBenchmarkTests` harness is skipped during normal tests unless explicit private-fixture environment variables are provided.
+
+## 2026-09-27 — short ES/CA/EN code-switching fixture
+
+A 13-second microphone fixture contains three short utterances separated by pauses. The exact spoken reference still needs to be written and human-verified, so this run is a qualitative coverage check rather than a WER measurement.
+
+With whole-file decoding, WhisperKit retained only Catalan/Spanish-like hypotheses and omitted the English turn. The shared energy detector initially split the short English phrase into two sub-second regions; joining internal pauses up to 500 ms produced four turns and recovered output for all three language regions. The warm WhisperKit run took 9.9 seconds and returned recognizable Catalan and Spanish plus an inaccurate but present English hypothesis. Apple Speech took 5.2 seconds with the same four turns, preserved some English sounds but labelled the selected hypothesis as Spanish, and mixed Catalan into Spanish because the Catalan system asset was unavailable.
+
+Conclusion: pause-based turns materially improve short code-switch coverage and are accepted as pipeline infrastructure, but they do not meet the accuracy release gate. WhisperKit remains the stronger multilingual candidate on this fixture; English wording and Apple model availability remain unresolved. The next fair comparison requires the exact three spoken sentences and several human-verified repetitions with different pause lengths and speakers.
 
 ### Gap-recovery experiments
 

@@ -78,6 +78,43 @@ final class TranscriptTests: XCTestCase {
         )
     }
 
+    func testSpeechTurnBuilderMergesShortPauseAndSplitsLongPause() {
+        let frames = [
+            false, true, true, true, true,
+            false, false,
+            true, true, true, true,
+            false, false, false, false, false,
+            true, true, true, true
+        ]
+
+        let turns = SpeechTurnBuilder.build(
+            activeFrames: frames,
+            frameDuration: 0.1,
+            audioDuration: 2,
+            minimumSpeechDuration: 0.3,
+            maximumInternalSilence: 0.25,
+            padding: 0
+        )
+
+        XCTAssertEqual(turns, [
+            SpeechTurn(startTime: 0.1, endTime: 1.1),
+            SpeechTurn(startTime: 1.6, endTime: 2.0)
+        ])
+    }
+
+    func testSpeechTurnBuilderDropsBriefNoiseAndClampsPadding() {
+        let turns = SpeechTurnBuilder.build(
+            activeFrames: [true, false, false, false, true, true, true],
+            frameDuration: 0.1,
+            audioDuration: 0.7,
+            minimumSpeechDuration: 0.3,
+            maximumInternalSilence: 0.15,
+            padding: 0.2
+        )
+
+        XCTAssertEqual(turns, [SpeechTurn(startTime: 0.2, endTime: 0.7)])
+    }
+
     func testMultilingualSelectorKeepsHighestConfidenceForOverlappingAudio() {
         let meetingID = UUID()
         let recordingID = UUID()

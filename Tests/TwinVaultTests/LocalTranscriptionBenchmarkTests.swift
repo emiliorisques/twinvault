@@ -20,6 +20,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             meetingID: meetingID,
             relativePath: audioURL.lastPathComponent
         )
+        let speechTurns = try LocalEnergySpeechTurnDetector().detectTurns(in: audioURL)
         let provider: any SpeechToTextProvider
         switch providerName {
         case "apple":
@@ -49,6 +50,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             try write(BenchmarkResult(
                 providerIdentifier: provider.identifier,
                 elapsedSeconds: startedAt.duration(to: .now).seconds,
+                speechTurns: speechTurns,
                 unavailableLocaleIdentifiers: output.unavailableLocaleIdentifiers,
                 segments: output.segments,
                 error: nil
@@ -57,6 +59,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             try write(BenchmarkResult(
                 providerIdentifier: provider.identifier,
                 elapsedSeconds: startedAt.duration(to: .now).seconds,
+                speechTurns: speechTurns,
                 unavailableLocaleIdentifiers: [],
                 segments: [],
                 error: error.localizedDescription
@@ -75,6 +78,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
 private struct BenchmarkResult: Codable {
     let providerIdentifier: String
     let elapsedSeconds: Double
+    let speechTurns: [SpeechTurn]
     let unavailableLocaleIdentifiers: [String]
     let segments: [TranscriptSegment]
     let error: String?

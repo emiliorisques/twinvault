@@ -38,10 +38,19 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
     nonisolated let displayName = "Apple Speech"
     private let audioDirectory: URL
     private let fileManager: FileManager
+    private let turnDetector: any SpeechTurnDetecting
+    private let turnSlicer: LocalAudioTurnSlicer
 
-    init(audioDirectory: URL, fileManager: FileManager = .default) {
+    init(
+        audioDirectory: URL,
+        fileManager: FileManager = .default,
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
+        turnSlicer: LocalAudioTurnSlicer = .init()
+    ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
+        self.turnDetector = turnDetector
+        self.turnSlicer = turnSlicer
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
@@ -69,13 +78,13 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
             throw LocalTranscriptionError.localeUnsupported(unsupportedIdentifiers.joined(separator: ", "))
         }
 
-        // Open once before per-locale recovery so a damaged audio file is not
-        // misreported as three unavailable language models.
-        _ = try AVAudioFile(forReading: fileURL)
+        let turns = try turnDetector.detectTurns(in: fileURL)
+        guard !turns.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
+        let prepared = try turnSlicer.prepare(fileURL: fileURL, turns: turns)
+        defer { try? fileManager.removeItem(at: prepared.directoryURL) }
 
-        var candidates: [TranscriptSegment] = []
         var unavailableIdentifiers = unsupportedIdentifiers
-        var completedAnalyses = 0
+        var availableLocales: [Locale] = []
         for locale in resolvedLocales {
             try Task.checkCancellation()
             let transcriber = SpeechTranscriber(
@@ -86,32 +95,52 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
             )
             do {
                 try await ensureModel(for: transcriber, locale: locale)
-                candidates.append(contentsOf: try await analyze(
-                    fileURL: fileURL,
-                    transcriber: transcriber,
-                    meetingID: request.meetingID,
-                    recordingID: recording.id,
-                    localeIdentifier: locale.identifier
-                ))
-                completedAnalyses += 1
+                availableLocales.append(locale)
             } catch {
                 if error is CancellationError { throw error }
                 unavailableIdentifiers.append(locale.identifier)
             }
         }
 
-        guard completedAnalyses > 0 else {
+        guard !availableLocales.isEmpty else {
             throw LocalTranscriptionError.modelUnavailable(
                 unavailableIdentifiers.joined(separator: ", ")
             )
         }
-        let selected = MultilingualTranscriptSelector.select(
-            candidates: candidates,
-            preferredLocaleIdentifiers: resolvedLocales.map(\.identifier)
-        )
+
+        var selected: [TranscriptSegment] = []
+        for slice in prepared.turns {
+            try Task.checkCancellation()
+            var turnCandidates: [TranscriptSegment] = []
+            for locale in availableLocales {
+                let transcriber = SpeechTranscriber(
+                    locale: locale,
+                    transcriptionOptions: [],
+                    reportingOptions: [],
+                    attributeOptions: [.audioTimeRange, .transcriptionConfidence]
+                )
+                do {
+                    turnCandidates.append(contentsOf: try await analyze(
+                        fileURL: slice.fileURL,
+                        transcriber: transcriber,
+                        meetingID: request.meetingID,
+                        recordingID: recording.id,
+                        localeIdentifier: locale.identifier,
+                        timeOffset: slice.turn.startTime
+                    ))
+                } catch {
+                    if error is CancellationError { throw error }
+                    unavailableIdentifiers.append(locale.identifier)
+                }
+            }
+            selected.append(contentsOf: MultilingualTranscriptSelector.select(
+                candidates: turnCandidates,
+                preferredLocaleIdentifiers: availableLocales.map(\.identifier)
+            ))
+        }
         guard !selected.isEmpty else { throw LocalTranscriptionError.noSpeechDetected }
         return TranscriptionOutput(
-            segments: selected,
+            segments: selected.sorted { $0.startTime < $1.startTime },
             unavailableLocaleIdentifiers: Array(Set(unavailableIdentifiers)).sorted()
         )
     }
@@ -168,7 +197,8 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
         transcriber: SpeechTranscriber,
         meetingID: UUID,
         recordingID: UUID,
-        localeIdentifier: String
+        localeIdentifier: String,
+        timeOffset: TimeInterval
     ) async throws -> [TranscriptSegment] {
         let audioFile = try AVAudioFile(forReading: fileURL)
         let analyzer = SpeechAnalyzer(modules: [transcriber])
@@ -178,7 +208,8 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
                 meetingID: meetingID,
                 recordingID: recordingID,
                 providerIdentifier: identifier,
-                localeIdentifier: localeIdentifier
+                localeIdentifier: localeIdentifier,
+                timeOffset: timeOffset
             )
         }
 
@@ -203,7 +234,8 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
         meetingID: UUID,
         recordingID: UUID,
         providerIdentifier: String,
-        localeIdentifier: String
+        localeIdentifier: String,
+        timeOffset: TimeInterval
     ) async throws -> [TranscriptSegment] {
         var segments: [TranscriptSegment] = []
         for try await result in transcriber.results {
@@ -214,8 +246,8 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
             let end = attributedRange.end.seconds
             segments.append(TranscriptSegment(
                 meetingID: meetingID,
-                startTime: start.isFinite ? start : 0,
-                endTime: end.isFinite ? end : 0,
+                startTime: timeOffset + (start.isFinite ? start : 0),
+                endTime: timeOffset + (end.isFinite ? end : 0),
                 text: text,
                 confidence: result.text.transcriptionConfidence,
                 sourceRecordingID: recordingID,
