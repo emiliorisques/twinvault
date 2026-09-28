@@ -53,3 +53,18 @@ Three follow-up strategies were measured on the same private fixture. Fixed over
 The accepted safeguard retries a gap at most once and persists any remaining interval for review. The release gate remains unmet: this fixture is not fully human-corrected, code-switched English is not consistently preserved, and the best directional WER is still roughly 21%. No transcript-derived item may become a confirmed Twin fact automatically.
 
 Target quality gates for the future memory pipeline are: no unexplained missing speech, human-corrected multilingual WER at or below 10% on representative fixtures, at least 95% accuracy for names/numbers/dates/commitments or explicit uncertainty flags, reliable timestamps, and mandatory provenance plus user confirmation for consequential memories.
+
+## 2026-09-28 — NVIDIA Parakeet TDT 0.6B v3 feasibility
+
+Parakeet v3 was evaluated outside the application with FluidAudio 0.17.4 and its Core ML conversion. This kept the experiment from adding a product dependency before the provider met the quality gate. The model bundle occupied about 469 MB. The same 1,299.7-second Radioteca microphone recording and the same truncated reference and normalizer used above were processed twice. Private audio, reference text, word timestamps, and raw hypotheses remain outside the repository.
+
+| Provider | Warm runtime | RTFx | Hypothesis words | Word edits | Approx. WER |
+|---|---:|---:|---:|---:|---:|
+| WhisperKit large-v3 turbo 626 MB | 140.3 s | 9.3x | 3,164 | 678 | 21.8% |
+| Parakeet TDT 0.6B v3 Core ML | 15.3 s | 84.7x | 1,096 | 2,910 | 93.8% |
+
+Parakeet was about 9.1 times faster than WhisperKit on this Mac and produced identical text on its cold and warm inference runs. Its reported aggregate confidence was 0.677. The accuracy result is nevertheless a decisive failure on this fixture: the recording is mostly Catalan, which Parakeet v3 does not support, and the model emitted a mixture of Spanish- and English-looking substitutions while omitting much of the speech. This is a deliberately adverse coverage test, not a fair estimate of Parakeet accuracy for supported Spanish or English.
+
+Two short code-switching recordings provided a qualitative check. Parakeet retained the Spanish and English regions clearly and processed each in under 0.1 seconds of reported inference time. Catalan regions were converted into plausible-looking but incorrect Spanish-like words. Aggregate confidence remained high (0.877 and 0.936), demonstrating that provider confidence cannot safely identify unsupported Catalan.
+
+Conclusion: Parakeet must not replace WhisperKit as the sole provider while Catalan remains a product requirement. Its speed justifies a second benchmark on a long, human-corrected Spanish/English meeting. Until that fixture exists, neither a Parakeet product dependency nor automatic Parakeet-to-Whisper routing is justified. Any future hybrid must use an independent acoustic language detector or explicit meeting-language policy; Parakeet confidence alone is insufficient.
