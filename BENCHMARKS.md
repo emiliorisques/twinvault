@@ -106,3 +106,20 @@ WhisperKit had the lower per-file WER on 678 recordings, Parakeet on 132, with 5
 The large source difference matters. `Corts Valencianes Anonymized` intentionally alters voices and is an adverse robustness test; `Parlament Parla v3` is closer to normal audible speech. The related [Interspeech 2025 study](https://arxiv.org/abs/2507.13875) reports 20.96% WER for its base Whisper model on the code-switching portion of Parlament Parla and 35.43% on Corts, while a code-switching fine-tune improves those figures. Its scoring slice and model execution are not identical to this benchmark, so those numbers are context rather than a direct reproduction. TwinVault's 19.0% WhisperKit result on the full Parlament Parla subset is therefore plausible, but it still misses the product's 10% representative-fixture release gate.
 
 Conclusion: for Catalan/Spanish meetings, WhisperKit remains the only viable current provider of the two. Parakeet can still be considered for an explicitly selected Spanish/English mode, but it must never be the automatic default when Catalan may occur. The next accuracy experiment should compare the existing WhisperKit model with BSC's Catalan/Spanish code-switching fine-tune on a small, human-verified meeting-style holdout; diarization should remain a separate downstream stage and will not repair recognition errors.
+
+## 2026-09-28 — BSC Catalan/Spanish fine-tune feasibility
+
+The Apache-2.0 [`BSC-LT/whisper-timestamped-cs`](https://huggingface.co/BSC-LT/whisper-timestamped-cs) model was evaluated outside the application before considering a product dependency. It is a 2B-parameter Whisper large-v3 fine-tune trained on two hours of Catalan/Spanish code-switching. The downloaded BF16 weights occupied about 2.9 GB. The temporary Python/PyTorch environment and weights were not added to TwinVault.
+
+The 1,299.7-second Radioteca microphone fixture, reference cutoff, normalizer, and corpus-level Levenshtein calculation were identical to the earlier WhisperKit run.
+
+| Provider | Runtime | RTFx | Hypothesis words | Word edits | Approx. WER |
+|---|---:|---:|---:|---:|---:|
+| WhisperKit large-v3 turbo 626 MB, Core ML | 140.3 s | 9.3x | 3,164 | 678 | 21.8% |
+| BSC whisper-timestamped-cs, PyTorch/MPS BF16 | 1,430.6 s | 0.91x | 3,384 | 569 | 18.3% |
+
+The BSC fine-tune reduced word edits by 109, a 3.5-point absolute and 16.1% relative WER improvement. This is a real but insufficient gain for the product's 10% release gate. Runtime is not a direct Core ML forecast, but the unconverted model was 10.2 times slower than the existing compressed WhisperKit model and substantially larger.
+
+The required three-language fixture was decisive. Given the short ES/CA/EN recording, BSC returned `Buenos días. Avui parlem de pressupost.` and omitted the entire English region. WhisperKit's wording for that region was inaccurate, but it at least retained speech from all three regions. The BSC model also translated an English passage in Radioteca into Catalan-like text rather than preserving the spoken language.
+
+Conclusion: do not convert or integrate this BSC fine-tune as TwinVault's default. It improves a strictly CA/ES meeting, but violates the ES/CA/EN coverage requirement and does not justify a second 3 GB model yet. Keep WhisperKit as the local multilingual default. Reconsider a specialized CA/ES model only after explicit per-meeting language profiles exist and representative human-verified fixtures demonstrate that the extra operational complexity is worthwhile.
