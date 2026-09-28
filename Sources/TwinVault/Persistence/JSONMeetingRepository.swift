@@ -66,6 +66,6 @@ actor JSONMeetingRepository: MeetingRepository {
 
     private func write(_ store: Store) throws {
         let data = try encoder.encode(store)
-        try data.write(to: paths.meetingStore, options: [.atomic, .completeFileProtection])
+        try data.write(to: paths.meetingStore, options: .atomic)
     }
 }

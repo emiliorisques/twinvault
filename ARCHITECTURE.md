@@ -68,7 +68,7 @@ This is provenance scaffolding, not the future Memory model. Facts, inferences, 
 
 ## Privacy and security posture
 
-There is no external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first Apple Speech request. Choosing WhisperKit for the first time downloads public Core ML model assets from the configured Argmax/Hugging Face repository into the local vault. Neither provider uploads meeting audio. Metadata and audio live under Application Support. Metadata uses atomic writes and platform data-protection options. This is not a claim of full encryption at rest: Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
+There is no external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first Apple Speech request. Choosing WhisperKit for the first time downloads public Core ML model assets from the configured Argmax/Hugging Face repository into the local vault. Neither provider uploads meeting audio. Metadata and audio live under Application Support, and metadata uses atomic writes. The macOS application does not claim application-level encryption at rest: it currently inherits filesystem protection such as FileVault when enabled. Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
 
 ## Concurrency
 
