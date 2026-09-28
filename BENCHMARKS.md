@@ -68,3 +68,19 @@ Parakeet was about 9.1 times faster than WhisperKit on this Mac and produced ide
 Two short code-switching recordings provided a qualitative check. Parakeet retained the Spanish and English regions clearly and processed each in under 0.1 seconds of reported inference time. Catalan regions were converted into plausible-looking but incorrect Spanish-like words. Aggregate confidence remained high (0.877 and 0.936), demonstrating that provider confidence cannot safely identify unsupported Catalan.
 
 Conclusion: Parakeet must not replace WhisperKit as the sole provider while Catalan remains a product requirement. Its speed justifies a second benchmark on a long, human-corrected Spanish/English meeting. Until that fixture exists, neither a Parakeet product dependency nor automatic Parakeet-to-Whisper routing is justified. Any future hybrid must use an independent acoustic language detector or explicit meeting-language policy; Parakeet confidence alone is insufficient.
+
+## 2026-09-28 — Bangor Miami Spanish/English code-switching
+
+The public `zeledon4` recording from the Bangor Miami corpus `mixed` subset was used as a supported-language stress test. It is a 1,308.9-second spontaneous conversation containing approximately 42.6% Spanish words and frequent Spanish/English switches. The dataset remained in a temporary directory and was not added to the product or repository.
+
+All engines received the same stereo MP3. Parakeet v3 and WhisperKit used whole-file decoding without a language hint. Apple Speech used TwinVault's current shared speech-turn pipeline and evaluated its locally available language models per turn. Before scoring, case and punctuation were removed, partial-word parentheses were joined, and the corpus's `xxx`, laughter, cough, and pause markers were excluded. The score remains directional: the reference contains conversational transcription conventions and simultaneous speakers rather than a release-quality, time-aligned ASR reference.
+
+| Provider | Runtime | RTFx | Reference words | Hypothesis words | Word edits | Approx. WER |
+|---|---:|---:|---:|---:|---:|---:|
+| NVIDIA Parakeet TDT 0.6B v3 Core ML | 10.3 s | 127.2x | 4,114 | 3,002 | 1,716 | 41.7% |
+| WhisperKit large-v3 turbo 626 MB | 170.6 s | 7.7x | 4,114 | 3,298 | 1,696 | 41.2% |
+| Apple Speech | 72.6 s | 18.0x | 4,114 | 1,629 | 2,906 | 70.6% |
+
+Parakeet and WhisperKit were effectively tied on this noisy corpus reference: WhisperKit's 0.5-point WER advantage is not meaningful enough to offset Parakeet's 16.6-times lower runtime. Parakeet visibly retained Spanish and English within the same passage. WhisperKit translated some Spanish passages into English despite being configured for transcription, which is unacceptable for evidence fidelity even when the semantic content is similar. Apple omitted substantially more speech and remained unsuitable as the primary mixed-language engine; it also reported the unrelated Catalan asset as unavailable because the application currently enables ES, CA, and EN for every meeting.
+
+This single recording does not meet the product's decision threshold. It does justify advancing Parakeet to a limited provider integration and a larger evaluation set, while retaining WhisperKit as the Catalan-capable fallback. The next decision gate should use at least five human-verified meeting-style fixtures, include clean and noisy audio, and score code-switch boundaries plus names, numbers, dates, and commitments separately from aggregate WER.
