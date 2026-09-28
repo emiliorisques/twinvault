@@ -84,3 +84,25 @@ All engines received the same stereo MP3. Parakeet v3 and WhisperKit used whole-
 Parakeet and WhisperKit were effectively tied on this noisy corpus reference: WhisperKit's 0.5-point WER advantage is not meaningful enough to offset Parakeet's 16.6-times lower runtime. Parakeet visibly retained Spanish and English within the same passage. WhisperKit translated some Spanish passages into English despite being configured for transcription, which is unacceptable for evidence fidelity even when the semantic content is similar. Apple omitted substantially more speech and remained unsuitable as the primary mixed-language engine; it also reported the unrelated Catalan asset as unavailable because the application currently enables ES, CA, and EN for every meeting.
 
 This single recording does not meet the product's decision threshold. It does justify advancing Parakeet to a limited provider integration and a larger evaluation set, while retaining WhisperKit as the Catalan-capable fallback. The next decision gate should use at least five human-verified meeting-style fixtures, include clean and noisy audio, and score code-switch boundaries plus names, numbers, dates, and commitments separately from aggregate WER.
+
+## 2026-09-28 — BSC Catalan/Spanish code-switching test set
+
+The complete public [BSC Catalan/Spanish code-switching ASR test set](https://huggingface.co/datasets/BSC-LT/BSCs_Code_Switching_CA-ES_ASR_Test) was evaluated: 867 manually inspected utterances, 14,978.9 seconds (4 h 09 m), and 40,560 normalized reference words. Every utterance is Catalan-dominant and contains intra-sentential Spanish. The sources are `Corts Valencianes Anonymized` (457 files) and `Parlament Parla v3` (410 files). The dataset is CC BY-NC 4.0; neither its audio nor raw hypotheses are distributed with TwinVault, and use beyond evaluation would require a licence review.
+
+Both engines received the same local FLAC files and no language hint. Text was normalized with Unicode NFKC, lowercase conversion, punctuation removal, and whitespace collapse before calculating corpus-level Levenshtein word error rate. The temporary batch runner loaded each model once. Five WhisperKit jobs initially timed out when eight Core ML predictions ran concurrently; all five succeeded when retried serially, confirming a benchmark concurrency problem rather than unreadable audio.
+
+| Provider | Runtime | RTFx | Hypothesis words | Word edits | Corpus WER | Empty outputs |
+|---|---:|---:|---:|---:|---:|---:|
+| NVIDIA Parakeet TDT 0.6B v3 Core ML | 158.8 s | 94.3x | 28,671 | 29,803 | 73.5% | 37 |
+| WhisperKit large-v3 turbo 626 MB | 1,465.2 s | 10.2x | 38,950 | 13,615 | 33.6% | 23 |
+
+| Subset | Parakeet WER | WhisperKit WER |
+|---|---:|---:|
+| Corts Valencianes Anonymized | 63.2% | 45.9% |
+| Parlament Parla v3 | 85.6% | 19.0% |
+
+WhisperKit had the lower per-file WER on 678 recordings, Parakeet on 132, with 57 ties. Its median per-file advantage was 33.3 WER points. Parakeet's 9.2-times runtime advantage is irrelevant here because it does not support Catalan and failed badly, especially on the cleaner `Parlament Parla v3` subset. Its confidence must not be used to route Catalan audio.
+
+The large source difference matters. `Corts Valencianes Anonymized` intentionally alters voices and is an adverse robustness test; `Parlament Parla v3` is closer to normal audible speech. The related [Interspeech 2025 study](https://arxiv.org/abs/2507.13875) reports 20.96% WER for its base Whisper model on the code-switching portion of Parlament Parla and 35.43% on Corts, while a code-switching fine-tune improves those figures. Its scoring slice and model execution are not identical to this benchmark, so those numbers are context rather than a direct reproduction. TwinVault's 19.0% WhisperKit result on the full Parlament Parla subset is therefore plausible, but it still misses the product's 10% representative-fixture release gate.
+
+Conclusion: for Catalan/Spanish meetings, WhisperKit remains the only viable current provider of the two. Parakeet can still be considered for an explicitly selected Spanish/English mode, but it must never be the automatic default when Catalan may occur. The next accuracy experiment should compare the existing WhisperKit model with BSC's Catalan/Spanish code-switching fine-tune on a small, human-verified meeting-style holdout; diarization should remain a separate downstream stage and will not repair recognition errors.
