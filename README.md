@@ -11,6 +11,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Browse previous meetings and inspect notes, timestamps, and audio status.
 - Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
 - Choose an explicit transcription profile: multilingual ES/CA/EN (recommended, backed by WhisperKit), experimental fast ES/EN (Parakeet), or Apple Speech as the system-native comparison mode.
+- See model preparation, download, loading, and local transcription states; Parakeet reports real download percentage and active work can be cancelled without replacing an existing transcript.
 - Split speech at local acoustic pauses before either engine processes a language hypothesis.
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
@@ -53,6 +54,8 @@ Phase 2H adds one shared, local speech-turn detector before both providers. It m
 Phase 2I replaces raw engine selection in the UI with explicit transcription profiles. The default `Multilingual ES · CA · EN` profile routes to WhisperKit; Apple Speech remains an explicit comparison option. `TranscriptionPolicy` exposes only profiles whose provider is registered, chooses the recommended available profile deterministically, and supplies the exact requested locales to the provider. Routing is selected before transcription and is never inferred from transcript text.
 
 Phase 2J adds FluidAudio 0.17.4 as a pinned dependency and exposes Parakeet TDT 0.6B v3 only through `Fast ES · EN — No Catalan (Experimental)`. This is a manual profile, never the default or an automatic fallback. The provider rejects any requested locale outside Spanish and English before it reads audio or invokes the engine. Its first explicit use downloads the Core ML model into `TwinVault/models/`; recordings remain local. Word timings are grouped into bounded evidence segments, provider/recording provenance is persisted, and long uncovered intervals remain marked for review. Parakeet does not return a trustworthy per-segment language label, so TwinVault stores none rather than inventing one.
+
+Phase 2K makes long-running transcription work visible and cancellable. FluidAudio's native callback supplies Parakeet's real model-download percentage and compilation state. Apple Speech and WhisperKit expose honest coarse stages because their current integration APIs do not provide an equivalent byte-level fraction. Cancellation is cooperative: TwinVault never saves a cancelled run and preserves the previous transcript, while a model runtime may need to finish its current non-interruptible Core ML operation before returning. Downloaded model files are retained for later local use.
 
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 

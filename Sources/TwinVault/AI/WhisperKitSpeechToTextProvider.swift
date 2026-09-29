@@ -35,7 +35,10 @@ struct WhisperEngineSegment: Equatable, Sendable, TranscriptTimedUnit {
 }
 
 protocol WhisperTranscribingEngine: Sendable {
-    func transcribe(audioPath: String) async throws -> [WhisperEngineSegment]
+    func transcribe(
+        audioPath: String,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [WhisperEngineSegment]
 }
 
 /// Owns the third-party runtime behind an actor so its non-Sendable model
@@ -50,8 +53,14 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
         self.modelsDirectory = modelsDirectory.standardizedFileURL
     }
 
-    func transcribe(audioPath: String) async throws -> [WhisperEngineSegment] {
+    func transcribe(
+        audioPath: String,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [WhisperEngineSegment] {
+        progressHandler?(TranscriptionProgress(stage: .preparingModel))
         let pipeline = try await loadPipeline()
+        try Task.checkCancellation()
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
         let results = try await pipeline.transcribe(
             audioPath: audioPath,
             audioInputOptions: AudioInputOptions(
@@ -260,7 +269,11 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
         var engineSegments: [WhisperEngineSegment] = []
         for slice in prepared.turns {
             try Task.checkCancellation()
-            let localSegments = try await engine.transcribe(audioPath: slice.fileURL.path)
+            let localSegments = try await engine.transcribe(
+                audioPath: slice.fileURL.path,
+                progressHandler: request.progressHandler
+            )
+            try Task.checkCancellation()
             engineSegments.append(contentsOf: localSegments.map {
                 WhisperEngineSegment(
                     startTime: slice.turn.startTime + $0.startTime,

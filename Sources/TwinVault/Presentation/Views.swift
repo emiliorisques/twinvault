@@ -142,20 +142,28 @@ struct MeetingDetailView: View {
                         ) {
                             Task { await model.togglePlayback(recording) }
                         }
-                        if model.transcribingRecordingID == recording.id {
-                            ProgressView().controlSize(.small)
-                            Text("Transcribing…").foregroundStyle(.secondary)
+                        if let activity = model.transcriptionActivity,
+                           activity.recordingID == recording.id {
+                            if let fraction = activity.progress.fractionCompleted {
+                                ProgressView(value: fraction)
+                                    .frame(width: 80)
+                            } else {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text(transcriptionStatus(activity))
+                                .foregroundStyle(.secondary)
+                            Button("Cancel", role: .cancel) {
+                                model.cancelTranscription()
+                            }
                         } else {
                             Menu {
                                 ForEach(model.transcriptionProfiles) { profile in
                                     Button {
-                                        Task {
-                                            await model.transcribe(
-                                                meetingID: meeting.id,
-                                                recordingID: recording.id,
-                                                profileID: profile.id
-                                            )
-                                        }
+                                        model.startTranscription(
+                                            meetingID: meeting.id,
+                                            recordingID: recording.id,
+                                            profileID: profile.id
+                                        )
                                     } label: {
                                         Label(
                                             profile.isRecommended
@@ -235,4 +243,20 @@ private func duration(_ interval: TimeInterval) -> String {
 private func languageLabel(_ localeIdentifier: String) -> String {
     localeIdentifier.split(whereSeparator: { $0 == "-" || $0 == "_" })
         .first.map { String($0).uppercased() } ?? localeIdentifier
+}
+
+private func transcriptionStatus(_ activity: TranscriptionActivity) -> String {
+    switch activity.progress.stage {
+    case .preparingModel:
+        return "Preparing \(activity.profileName)…"
+    case .downloadingModel:
+        if let fraction = activity.progress.fractionCompleted {
+            return "Downloading model \(Int(fraction * 100))%"
+        }
+        return "Downloading model…"
+    case .loadingModel:
+        return "Loading local model…"
+    case .transcribing:
+        return "Transcribing locally…"
+    }
 }

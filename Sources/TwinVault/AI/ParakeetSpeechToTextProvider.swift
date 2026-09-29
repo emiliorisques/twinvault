@@ -32,7 +32,10 @@ struct ParakeetEngineSegment: Equatable, Sendable, TranscriptTimedUnit {
 }
 
 protocol ParakeetTranscribingEngine: Sendable {
-    func transcribe(fileURL: URL) async throws -> [ParakeetEngineSegment]
+    func transcribe(
+        fileURL: URL,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [ParakeetEngineSegment]
 }
 
 struct ParakeetTimedWord: Equatable, Sendable {
@@ -110,8 +113,14 @@ actor LocalParakeetEngine: ParakeetTranscribingEngine {
             .standardizedFileURL
     }
 
-    func transcribe(fileURL: URL) async throws -> [ParakeetEngineSegment] {
-        let manager = try await loadManager()
+    func transcribe(
+        fileURL: URL,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [ParakeetEngineSegment] {
+        progressHandler?(TranscriptionProgress(stage: .preparingModel))
+        let manager = try await loadManager(progressHandler: progressHandler)
+        try Task.checkCancellation()
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
         var decoderState = TdtDecoderState.make(decoderLayers: await manager.decoderLayerCount)
         // No single-language hint is supplied: this explicit profile is for
         // Spanish/English code-switching within the same recording.
@@ -130,12 +139,32 @@ actor LocalParakeetEngine: ParakeetTranscribingEngine {
         )
     }
 
-    private func loadManager() async throws -> AsrManager {
+    private func loadManager(
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> AsrManager {
         if let manager { return manager }
         let models = try await AsrModels.downloadAndLoad(
             to: modelDirectory,
-            version: .v3
+            version: .v3,
+            progressHandler: { progress in
+                let stage: TranscriptionProgress.Stage
+                switch progress.phase {
+                case .listing:
+                    stage = .preparingModel
+                case .downloading:
+                    stage = .downloadingModel
+                case .compiling:
+                    stage = .loadingModel
+                }
+                progressHandler?(TranscriptionProgress(
+                    stage: stage,
+                    fractionCompleted: stage == .downloadingModel
+                        ? progress.fractionCompleted
+                        : nil
+                ))
+            }
         )
+        try Task.checkCancellation()
         let loaded = AsrManager(config: .default, models: models)
         manager = loaded
         return loaded
@@ -187,7 +216,11 @@ actor ParakeetSpeechToTextProvider: SpeechToTextProvider {
         }
 
         let fileURL = try validatedURL(for: recording)
-        let engineSegments = try await engine.transcribe(fileURL: fileURL)
+        let engineSegments = try await engine.transcribe(
+            fileURL: fileURL,
+            progressHandler: request.progressHandler
+        )
+        try Task.checkCancellation()
         guard !engineSegments.isEmpty else {
             throw ParakeetTranscriptionError.noSpeechDetected
         }

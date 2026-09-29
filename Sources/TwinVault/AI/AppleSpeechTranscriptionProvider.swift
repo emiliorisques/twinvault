@@ -54,6 +54,7 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
+        request.progressHandler?(TranscriptionProgress(stage: .preparingModel))
         guard #available(macOS 26.0, *) else {
             throw LocalTranscriptionError.unavailableOnThisMac
         }
@@ -85,6 +86,7 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
 
         var unavailableIdentifiers = unsupportedIdentifiers
         var availableLocales: [Locale] = []
+        request.progressHandler?(TranscriptionProgress(stage: .loadingModel))
         for locale in resolvedLocales {
             try Task.checkCancellation()
             let transcriber = SpeechTranscriber(
@@ -108,6 +110,7 @@ actor AppleSpeechTranscriptionProvider: SpeechToTextProvider {
             )
         }
 
+        request.progressHandler?(TranscriptionProgress(stage: .transcribing))
         var selected: [TranscriptSegment] = []
         for slice in prepared.turns {
             try Task.checkCancellation()

@@ -224,8 +224,12 @@ private actor FakeWhisperEngine: WhisperTranscribingEngine {
         self.segments = segments
     }
 
-    func transcribe(audioPath: String) -> [WhisperEngineSegment] {
+    func transcribe(
+        audioPath: String,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) -> [WhisperEngineSegment] {
         path = audioPath
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
         return segments
     }
 
@@ -240,8 +244,12 @@ private actor FakeParakeetEngine: ParakeetTranscribingEngine {
         self.segments = segments
     }
 
-    func transcribe(fileURL: URL) -> [ParakeetEngineSegment] {
+    func transcribe(
+        fileURL: URL,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) -> [ParakeetEngineSegment] {
         url = fileURL
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
         return segments
     }
 

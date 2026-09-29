@@ -250,6 +250,54 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments.first?.localeIdentifier, "en-US")
         XCTAssertEqual(stored?.transcriptionLocaleIdentifiers, ["en-US"])
     }
+
+    func testCancellingTranscriptionPreservesExistingTranscript() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+        let existing = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 0,
+            endTime: 1,
+            text: "Keep this transcript",
+            sourceRecordingID: recording.id,
+            providerIdentifier: "existing.provider"
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Cancellation",
+            audioRecordings: [recording],
+            transcriptSegments: [existing],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: CancellableSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        model.startTranscription(meetingID: meetingID, recordingID: recording.id)
+        for _ in 0..<20 where model.transcriptionActivity?.progress.fractionCompleted != 0.5 {
+            await Task.yield()
+        }
+        XCTAssertEqual(model.transcriptionActivity?.recordingID, recording.id)
+        XCTAssertEqual(model.transcriptionActivity?.progress.stage, .downloadingModel)
+        XCTAssertEqual(model.transcriptionActivity?.progress.fractionCompleted, 0.5)
+
+        model.cancelTranscription()
+        for _ in 0..<20 where model.transcriptionActivity != nil {
+            await Task.yield()
+        }
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments, [existing])
+        XCTAssertNil(model.transcriptionActivity)
+        XCTAssertNil(model.errorMessage)
+    }
 }
 
 private enum TestCaptureError: Error {
@@ -388,5 +436,16 @@ private struct FakeSpeechToTextProvider: SpeechToTextProvider {
             providerIdentifier: identifier,
             localeIdentifier: request.localeIdentifiers.first
         )], reviewIntervals: reviewIntervals, unavailableLocaleIdentifiers: unavailableLocaleIdentifiers)
+    }
+}
+
+private struct CancellableSpeechToTextProvider: SpeechToTextProvider {
+    let identifier = "test.cancellable"
+    let displayName = "Cancellable provider"
+
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
+        request.progressHandler?(TranscriptionProgress(stage: .downloadingModel, fractionCompleted: 0.5))
+        try await Task.sleep(for: .seconds(30))
+        return TranscriptionOutput(segments: [])
     }
 }

@@ -1,5 +1,12 @@
 import Foundation
 
+struct TranscriptionActivity: Equatable {
+    let id: UUID
+    let recordingID: UUID
+    let profileName: String
+    var progress: TranscriptionProgress
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -11,10 +18,12 @@ final class AppModel {
     private let transcriptionPolicy: TranscriptionPolicy
     private let audioDirectory: URL
     private var systemAudioMonitoringTask: Task<Void, Never>?
+    private var transcriptionTask: Task<Void, Never>?
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
-    private(set) var transcribingRecordingID: UUID?
+    private(set) var transcriptionActivity: TranscriptionActivity?
+    var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
     let transcriptionProfiles: [TranscriptionProfile]
     var errorMessage: String?
 
@@ -181,7 +190,7 @@ final class AppModel {
         recordingID: UUID,
         profileID: String? = nil
     ) async {
-        guard transcribingRecordingID == nil else { return }
+        guard transcriptionActivity == nil else { return }
         guard var meeting = meetings.first(where: { $0.id == meetingID }),
               let recording = meeting.audioRecordings.first(where: { $0.id == recordingID }) else {
             errorMessage = LocalTranscriptionError.noRecording.localizedDescription
@@ -194,14 +203,32 @@ final class AppModel {
             return
         }
 
-        transcribingRecordingID = recordingID
-        defer { transcribingRecordingID = nil }
+        let activityID = UUID()
+        transcriptionActivity = TranscriptionActivity(
+            id: activityID,
+            recordingID: recordingID,
+            profileName: profile.displayName,
+            progress: TranscriptionProgress(stage: .preparingModel)
+        )
+        defer {
+            if transcriptionActivity?.id == activityID {
+                transcriptionActivity = nil
+            }
+            transcriptionTask = nil
+        }
         do {
             let output = try await speechToText.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
                 recordings: [recording],
-                localeIdentifiers: profile.localeIdentifiers
+                localeIdentifiers: profile.localeIdentifiers,
+                progressHandler: { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        guard self?.transcriptionActivity?.id == activityID else { return }
+                        self?.transcriptionActivity?.progress = progress
+                    }
+                }
             ))
+            try Task.checkCancellation()
             meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
             meeting.transcriptSegments.append(contentsOf: output.segments)
             meeting.transcriptSegments.sort {
@@ -222,9 +249,32 @@ final class AppModel {
             } else if !output.reviewIntervals.isEmpty {
                 errorMessage = "Transcription completed, but some long audio intervals contain no transcript. They are marked for review and must not be treated as complete evidence."
             }
+        } catch is CancellationError {
+            // Cancellation is a user action, not an application error. Existing
+            // transcript data remains untouched because persistence happens later.
         } catch {
+            if Task.isCancelled { return }
             errorMessage = error.localizedDescription
         }
+    }
+
+    func startTranscription(
+        meetingID: UUID,
+        recordingID: UUID,
+        profileID: String? = nil
+    ) {
+        guard transcriptionTask == nil, transcriptionActivity == nil else { return }
+        transcriptionTask = Task { [weak self] in
+            await self?.transcribe(
+                meetingID: meetingID,
+                recordingID: recordingID,
+                profileID: profileID
+            )
+        }
+    }
+
+    func cancelTranscription() {
+        transcriptionTask?.cancel()
     }
 
     private func validatedAudioURL(for recording: AudioRecordingReference) throws -> URL {

@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2J experimental Parakeet profile
+# TwinVault Architecture — Phase 2K transcription progress and cancellation
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. Phase 2K exposes model/transcription progress and cooperative cancellation. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -53,6 +53,8 @@ The UI selects a `TranscriptionProfile`, not a raw model implementation. The rec
 
 `ParakeetSpeechToTextProvider` is registered only for the explicit experimental ES/EN profile. It performs a second provider-level allowlist check and rejects Catalan or any other configured language before file access and inference. FluidAudio 0.17.4 and Parakeet v3 are pinned to the versions used in the feasibility benchmarks. The model is lazily downloaded into the vault's controlled models directory only after explicit profile selection. The runtime lives behind an actor and test-only engines avoid model downloads. Word timestamps are grouped at acoustic pauses or bounded duration/word counts to create evidence-sized segments; no per-segment language is asserted. Long uncovered intervals use the same review-warning policy as WhisperKit.
 
+`TranscriptionRequest` carries an optional `Sendable` progress sink. Providers report semantic stages without coupling the domain to SwiftUI. FluidAudio supplies Parakeet's determinate download fraction; WhisperKit and Apple Speech report indeterminate preparation/loading stages because their adapters cannot obtain a trustworthy equivalent fraction. `AppModel` owns the single active task and cancellation boundary. It checks cancellation before replacing transcript data, suppresses cancellation as a user-requested error, and keeps all previously persisted evidence unchanged. Provider cancellation is cooperative, so a Core ML call may return only after its current non-interruptible operation finishes.
+
 ## ADR-001: versioned JSON before SQLite
 
 Phase 1 has four small aggregate types and no relational query workload. A schema-versioned JSON document with atomic replacement is transparent, testable, backup-friendly, and avoids a dependency or premature migration system. Large audio files are never placed in metadata.
@@ -82,13 +84,12 @@ Types crossing boundaries conform to `Sendable`. The repository is an actor. Pre
 
 ## Next increments (not implemented)
 
-1. Add visible model download/readiness progress and cancellation for WhisperKit and Parakeet.
-2. Build human-corrected multilingual and cross-channel evaluation fixtures and enforce quality gates.
-3. Add buffer-level host-time calibration and measure microphone/system drift.
-4. Transcribe both channels while retaining independent evidence.
-5. Deduplicate overlapping channel hypotheses only after timing accuracy is measured.
-6. Add diarization independently and align turns through the common meeting timeline.
-7. Require review/confirmation before transcript-derived facts enter Twin memory.
-8. Move metadata and transcript persistence to SQLite before production-volume transcripts.
+1. Build human-corrected multilingual and cross-channel evaluation fixtures and enforce quality gates.
+2. Add buffer-level host-time calibration and measure microphone/system drift.
+3. Transcribe both channels while retaining independent evidence.
+4. Deduplicate overlapping channel hypotheses only after timing accuracy is measured.
+5. Add diarization independently and align turns through the common meeting timeline.
+6. Require review/confirmation before transcript-derived facts enter Twin memory.
+7. Move metadata and transcript persistence to SQLite before production-volume transcripts.
 
 Speaker diarization and speaker identification remain distinct boundaries. Only their contracts exist; model implementations are not part of this phase.

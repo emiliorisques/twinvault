@@ -56,15 +56,37 @@ struct TranscriptionRequest: Sendable {
     let meetingID: UUID
     let recordings: [AudioRecordingReference]
     let localeIdentifiers: [String]
+    let progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
 
     init(
         meetingID: UUID,
         recordings: [AudioRecordingReference],
-        localeIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers
+        localeIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)? = nil
     ) {
         self.meetingID = meetingID
         self.recordings = recordings
         self.localeIdentifiers = localeIdentifiers
+        self.progressHandler = progressHandler
+    }
+}
+
+struct TranscriptionProgress: Equatable, Sendable {
+    enum Stage: Equatable, Sendable {
+        case preparingModel
+        case downloadingModel
+        case loadingModel
+        case transcribing
+    }
+
+    let stage: Stage
+    /// Known download progress in [0, 1]. Nil means the provider cannot
+    /// report a trustworthy fraction for the current operation.
+    let fractionCompleted: Double?
+
+    init(stage: Stage, fractionCompleted: Double? = nil) {
+        self.stage = stage
+        self.fractionCompleted = fractionCompleted.map { min(1, max(0, $0)) }
     }
 }
 
