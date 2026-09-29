@@ -147,16 +147,24 @@ struct MeetingDetailView: View {
                             Text("Transcribing…").foregroundStyle(.secondary)
                         } else {
                             Menu {
-                                ForEach(model.transcriptionProviderOptions) { provider in
-                                    Button(provider.displayName) {
+                                ForEach(model.transcriptionProfiles) { profile in
+                                    Button {
                                         Task {
                                             await model.transcribe(
                                                 meetingID: meeting.id,
                                                 recordingID: recording.id,
-                                                providerIdentifier: provider.id
+                                                profileID: profile.id
                                             )
                                         }
+                                    } label: {
+                                        Label(
+                                            profile.isRecommended
+                                                ? "\(profile.displayName) — Recommended"
+                                                : profile.displayName,
+                                            systemImage: profile.isRecommended ? "checkmark.seal" : "waveform"
+                                        )
                                     }
+                                    .help(profile.detail)
                                 }
                             } label: {
                                 Label(
@@ -166,7 +174,7 @@ struct MeetingDetailView: View {
                                 )
                             }
                             .disabled(model.transcribingRecordingID != nil)
-                            .help("WhisperKit downloads its local multilingual model on first use; Apple Speech uses system-managed language assets.")
+                            .help("Choose a local transcription profile. The recommended profile supports mixed Spanish, Catalan, and English.")
                         }
                     }
                 }

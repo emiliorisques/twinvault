@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2H multilingual speech turns
+# TwinVault Architecture — Phase 2I transcription profiles
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -17,6 +17,7 @@ AppModel (use-case coordination)
     ├── AudioPlaybackService ── LocalAudioPlaybackService
     └── SpeechToTextProvider ─┬─ AppleSpeechTranscriptionProvider
                               └─ WhisperKitSpeechToTextProvider
+        TranscriptionPolicy ───── profile → available provider + locales
                     │
                     └── SpeechTurnDetecting ── LocalEnergySpeechTurnDetector
                     │
@@ -46,6 +47,8 @@ Whisper control tokens are removed before text enters the domain. The current Wh
 WhisperKit performs one bounded recovery attempt for long timestamp gaps that contain acoustic activity. Remaining gaps of eight seconds or more become persisted `TranscriptReviewInterval` records linked to the exact source recording. They are warnings, not claims that speech definitely exists: silence and music can also create uncovered intervals. Future memory extraction must treat a transcript with review intervals as incomplete evidence.
 
 The third-party runtime is isolated behind an internal engine protocol. Unit tests substitute a deterministic fake, so CI neither accesses the network nor downloads model weights. Apple Speech remains available in the same UI for comparison and fallback. A successful new run replaces only transcript segments for the selected recording; provider provenance remains on every segment.
+
+The UI selects a `TranscriptionProfile`, not a raw model implementation. The recommended profile requests ES/CA/EN and routes to WhisperKit; Apple Speech is retained as a clearly named system-native comparison profile. `TranscriptionPolicy` filters profiles against the providers registered at composition time and picks the recommended available profile as the deterministic default. A profile determines provider and requested locales before audio processing. Transcript text or an unreliable result-level language label can never silently switch engines. Experimental Parakeet routing remains absent until a compatible provider exists and passes language-specific quality gates; diarization is not a language router.
 
 ## ADR-001: versioned JSON before SQLite
 

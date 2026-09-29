@@ -124,9 +124,60 @@ extension SpeechToTextProvider {
     var displayName: String { identifier }
 }
 
-struct SpeechToTextProviderOption: Identifiable, Equatable, Sendable {
+/// A user-visible transcription intent. Profiles select a provider and its
+/// supported languages before audio is processed; transcript text never
+/// silently changes this routing decision.
+struct TranscriptionProfile: Identifiable, Equatable, Sendable {
     let id: String
     let displayName: String
+    let detail: String
+    let providerIdentifier: String
+    let localeIdentifiers: [String]
+    let isRecommended: Bool
+
+    init(
+        id: String,
+        displayName: String,
+        detail: String,
+        providerIdentifier: String,
+        localeIdentifiers: [String],
+        isRecommended: Bool = false
+    ) {
+        self.id = id
+        self.displayName = displayName
+        self.detail = detail
+        self.providerIdentifier = providerIdentifier
+        self.localeIdentifiers = localeIdentifiers
+        self.isRecommended = isRecommended
+    }
+}
+
+/// Filters configuration against providers that are actually installed and
+/// chooses one deterministic default. This keeps experimental engines out of
+/// the UI until a real provider implementation has been registered.
+struct TranscriptionPolicy: Sendable {
+    let availableProfiles: [TranscriptionProfile]
+
+    init(
+        profiles: [TranscriptionProfile],
+        availableProviderIdentifiers: Set<String>
+    ) {
+        var seenIDs = Set<String>()
+        availableProfiles = profiles.filter { profile in
+            availableProviderIdentifiers.contains(profile.providerIdentifier)
+                && !profile.localeIdentifiers.isEmpty
+                && seenIDs.insert(profile.id).inserted
+        }
+    }
+
+    var defaultProfile: TranscriptionProfile? {
+        availableProfiles.first(where: \.isRecommended) ?? availableProfiles.first
+    }
+
+    func profile(id: String?) -> TranscriptionProfile? {
+        guard let id else { return defaultProfile }
+        return availableProfiles.first { $0.id == id }
+    }
 }
 
 struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {

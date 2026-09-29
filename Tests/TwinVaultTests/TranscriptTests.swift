@@ -78,6 +78,31 @@ final class TranscriptTests: XCTestCase {
         )
     }
 
+    func testTranscriptionPolicyPrefersRecommendedAvailableProfile() {
+        let policy = TranscriptionPolicy(
+            profiles: [
+                profile(id: "apple", provider: "apple"),
+                profile(id: "multilingual", provider: "whisper", recommended: true)
+            ],
+            availableProviderIdentifiers: ["apple", "whisper"]
+        )
+
+        XCTAssertEqual(policy.defaultProfile?.id, "multilingual")
+    }
+
+    func testTranscriptionPolicyHidesProfilesWithoutInstalledProvider() {
+        let policy = TranscriptionPolicy(
+            profiles: [
+                profile(id: "multilingual", provider: "whisper", recommended: true),
+                profile(id: "fast", provider: "parakeet")
+            ],
+            availableProviderIdentifiers: ["whisper"]
+        )
+
+        XCTAssertEqual(policy.availableProfiles.map(\.id), ["multilingual"])
+        XCTAssertNil(policy.profile(id: "fast"))
+    }
+
     func testSpeechTurnBuilderMergesShortPauseAndSplitsLongPause() {
         let frames = [
             false, true, true, true, true,
@@ -162,6 +187,21 @@ final class TranscriptTests: XCTestCase {
             sourceRecordingID: recordingID,
             providerIdentifier: "test.multilingual",
             localeIdentifier: locale
+        )
+    }
+
+    private func profile(
+        id: String,
+        provider: String,
+        recommended: Bool = false
+    ) -> TranscriptionProfile {
+        TranscriptionProfile(
+            id: id,
+            displayName: id,
+            detail: "Test profile",
+            providerIdentifier: provider,
+            localeIdentifiers: ["es-ES", "ca-ES", "en-US"],
+            isRecommended: recommended
         )
     }
 }

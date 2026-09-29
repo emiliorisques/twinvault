@@ -199,7 +199,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertNotNil(model.errorMessage)
     }
 
-    func testExplicitlySelectedTranscriptionProviderIsUsed() async {
+    func testExplicitlySelectedTranscriptionProfileUsesItsProviderAndLanguages() async {
         let repository = InMemoryMeetingRepository()
         let meetingID = UUID()
         let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
@@ -217,6 +217,23 @@ final class AppModelTests: XCTestCase {
             systemAudio: FailingSystemAudioService(),
             playback: FakePlaybackService(),
             speechToTextProviders: [first, selected],
+            transcriptionProfiles: [
+                TranscriptionProfile(
+                    id: "multilingual",
+                    displayName: "Multilingual",
+                    detail: "Test default",
+                    providerIdentifier: first.identifier,
+                    localeIdentifiers: ["es-ES", "ca-ES", "en-US"],
+                    isRecommended: true
+                ),
+                TranscriptionProfile(
+                    id: "english",
+                    displayName: "English",
+                    detail: "Test selection",
+                    providerIdentifier: selected.identifier,
+                    localeIdentifiers: ["en-US"]
+                )
+            ],
             audioDirectory: FileManager.default.temporaryDirectory
         )
         await model.load()
@@ -224,12 +241,14 @@ final class AppModelTests: XCTestCase {
         await model.transcribe(
             meetingID: meetingID,
             recordingID: recording.id,
-            providerIdentifier: selected.identifier
+            profileID: "english"
         )
 
         let stored = await repository.meeting(id: meetingID)
         XCTAssertEqual(stored?.transcriptSegments.first?.text, "Selected")
         XCTAssertEqual(stored?.transcriptSegments.first?.providerIdentifier, "test.selected")
+        XCTAssertEqual(stored?.transcriptSegments.first?.localeIdentifier, "en-US")
+        XCTAssertEqual(stored?.transcriptionLocaleIdentifiers, ["en-US"])
     }
 }
 
