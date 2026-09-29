@@ -12,11 +12,14 @@ as described in `SOURCES.md`, then run:
 ```bash
 python3 scripts/build_benchmark.py --sources /path/to/source-clips
 python3 scripts/validate_benchmark.py
+python3 scripts/score_transcriptions.py --results /path/to/provider-json
 ```
 
 The build is deterministic for the listed source files. Cases 06 and 10 mix a MUSAN
 noise clip at a calculated 10 dB SNR. Case 07 reconstructs a 150-second AMI meeting
 window on its original timeline from individual headset segments, preserving overlap.
+The scorer expects `parakeet-<case>.json` and `whisperkit-<case>.json` files in the
+results directory and writes `comparison_results.csv` plus `comparison_report.md`.
 
 ## Reference status
 

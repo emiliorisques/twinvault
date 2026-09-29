@@ -151,3 +151,44 @@ accuracy decision without a human reference. The system channel is the preferred
 for remote participants; the microphone channel includes the local speaker plus room
 echo and should not be merged naively. Cross-channel alignment/deduplication remains a
 separate future step.
+
+## 2026-09-29 — public eight-case ES/CA/EN suite
+
+Fast ES/EN (Parakeet) and the current TwinVault WhisperKit provider processed all eight
+generated benchmark WAVs successfully. Scoring used Unicode NFKC, lowercase text,
+punctuation removal and corpus-level Levenshtein word edits. References are copied from
+FLEURS/AMI and have not yet received the required word-for-word human review, so all WER
+figures are directional. AMI includes overlapping speech, making its linear WER an
+especially conservative measure.
+
+| Case | Languages | Fast ES/EN WER / runtime | WhisperKit WER / runtime |
+|---|---|---:|---:|
+| ES clean | ES | 5.8% / 1.1 s | 3.3% / 20.2 s |
+| EN clean | EN | 6.9% / 1.1 s | 45.7% / 15.9 s |
+| ES/EN | ES+EN | 6.5% / 1.3 s | 22.1% / 15.0 s |
+| CA/ES | CA+ES | 54.9% / 2.8 s | 11.6% / 21.3 s |
+| ES/CA/EN | ES+CA+EN | 34.4% / 1.4 s | 14.7% / 27.9 s |
+| multilingual + noise | ES+CA+EN | 45.4% / 3.7 s | 26.3% / 18.6 s |
+| AMI meeting overlap | EN | 22.4% / 1.9 s | 71.6% / 28.7 s |
+| stress test | ES+CA+EN | 45.5% / 3.0 s | 26.5% / 23.7 s |
+
+Across all 1,069 seconds and 2,363 reference words, Fast ES/EN obtained 27.7% directional
+micro-WER in 16.3 seconds (65.5x real time); WhisperKit obtained 31.5% in 171.3 seconds
+(6.2x real time). That aggregate hides the actual routing decision:
+
+- on cases 01–03 (ES/EN, without the overlapping AMI reconstruction), Fast scored 6.4%
+  and WhisperKit 23.8%;
+- on the four Catalan-containing cases, Fast scored 44.5% and WhisperKit 19.4%;
+- on AMI alone, Fast scored 22.4% and WhisperKit 71.6%.
+
+The English and AMI failures must not be interpreted as a limitation of the underlying
+Whisper model alone. The current product provider slices every detected acoustic turn and
+decodes each independently. That strategy was already shown to regress long-form Whisper
+accuracy, and here it omitted substantial English content. This benchmark reinforces the
+pending engineering change: restore a whole-file/incremental Whisper baseline and rerun
+the same suite before deciding final routing.
+
+Current evidence supports Fast ES/EN for explicitly ES/EN meetings and WhisperKit when
+Catalan can occur. It does not support routing from Parakeet confidence or silently using
+Fast for a potentially Catalan meeting. No transcript-derived memory should be confirmed
+automatically from either provider.
