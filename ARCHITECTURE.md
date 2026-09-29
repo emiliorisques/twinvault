@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2I transcription profiles
+# TwinVault Architecture — Phase 2J experimental Parakeet profile
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H gives both speech engines the same local pause-based turn boundary. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -16,7 +16,8 @@ AppModel (use-case coordination)
     ├── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
     ├── AudioPlaybackService ── LocalAudioPlaybackService
     └── SpeechToTextProvider ─┬─ AppleSpeechTranscriptionProvider
-                              └─ WhisperKitSpeechToTextProvider
+                              ├─ WhisperKitSpeechToTextProvider
+                              └─ ParakeetSpeechToTextProvider
         TranscriptionPolicy ───── profile → available provider + locales
                     │
                     └── SpeechTurnDetecting ── LocalEnergySpeechTurnDetector
@@ -48,7 +49,9 @@ WhisperKit performs one bounded recovery attempt for long timestamp gaps that co
 
 The third-party runtime is isolated behind an internal engine protocol. Unit tests substitute a deterministic fake, so CI neither accesses the network nor downloads model weights. Apple Speech remains available in the same UI for comparison and fallback. A successful new run replaces only transcript segments for the selected recording; provider provenance remains on every segment.
 
-The UI selects a `TranscriptionProfile`, not a raw model implementation. The recommended profile requests ES/CA/EN and routes to WhisperKit; Apple Speech is retained as a clearly named system-native comparison profile. `TranscriptionPolicy` filters profiles against the providers registered at composition time and picks the recommended available profile as the deterministic default. A profile determines provider and requested locales before audio processing. Transcript text or an unreliable result-level language label can never silently switch engines. Experimental Parakeet routing remains absent until a compatible provider exists and passes language-specific quality gates; diarization is not a language router.
+The UI selects a `TranscriptionProfile`, not a raw model implementation. The recommended profile requests ES/CA/EN and routes to WhisperKit; Apple Speech is retained as a clearly named system-native comparison profile. `TranscriptionPolicy` filters profiles against the providers registered at composition time and picks the recommended available profile as the deterministic default. A profile determines provider and requested locales before audio processing. Transcript text or an unreliable result-level language label can never silently switch engines. Diarization is not a language router.
+
+`ParakeetSpeechToTextProvider` is registered only for the explicit experimental ES/EN profile. It performs a second provider-level allowlist check and rejects Catalan or any other configured language before file access and inference. FluidAudio 0.17.4 and Parakeet v3 are pinned to the versions used in the feasibility benchmarks. The model is lazily downloaded into the vault's controlled models directory only after explicit profile selection. The runtime lives behind an actor and test-only engines avoid model downloads. Word timestamps are grouped at acoustic pauses or bounded duration/word counts to create evidence-sized segments; no per-segment language is asserted. Long uncovered intervals use the same review-warning policy as WhisperKit.
 
 ## ADR-001: versioned JSON before SQLite
 
@@ -71,7 +74,7 @@ This is provenance scaffolding, not the future Memory model. Facts, inferences, 
 
 ## Privacy and security posture
 
-There is no external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first Apple Speech request. Choosing WhisperKit for the first time downloads public Core ML model assets from the configured Argmax/Hugging Face repository into the local vault. Neither provider uploads meeting audio. Metadata and audio live under Application Support, and metadata uses atomic writes. The macOS application does not claim application-level encryption at rest: it currently inherits filesystem protection such as FileVault when enabled. Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
+There is no external inference service. Microphone access is requested only when the user starts a meeting. `AssetInventory` may download a language model from Apple at the user's first Apple Speech request. Choosing WhisperKit or experimental Parakeet for the first time downloads public Core ML model assets from their configured model repositories into the local vault. Providers never upload meeting audio. Metadata and audio live under Application Support, and metadata uses atomic writes. The macOS application does not claim application-level encryption at rest: it currently inherits filesystem protection such as FileVault when enabled. Keychain-managed workspace keys, Apple cryptographic APIs, audit logs, export, retention, and propagation-aware deletion require a deliberate later phase.
 
 ## Concurrency
 
@@ -79,7 +82,7 @@ Types crossing boundaries conform to `Sendable`. The repository is an actor. Pre
 
 ## Next increments (not implemented)
 
-1. Add visible WhisperKit model download/readiness progress and cancellation.
+1. Add visible model download/readiness progress and cancellation for WhisperKit and Parakeet.
 2. Build human-corrected multilingual and cross-channel evaluation fixtures and enforce quality gates.
 3. Add buffer-level host-time calibration and measure microphone/system drift.
 4. Transcribe both channels while retaining independent evidence.

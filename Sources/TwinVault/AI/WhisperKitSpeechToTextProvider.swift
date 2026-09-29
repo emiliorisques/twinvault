@@ -22,7 +22,12 @@ enum WhisperKitTranscriptionError: LocalizedError {
     }
 }
 
-struct WhisperEngineSegment: Equatable, Sendable {
+protocol TranscriptTimedUnit {
+    var startTime: TimeInterval { get }
+    var endTime: TimeInterval { get }
+}
+
+struct WhisperEngineSegment: Equatable, Sendable, TranscriptTimedUnit {
     let startTime: TimeInterval
     let endTime: TimeInterval
     let text: String
@@ -159,8 +164,8 @@ enum TranscriptGapRepairPlanner {
     static let minimumGapDuration: TimeInterval = 8
     static let maximumRepairDuration: TimeInterval = 90
 
-    static func gaps(
-        in segments: [WhisperEngineSegment],
+    static func gaps<Segment: TranscriptTimedUnit>(
+        in segments: [Segment],
         audioDuration: TimeInterval
     ) -> [TranscriptGap] {
         guard audioDuration > 0 else { return [] }

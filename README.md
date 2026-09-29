@@ -10,7 +10,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Store audio separately from versioned meeting metadata.
 - Browse previous meetings and inspect notes, timestamps, and audio status.
 - Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
-- Choose an explicit transcription profile: multilingual ES/CA/EN (recommended, backed by WhisperKit) or Apple Speech as the system-native comparison mode.
+- Choose an explicit transcription profile: multilingual ES/CA/EN (recommended, backed by WhisperKit), experimental fast ES/EN (Parakeet), or Apple Speech as the system-native comparison mode.
 - Split speech at local acoustic pauses before either engine processes a language hypothesis.
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
@@ -50,13 +50,15 @@ Phase 2G adds a bounded quality safeguard. WhisperKit examines long timestamp ga
 
 Phase 2H adds one shared, local speech-turn detector before both providers. It measures short PCM energy windows, joins brief internal pauses, and creates lossless temporary CAF slices. Apple evaluates its available locale models per turn; WhisperKit detects language independently per turn. Segment timestamps are translated back to the original recording timeline and retain their recording/provider provenance. Temporary slices are removed after each run and are never stored in the vault. A `SpeechTurn` is only an acoustic interval: it contains no speaker identity and is not diarization.
 
-Phase 2I replaces raw engine selection in the UI with explicit transcription profiles. The default `Multilingual ES · CA · EN` profile routes to WhisperKit; Apple Speech remains an explicit comparison option. `TranscriptionPolicy` exposes only profiles whose provider is registered, chooses the recommended available profile deterministically, and supplies the exact requested locales to the provider. Routing is selected before transcription and is never inferred from transcript text. Parakeet is not integrated or exposed yet because the evaluated multilingual checkpoint does not cover Catalan.
+Phase 2I replaces raw engine selection in the UI with explicit transcription profiles. The default `Multilingual ES · CA · EN` profile routes to WhisperKit; Apple Speech remains an explicit comparison option. `TranscriptionPolicy` exposes only profiles whose provider is registered, chooses the recommended available profile deterministically, and supplies the exact requested locales to the provider. Routing is selected before transcription and is never inferred from transcript text.
 
-WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment.
+Phase 2J adds FluidAudio 0.17.4 as a pinned dependency and exposes Parakeet TDT 0.6B v3 only through `Fast ES · EN — No Catalan (Experimental)`. This is a manual profile, never the default or an automatic fallback. The provider rejects any requested locale outside Spanish and English before it reads audio or invokes the engine. Its first explicit use downloads the Core ML model into `TwinVault/models/`; recordings remain local. Word timings are grouped into bounded evidence segments, provider/recording provenance is persisted, and long uncovered intervals remain marked for review. Parakeet does not return a trustworthy per-segment language label, so TwinVault stores none rather than inventing one.
+
+WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech and WhisperKit are replaceable implementations of `SpeechToTextProvider`; diarization and speaker identification remain separate unimplemented contracts. Structured memory, twins, external integrations, and generative-AI inference remain absent.
+`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, and Parakeet are replaceable implementations of `SpeechToTextProvider`; diarization and speaker identification remain separate unimplemented contracts. Structured memory, twins, external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
 Aggregate local evaluation results are recorded in [BENCHMARKS.md](BENCHMARKS.md); private fixtures and raw transcripts are excluded.

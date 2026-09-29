@@ -19,7 +19,10 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
 
     func testGapRepairPlannerBoundsVeryLongRepairs() {
         XCTAssertEqual(
-            TranscriptGapRepairPlanner.gaps(in: [], audioDuration: 200),
+            TranscriptGapRepairPlanner.gaps(
+                in: [WhisperEngineSegment](),
+                audioDuration: 200
+            ),
             [
                 TranscriptGap(startTime: 0, endTime: 90),
                 TranscriptGap(startTime: 90, endTime: 180),
@@ -117,6 +120,96 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
     }
 }
 
+final class ParakeetSpeechToTextProviderTests: XCTestCase {
+    func testSegmenterCreatesTimestampedEvidenceChunks() {
+        let segments = ParakeetSegmenter.segments(
+            words: [
+                ParakeetTimedWord(text: "Buenos", startTime: 0, endTime: 0.4),
+                ParakeetTimedWord(text: "días", startTime: 0.5, endTime: 0.9),
+                ParakeetTimedWord(text: "Hello", startTime: 2, endTime: 2.4)
+            ],
+            fallbackText: "",
+            audioDuration: 3
+        )
+
+        XCTAssertEqual(segments, [
+            ParakeetEngineSegment(startTime: 0, endTime: 0.9, text: "Buenos días"),
+            ParakeetEngineSegment(startTime: 2, endTime: 2.4, text: "Hello")
+        ])
+    }
+
+    func testProviderMapsSegmentsWithRecordingAndProviderProvenance() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "meeting.caf")
+        try makeSilentAudio(at: fileURL, duration: 4)
+        let engine = FakeParakeetEngine(segments: [
+            ParakeetEngineSegment(startTime: 1, endTime: 2, text: "Budget Friday")
+        ])
+        let provider = ParakeetSpeechToTextProvider(
+            audioDirectory: directory,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: fileURL.lastPathComponent
+        )
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording],
+            localeIdentifiers: ["es-ES", "en-US"]
+        ))
+
+        XCTAssertEqual(output.segments.count, 1)
+        XCTAssertEqual(output.segments[0].sourceRecordingID, recording.id)
+        XCTAssertEqual(output.segments[0].providerIdentifier, provider.identifier)
+        XCTAssertNil(output.segments[0].localeIdentifier)
+        let receivedURL = await engine.receivedURL()
+        XCTAssertEqual(receivedURL, fileURL)
+    }
+
+    func testProviderRejectsCatalanBeforeCallingEngine() async {
+        let engine = FakeParakeetEngine(segments: [])
+        let provider = ParakeetSpeechToTextProvider(
+            audioDirectory: FileManager.default.temporaryDirectory,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "meeting.m4a"
+        )
+
+        do {
+            _ = try await provider.transcribe(TranscriptionRequest(
+                meetingID: meetingID,
+                recordings: [recording],
+                localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
+            ))
+            XCTFail("Catalan must not be routed to Parakeet.")
+        } catch ParakeetTranscriptionError.unsupportedLocales(let locales) {
+            XCTAssertEqual(locales, ["ca-ES"])
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        let receivedURL = await engine.receivedURL()
+        XCTAssertNil(receivedURL)
+    }
+
+    private func makeSilentAudio(at url: URL, duration: TimeInterval) throws {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        let frameCount = AVAudioFrameCount(duration * format.sampleRate)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
+        memset(buffer.floatChannelData![0], 0, Int(frameCount) * MemoryLayout<Float>.size)
+        try file.write(from: buffer)
+    }
+}
+
 private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
     let turns: [SpeechTurn]
 
@@ -137,4 +230,20 @@ private actor FakeWhisperEngine: WhisperTranscribingEngine {
     }
 
     func receivedPath() -> String? { path }
+}
+
+private actor FakeParakeetEngine: ParakeetTranscribingEngine {
+    private let segments: [ParakeetEngineSegment]
+    private var url: URL?
+
+    init(segments: [ParakeetEngineSegment]) {
+        self.segments = segments
+    }
+
+    func transcribe(fileURL: URL) -> [ParakeetEngineSegment] {
+        url = fileURL
+        return segments
+    }
+
+    func receivedURL() -> URL? { url }
 }

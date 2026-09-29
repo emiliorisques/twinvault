@@ -16,6 +16,10 @@ struct TwinVaultApplication: App {
                 modelsDirectory: paths.modelsDirectory
             )
             let appleSpeech = AppleSpeechTranscriptionProvider(audioDirectory: paths.audioDirectory)
+            let parakeet = ParakeetSpeechToTextProvider(
+                audioDirectory: paths.audioDirectory,
+                modelsDirectory: paths.modelsDirectory
+            )
             let transcriptionProfiles = [
                 TranscriptionProfile(
                     id: "multilingual.es-ca-en",
@@ -31,6 +35,13 @@ struct TwinVaultApplication: App {
                     detail: "System-native comparison mode; availability depends on Apple's installed language assets.",
                     providerIdentifier: appleSpeech.identifier,
                     localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
+                ),
+                TranscriptionProfile(
+                    id: "fast.es-en.experimental",
+                    displayName: "Fast ES · EN — No Catalan (Experimental)",
+                    detail: "Very fast local Parakeet mode. It does not support Catalan; the first use downloads its local model.",
+                    providerIdentifier: parakeet.identifier,
+                    localeIdentifiers: ["es-ES", "en-US"]
                 )
             ]
             _model = State(initialValue: AppModel(
@@ -38,7 +49,7 @@ struct TwinVaultApplication: App {
                 audio: audio,
                 systemAudio: systemAudio,
                 playback: playback,
-                speechToTextProviders: [whisperKit, appleSpeech],
+                speechToTextProviders: [whisperKit, appleSpeech, parakeet],
                 transcriptionProfiles: transcriptionProfiles,
                 audioDirectory: paths.audioDirectory
             ))

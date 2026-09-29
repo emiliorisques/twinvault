@@ -29,7 +29,9 @@
 		A10000000000000000000020 /* WhisperKitSpeechToTextProviderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */; };
 		A10000000000000000000021 /* LocalTranscriptionBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */; };
 		A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* LocalSpeechTurnDetector.swift */; };
+		A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */; };
 		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
+		A20000000000000000000002 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -68,6 +70,7 @@
 		B10000000000000000000023 /* WhisperKitSpeechToTextProviderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhisperKitSpeechToTextProviderTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionBenchmarkTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* LocalSpeechTurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeechTurnDetector.swift; sourceTree = "<group>"; };
+		B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetSpeechToTextProvider.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -76,6 +79,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A20000000000000000000001 /* WhisperKit in Frameworks */,
+				A20000000000000000000002 /* FluidAudio in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -159,6 +163,7 @@
 				B10000000000000000000021 /* MultilingualTranscriptSelector.swift */,
 				B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */,
 				B10000000000000000000025 /* LocalSpeechTurnDetector.swift */,
+				B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -211,6 +216,7 @@
 			name = TwinVault;
 			packageProductDependencies = (
 				N20000000000000000000001 /* WhisperKit */,
+				N20000000000000000000002 /* FluidAudio */,
 			);
 			productName = TwinVault;
 			productReference = B10000000000000000000013 /* TwinVault.app */;
@@ -264,6 +270,7 @@
 			mainGroup = G10000000000000000000001;
 			packageReferences = (
 				M20000000000000000000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */,
+				M20000000000000000000002 /* XCRemoteSwiftPackageReference "FluidAudio" */,
 			);
 			productRefGroup = G10000000000000000000009 /* Products */;
 			projectDirPath = "";
@@ -313,6 +320,7 @@
 				A10000000000000000000018 /* MultilingualTranscriptSelector.swift in Sources */,
 				A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */,
 				A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */,
+				A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,6 +475,14 @@
 				version = 1.1.0;
 			};
 		};
+		M20000000000000000000002 /* XCRemoteSwiftPackageReference "FluidAudio" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/FluidInference/FluidAudio.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.17.4;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -474,6 +490,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = M20000000000000000000001 /* XCRemoteSwiftPackageReference "argmax-oss-swift" */;
 			productName = WhisperKit;
+		};
+		N20000000000000000000002 /* FluidAudio */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = M20000000000000000000002 /* XCRemoteSwiftPackageReference "FluidAudio" */;
+			productName = FluidAudio;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
