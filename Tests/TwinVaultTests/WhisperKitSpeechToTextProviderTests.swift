@@ -31,6 +31,24 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         )
     }
 
+    func testCoveragePlannerIgnoresSilenceAndReportsOnlyUncoveredSpeech() {
+        let turns = [
+            SpeechTurn(startTime: 10, endTime: 30),
+            SpeechTurn(startTime: 80, endTime: 85)
+        ]
+        let segments = [
+            WhisperEngineSegment(startTime: 10, endTime: 18, text: "Covered", languageCode: nil)
+        ]
+
+        XCTAssertEqual(
+            TranscriptCoveragePlanner.uncoveredSpeechIntervals(
+                speechTurns: turns,
+                transcriptSegments: segments
+            ),
+            [TranscriptGap(startTime: 18, endTime: 30)]
+        )
+    }
+
     func testSanitizerRemovesWhisperControlTokens() {
         XCTAssertEqual(
             WhisperTranscriptSanitizer.clean(
@@ -40,7 +58,7 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         )
     }
 
-    func testMapsEngineSegmentsWithRecordingProvenance() async throws {
+    func testTranscribesWholeRecordingAndMapsProvenance() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -56,7 +74,7 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
             audioDirectory: directory,
             engine: engine,
             turnDetector: FixedSpeechTurnDetector(turns: [
-                SpeechTurn(startTime: 10, endTime: 15)
+                SpeechTurn(startTime: 0, endTime: 16)
             ])
         )
         let meetingID = UUID()
@@ -72,14 +90,13 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
 
         XCTAssertEqual(output.segments.count, 1)
         XCTAssertEqual(output.segments[0].text, "Bon dia")
-        XCTAssertEqual(output.segments[0].startTime, 12.5)
-        XCTAssertEqual(output.segments[0].endTime, 14)
+        XCTAssertEqual(output.segments[0].startTime, 2.5)
+        XCTAssertEqual(output.segments[0].endTime, 4)
         XCTAssertEqual(output.segments[0].sourceRecordingID, recording.id)
         XCTAssertEqual(output.segments[0].providerIdentifier, provider.identifier)
         XCTAssertEqual(output.segments[0].localeIdentifier, "ca")
         let receivedPath = await engine.receivedPath()
-        XCTAssertNotEqual(receivedPath, fileURL.path)
-        XCTAssertEqual(URL(fileURLWithPath: receivedPath ?? "").pathExtension, "caf")
+        XCTAssertEqual(receivedPath, fileURL.path)
     }
 
     func testRejectsPathTraversalBeforeCallingEngine() async {

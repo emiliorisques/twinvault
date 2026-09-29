@@ -205,6 +205,46 @@ enum TranscriptGapRepairPlanner {
     }
 }
 
+/// Compares acoustic speech regions with the final transcript. VAD is used
+/// only as a coverage signal; it never determines Whisper's decode boundaries.
+enum TranscriptCoveragePlanner {
+    static func uncoveredSpeechIntervals<Segment: TranscriptTimedUnit>(
+        speechTurns: [SpeechTurn],
+        transcriptSegments: [Segment]
+    ) -> [TranscriptGap] {
+        let segments = transcriptSegments.sorted { $0.startTime < $1.startTime }
+        var gaps: [TranscriptGap] = []
+
+        for turn in speechTurns.sorted(by: { $0.startTime < $1.startTime }) {
+            var coveredUntil = turn.startTime
+            for segment in segments where segment.endTime > turn.startTime && segment.startTime < turn.endTime {
+                appendGap(
+                    from: coveredUntil,
+                    to: min(turn.endTime, segment.startTime),
+                    into: &gaps
+                )
+                coveredUntil = max(coveredUntil, min(turn.endTime, segment.endTime))
+            }
+            appendGap(from: coveredUntil, to: turn.endTime, into: &gaps)
+        }
+        return gaps
+    }
+
+    private static func appendGap(
+        from start: TimeInterval,
+        to end: TimeInterval,
+        into gaps: inout [TranscriptGap]
+    ) {
+        guard end - start >= TranscriptGapRepairPlanner.minimumGapDuration else { return }
+        var cursor = start
+        while cursor < end {
+            let gapEnd = min(end, cursor + TranscriptGapRepairPlanner.maximumRepairDuration)
+            gaps.append(TranscriptGap(startTime: cursor, endTime: gapEnd))
+            cursor = gapEnd
+        }
+    }
+}
+
 enum WhisperTranscriptSanitizer {
     static func clean(_ text: String) -> String {
         text.replacingOccurrences(
@@ -226,34 +266,29 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
     private let fileManager: FileManager
     private let engine: any WhisperTranscribingEngine
     private let turnDetector: any SpeechTurnDetecting
-    private let turnSlicer: LocalAudioTurnSlicer
 
     init(
         audioDirectory: URL,
         modelsDirectory: URL,
         fileManager: FileManager = .default,
-        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
-        turnSlicer: LocalAudioTurnSlicer = .init()
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = LocalWhisperKitEngine(modelsDirectory: modelsDirectory)
         self.turnDetector = turnDetector
-        self.turnSlicer = turnSlicer
     }
 
     init(
         audioDirectory: URL,
         fileManager: FileManager = .default,
         engine: any WhisperTranscribingEngine,
-        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
-        turnSlicer: LocalAudioTurnSlicer = .init()
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = engine
         self.turnDetector = turnDetector
-        self.turnSlicer = turnSlicer
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
@@ -261,28 +296,11 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
             throw WhisperKitTranscriptionError.noRecording
         }
         let fileURL = try validatedURL(for: recording)
-        let turns = try turnDetector.detectTurns(in: fileURL)
-        guard !turns.isEmpty else { throw WhisperKitTranscriptionError.noSpeechDetected }
-        let prepared = try turnSlicer.prepare(fileURL: fileURL, turns: turns)
-        defer { try? fileManager.removeItem(at: prepared.directoryURL) }
-
-        var engineSegments: [WhisperEngineSegment] = []
-        for slice in prepared.turns {
-            try Task.checkCancellation()
-            let localSegments = try await engine.transcribe(
-                audioPath: slice.fileURL.path,
-                progressHandler: request.progressHandler
-            )
-            try Task.checkCancellation()
-            engineSegments.append(contentsOf: localSegments.map {
-                WhisperEngineSegment(
-                    startTime: slice.turn.startTime + $0.startTime,
-                    endTime: slice.turn.startTime + $0.endTime,
-                    text: $0.text,
-                    languageCode: $0.languageCode
-                )
-            })
-        }
+        var engineSegments = try await engine.transcribe(
+            audioPath: fileURL.path,
+            progressHandler: request.progressHandler
+        )
+        try Task.checkCancellation()
         engineSegments.sort { $0.startTime < $1.startTime }
         let segments = engineSegments.map { segment in
             TranscriptSegment(
@@ -298,10 +316,17 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
         guard !segments.isEmpty else {
             throw WhisperKitTranscriptionError.noSpeechDetected
         }
-        let audioDuration = try? AVAudioFile(forReading: fileURL).duration
-        let reviewIntervals = TranscriptGapRepairPlanner.gaps(
-            in: engineSegments,
-            audioDuration: audioDuration ?? 0
+        let speechTurns: [SpeechTurn]
+        do {
+            speechTurns = try turnDetector.detectTurns(in: fileURL)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            speechTurns = []
+        }
+        let reviewIntervals = TranscriptCoveragePlanner.uncoveredSpeechIntervals(
+            speechTurns: speechTurns,
+            transcriptSegments: engineSegments
         ).map {
             TranscriptReviewInterval(
                 meetingID: request.meetingID,
@@ -329,11 +354,5 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
             throw WhisperKitTranscriptionError.recordingMissing
         }
         return fileURL
-    }
-}
-
-private extension AVAudioFile {
-    var duration: TimeInterval {
-        TimeInterval(length) / fileFormat.sampleRate
     }
 }

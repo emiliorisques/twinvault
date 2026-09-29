@@ -192,3 +192,38 @@ Current evidence supports Fast ES/EN for explicitly ES/EN meetings and WhisperKi
 Catalan can occur. It does not support routing from Parakeet confidence or silently using
 Fast for a potentially Catalan meeting. No transcript-derived memory should be confirmed
 automatically from either provider.
+
+## 2026-09-29 — whole-recording Whisper correction
+
+The same eight WAV files and references were rerun after removing the outer energy-turn
+slicing from the WhisperKit provider. WhisperKit now receives each complete recording
+once; its own incremental loader and VAD remain active. The application energy detector
+is used only to flag acoustically active regions left uncovered by the final transcript.
+Fast ES/EN was unchanged and its previous results were retained for comparison.
+
+| Case | Whisper per-turn WER | Whisper whole-recording WER | Whole-recording runtime |
+|---|---:|---:|---:|
+| ES clean | 3.3% | 5.4% | 84.4 s |
+| EN clean | 45.7% | 11.4% | 13.9 s |
+| ES/EN | 22.1% | 25.4% | 20.0 s |
+| CA/ES | 11.6% | 21.1% | 20.9 s |
+| ES/CA/EN | 14.7% | 33.1% | 24.2 s |
+| multilingual + noise | 26.3% | 26.7% | 21.4 s |
+| AMI meeting overlap | 71.6% | 31.1% | 26.2 s |
+| stress test | 26.5% | 29.2% | 19.7 s |
+
+Directional micro-WER across all 1,069 seconds improved from 31.5% to 24.2%. The
+largest corrections were the English-clean and AMI cases, confirming that independent
+short-turn decoding was losing important Whisper context. The first run includes an
+84.4-second cold model preparation cost; total measured runtime was 230.7 seconds, or
+4.6x real time. Runtime should therefore be compared with both cold and warm runs in a
+future performance benchmark.
+
+The correction is not a complete multilingual routing solution. Whole-recording Whisper
+regressed on several short code-switch cases, while Fast ES/EN still scored 6.4% versus
+Whisper's 14.6% on the non-AMI ES/EN cases. On the four Catalan-containing cases,
+Whisper remained better at 27.8% versus Fast's 44.5%. References are dataset-provided,
+not yet word-for-word human verified, and AMI overlap makes linear WER conservative.
+The next experiment should detect language regions acoustically and route only
+high-confidence Catalan regions away from the fast ES/EN path; transcript text must not
+be used as the sole router.
