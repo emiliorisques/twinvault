@@ -1,0 +1,169 @@
+{
+  "audio": "01_es_clean.wav",
+  "duration_seconds": 123.93,
+  "languages": [
+    "es"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 12.66,
+      "language": "es",
+      "speaker": null,
+      "text": "La ONU tiene la intención de completar un fondo de asistencia en favor de los países víctima de los efectos del calentamiento global, a fin de poder enfrentar su impacto.",
+      "source_id": "es:1510:11152791453432915651.wav"
+    },
+    {
+      "start": 13.01,
+      "end": 23.09,
+      "language": "es",
+      "speaker": null,
+      "text": "Rápidamente, agentes munidos con equipos antidisturbios ingresaron al patio y abatieron a los presidiarios con gases lacrimógenos.",
+      "source_id": "es:1511:5491079664721900451.wav"
+    },
+    {
+      "start": 23.44,
+      "end": 40.24,
+      "language": "es",
+      "speaker": null,
+      "text": "El nuevo entorno cuenta con distintos recursos y competidores y, por lo tanto, una nueva población necesitará características o adaptaciones diferentes de las que tenía antes para ser un competidor fuerte.",
+      "source_id": "es:1512:12872201846763141698.wav"
+    },
+    {
+      "start": 40.59,
+      "end": 50.49,
+      "language": "es",
+      "speaker": null,
+      "text": "Argentina es famosa por contar con uno de los mejores equipos y los mejores jugadores de polo a nivel mundial.",
+      "source_id": "es:1513:2082414369732400386.wav"
+    },
+    {
+      "start": 50.84,
+      "end": 66.38,
+      "language": "es",
+      "speaker": null,
+      "text": "Una vez que cesaron los enfrentamientos, luego de que se trasladaran al hospital a los heridos, cerca de 40 de los prisioneros restantes permanecieron en el patio, resistiéndose a ir a sus celdas.",
+      "source_id": "es:1514:16764452883870702025.wav"
+    },
+    {
+      "start": 66.73,
+      "end": 72.31,
+      "language": "es",
+      "speaker": null,
+      "text": "En cuatro años, es el quinto CEP de Martelly.",
+      "source_id": "es:1515:16255658476875547265.wav"
+    },
+    {
+      "start": 72.66,
+      "end": 81.12,
+      "language": "es",
+      "speaker": null,
+      "text": "Dele al lugar toda la dignidad, la solemnidad y el respeto que amerita. No bromee acerca del Holocausto o el nazismo.",
+      "source_id": "es:1516:6018638038885268426.wav"
+    },
+    {
+      "start": 81.47,
+      "end": 92.63,
+      "language": "es",
+      "speaker": null,
+      "text": "En Manila, capital de Filipinas, un ex agente policial de ese país secuestró un autobús y mantuvo cautivos a turistas que venían de Hong Kong.",
+      "source_id": "es:1518:12495118209672785697.wav"
+    },
+    {
+      "start": 92.98,
+      "end": 108.4,
+      "language": "es",
+      "speaker": null,
+      "text": "La investigación en el campo de la IA supone el desarrollo de máquinas a fin de automatizar tareas que requieren un comportamiento inteligente.",
+      "source_id": "es:1517:18142468751126065192.wav"
+    },
+    {
+      "start": 108.75,
+      "end": 123.93,
+      "language": "es",
+      "speaker": null,
+      "text": "Desde 2008, entre los 1400 encuestados en forma previa a las elecciones federales de 2010 hubo un crecimiento del 8 % de quienes se oponen a que Australia se convierta en república.",
+      "source_id": "es:1520:7573338294611270642.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1510,
+      "source_file": "11152791453432915651.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1511,
+      "source_file": "5491079664721900451.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1512,
+      "source_file": "12872201846763141698.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1513,
+      "source_file": "2082414369732400386.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1514,
+      "source_file": "16764452883870702025.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1515,
+      "source_file": "16255658476875547265.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1516,
+      "source_file": "6018638038885268426.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1518,
+      "source_file": "12495118209672785697.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1517,
+      "source_file": "18142468751126065192.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1520,
+      "source_file": "7573338294611270642.wav"
+    }
+  ]
+}

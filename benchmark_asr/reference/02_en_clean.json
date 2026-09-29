@@ -1,0 +1,199 @@
+{
+  "audio": "02_en_clean.wav",
+  "duration_seconds": 123.11,
+  "languages": [
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 7.92,
+      "language": "en",
+      "speaker": null,
+      "text": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the impacts.",
+      "source_id": "en:1510:1009709090964908274.wav"
+    },
+    {
+      "start": 8.27,
+      "end": 17.75,
+      "language": "en",
+      "speaker": null,
+      "text": "Soon, officers equipped with riot gear entered the yard and cornered the inmates with tear gas.",
+      "source_id": "en:1511:10927605878527486298.wav"
+    },
+    {
+      "start": 18.1,
+      "end": 31.4,
+      "language": "en",
+      "speaker": null,
+      "text": "This new environment has different resources and different competitors, so the new population will need different features or adaptations to be a strong competitor than what they had needed before.",
+      "source_id": "en:1512:7931741157330894890.wav"
+    },
+    {
+      "start": 31.75,
+      "end": 37.57,
+      "language": "en",
+      "speaker": null,
+      "text": "Argentina is well known for having one of the best polo teams and players in the world.",
+      "source_id": "en:1513:12541283768447528582.wav"
+    },
+    {
+      "start": 37.92,
+      "end": 53.22,
+      "language": "en",
+      "speaker": null,
+      "text": "When the fighting ceased after the wounded were transported to the hospital, about 40 of the other remaining inmates stayed in the yard and refused to return to their cells.",
+      "source_id": "en:1514:15472366452348613907.wav"
+    },
+    {
+      "start": 53.57,
+      "end": 61.61,
+      "language": "en",
+      "speaker": null,
+      "text": "It is Martelly's fifth CEP in four years.",
+      "source_id": "en:1515:1894240377480073066.wav"
+    },
+    {
+      "start": 61.96,
+      "end": 74.08,
+      "language": "en",
+      "speaker": null,
+      "text": "Please treat the site with all of the dignity, solemnity and respect it deserves. Do not make jokes about the Holocaust or Nazis.",
+      "source_id": "en:1516:17606651572533263873.wav"
+    },
+    {
+      "start": 74.43,
+      "end": 81.45,
+      "language": "en",
+      "speaker": null,
+      "text": "Research in AI involves making machines to automate tasks that require intelligent behavior.",
+      "source_id": "en:1517:10885549230041454053.wav"
+    },
+    {
+      "start": 81.8,
+      "end": 93.56,
+      "language": "en",
+      "speaker": null,
+      "text": "A former Filipino policeman has kept Hong Kong tourists hostage by hijacking their bus in Manila, the capital of the Philippines.",
+      "source_id": "en:1518:10807778671969097912.wav"
+    },
+    {
+      "start": 93.91,
+      "end": 101.95,
+      "language": "en",
+      "speaker": null,
+      "text": "In many cases, enrolling on a gap-year course abroad can actually improve your chances of moving into higher education back in your home country.",
+      "source_id": "en:1519:16685771406658302555.wav"
+    },
+    {
+      "start": 102.3,
+      "end": 117.24,
+      "language": "en",
+      "speaker": null,
+      "text": "Out of 1,400 people polled prior to the 2010 federal election, those who oppose Australia becoming a republic grew by 8 per cent since 2008.",
+      "source_id": "en:1520:608005572552850776.wav"
+    },
+    {
+      "start": 117.59,
+      "end": 123.11,
+      "language": "en",
+      "speaker": null,
+      "text": "The satellite in space gets the call and then reflects it back down, almost instantly.",
+      "source_id": "en:1521:11840539862172308240.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1510,
+      "source_file": "1009709090964908274.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1511,
+      "source_file": "10927605878527486298.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1512,
+      "source_file": "7931741157330894890.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1513,
+      "source_file": "12541283768447528582.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1514,
+      "source_file": "15472366452348613907.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1515,
+      "source_file": "1894240377480073066.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1516,
+      "source_file": "17606651572533263873.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1517,
+      "source_file": "10885549230041454053.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1518,
+      "source_file": "10807778671969097912.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1519,
+      "source_file": "16685771406658302555.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1520,
+      "source_file": "608005572552850776.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1521,
+      "source_file": "11840539862172308240.wav"
+    }
+  ]
+}

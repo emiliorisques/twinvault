@@ -1,0 +1,176 @@
+{
+  "audio": "10_stress_test.wav",
+  "duration_seconds": 123.57,
+  "languages": [
+    "es",
+    "ca",
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 14.82,
+      "language": "es",
+      "speaker": null,
+      "text": "En la autopista de Búfalo-Pittsburgh, el tramo entre Point Marion y Fairmont es el de las condiciones de manejo más desafiantes y con frecuencia recorre terrenos apartados y solitarios.",
+      "source_id": "es:1538:11628447209919953063.wav"
+    },
+    {
+      "start": 15.17,
+      "end": 25.83,
+      "language": "ca",
+      "speaker": null,
+      "text": "La puntuació final fou una victòria d'un punt, 21 a 20, finalitzant la ratxa de 15 victòries dels All Black.",
+      "source_id": "ca:1523:2057094869634011850.wav"
+    },
+    {
+      "start": 26.18,
+      "end": 44.36,
+      "language": "en",
+      "speaker": null,
+      "text": "It uses satellite-based technology as opposed to older ground-radar-based technology to allow air traffic controllers to pinpoint aircraft with greater precision and give pilots more accurate information.",
+      "source_id": "en:1535:17020026058488269738.wav"
+    },
+    {
+      "start": 44.71,
+      "end": 52.03,
+      "language": "es",
+      "speaker": null,
+      "text": "El paciente había estado en Nigeria, donde hubo algunos casos de Ébola.",
+      "source_id": "es:1543:16415711602924019767.wav"
+    },
+    {
+      "start": 52.38,
+      "end": 60.54,
+      "language": "en",
+      "speaker": null,
+      "text": "Local authorities are warning residents in the vicinity of the plant to stay indoors, turn off air-conditioners and not to drink tap water.",
+      "source_id": "en:1536:10408474834696432538.wav"
+    },
+    {
+      "start": 60.89,
+      "end": 72.17,
+      "language": "ca",
+      "speaker": null,
+      "text": "Hi ha molts d'efectes socials i polítics com l'ús del sistema mètric, un canvi de l'absolutisme al republicanisme, nacionalisme i la creença que el país pertany al poble i no a un sol governant.",
+      "source_id": "ca:1524:1305706724210013690.wav"
+    },
+    {
+      "start": 72.52,
+      "end": 88.96,
+      "language": "es",
+      "speaker": null,
+      "text": "Se les paga muy bien a las empresas de mensajería por hacer entregas veloces. Con frecuencia, el tiempo es muy importante cuando se trata de documentos comerciales, mercadería o repuestos para reparaciones urgentes.",
+      "source_id": "es:1541:2541757592169628141.wav"
+    },
+    {
+      "start": 89.31,
+      "end": 109.23,
+      "language": "ca",
+      "speaker": null,
+      "text": "Els amplis passejos, els edificis amb façanes de vidre i els centres comercials moderns estan esquitxats de teulats tradicionals de teules vermelles, el mercat del segle XVIII i les antigues mesquites i esglésies, tot i que la ciutat exhala una atmosfera més de l'Europa mediterrània que de la Turquia tradicional.",
+      "source_id": "ca:1525:13741747639777813627.wav"
+    },
+    {
+      "start": 109.58,
+      "end": 117.22,
+      "language": "en",
+      "speaker": null,
+      "text": "You can see the pyramids in the dark and you can see them in silence before the show begins.",
+      "source_id": "en:1537:14212474766306388319.wav"
+    },
+    {
+      "start": 117.57,
+      "end": 123.57,
+      "language": "es",
+      "speaker": null,
+      "text": "Podemos encontrar curry «seco» y «húmedo», en función del volumen de líquido.",
+      "source_id": "es:1545:9636595379511704367.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1538,
+      "source_file": "11628447209919953063.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1523,
+      "source_file": "2057094869634011850.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1535,
+      "source_file": "17020026058488269738.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1543,
+      "source_file": "16415711602924019767.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1536,
+      "source_file": "10408474834696432538.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1524,
+      "source_file": "1305706724210013690.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1541,
+      "source_file": "2541757592169628141.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1525,
+      "source_file": "13741747639777813627.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1537,
+      "source_file": "14212474766306388319.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1545,
+      "source_file": "9636595379511704367.wav"
+    },
+    {
+      "dataset": "MUSAN",
+      "source_file": "noise-sound-bible-0009.wav",
+      "snr_db": 10.0
+    }
+  ]
+}

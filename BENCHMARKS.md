@@ -123,3 +123,31 @@ The BSC fine-tune reduced word edits by 109, a 3.5-point absolute and 16.1% rela
 The required three-language fixture was decisive. Given the short ES/CA/EN recording, BSC returned `Buenos días. Avui parlem de pressupost.` and omitted the entire English region. WhisperKit's wording for that region was inaccurate, but it at least retained speech from all three regions. The BSC model also translated an English passage in Radioteca into Catalan-like text rather than preserving the spoken language.
 
 Conclusion: do not convert or integrate this BSC fine-tune as TwinVault's default. It improves a strictly CA/ES meeting, but violates the ES/CA/EN coverage requirement and does not justify a second 3 GB model yet. Keep WhisperKit as the local multilingual default. Reconsider a specialized CA/ES model only after explicit per-meeting language profiles exist and representative human-verified fixtures demonstrate that the extra operational complexity is worthwhile.
+
+## 2026-09-29 — latest two local meetings, Fast ES/EN versus WhisperKit
+
+The two newest private meetings were tested channel-by-channel with the same application
+providers. Raw audio and hypotheses remain outside the repository. There is no manually
+corrected reference for these recordings, so this is a speed and coverage diagnostic,
+not an accuracy/WER benchmark.
+
+| Recording/channel | Duration | Parakeet runtime / words | WhisperKit runtime / words |
+|---|---:|---:|---:|
+| `test 2` microphone | 354.6 s | 21.4 s / 884 | 134.2 s / 847 |
+| `test 2` system | 354.4 s | 5.6 s / 466 | 46.9 s / 467 |
+| `Test Dani` microphone | 49.0 s | 0.46 s / 127 | 13.1 s / 126 |
+| `Test Dani` system | 48.7 s | 0.45 s / 81 | 7.3 s / 77 |
+
+All eight provider/channel runs completed without an engine error. In `test 2`, the
+orange coverage intervals closely match actual silence in the system track: that channel
+contains about 156.6 seconds of silence (44.2%), including long silent spans around
+01:06–01:28, 02:43–03:19, 04:08–04:49 and 05:13–05:24. The warning therefore means
+“review this gap” and, for this recording, is not evidence that Fast ES/EN failed.
+
+A brief unscored inspection found WhisperKit more coherent in parts of the mixed
+Spanish/English conversation, while Parakeet was much faster and recovered the late
+short responses in `Test Dani` that WhisperKit omitted. Neither observation is an
+accuracy decision without a human reference. The system channel is the preferred source
+for remote participants; the microphone channel includes the local speaker plus room
+echo and should not be merged naively. Cross-channel alignment/deduplication remains a
+separate future step.

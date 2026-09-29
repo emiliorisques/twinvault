@@ -1,0 +1,170 @@
+{
+  "audio": "04_ca_es.wav",
+  "duration_seconds": 130.21,
+  "languages": [
+    "ca",
+    "es"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 10.5,
+      "language": "ca",
+      "speaker": null,
+      "text": "L'ONU també espera enllestir un fons per a ajudar als països afectats per l'escalfament global a fer front als impactes.",
+      "source_id": "ca:1510:15030145326853713488.wav"
+    },
+    {
+      "start": 10.85,
+      "end": 25.37,
+      "language": "es",
+      "speaker": null,
+      "text": "Si viaja a las regiones árticas o antárticas en época invernal, vivirá la experiencia de la noche polar, que significa que el sol no se alza por encima del horizonte.",
+      "source_id": "es:1526:13388429922015955649.wav"
+    },
+    {
+      "start": 25.72,
+      "end": 33.82,
+      "language": "ca",
+      "speaker": null,
+      "text": "Aviat, agents amb equipament antiavalots van entrar al pati i arraconaren els presos amb gas lacrimogen.",
+      "source_id": "ca:1511:2683743691961638143.wav"
+    },
+    {
+      "start": 34.17,
+      "end": 53.01,
+      "language": "es",
+      "speaker": null,
+      "text": "El esquiador del grupo masculino con discapacidad visual, Maciej Krezel, y su guía, Anna Ogarzynska, de Polonia, terminaron en el decimotercer lugar en el Super-G. Jong Seork Park de Corea del Sur obtuvo el vigésimo cuarto puesto en el grupo masculino sentados.",
+      "source_id": "es:1527:8590370792323234470.wav"
+    },
+    {
+      "start": 53.36,
+      "end": 65.9,
+      "language": "ca",
+      "speaker": null,
+      "text": "Aquest nou entorn té diferents recursos i competidors, de manera que la nova població necessitarà característiques o adaptacions diferents de les que necessitava abans per a ser un fort competidor.",
+      "source_id": "ca:1512:10969426192817589062.wav"
+    },
+    {
+      "start": 66.25,
+      "end": 79.45,
+      "language": "es",
+      "speaker": null,
+      "text": "Con anterioridad, el director ejecutivo de Ring, Jamie Siminoff, mencionó que la compañía había iniciado a raíz de que el timbre de su entrada no podía oírse desde la tienda que tenía montada en su garaje.",
+      "source_id": "es:1529:6735847874517424555.wav"
+    },
+    {
+      "start": 79.8,
+      "end": 87.54,
+      "language": "ca",
+      "speaker": null,
+      "text": "L'Argentina és famosa per comptar amb un dels millors equips i jugadors de polo de tot el món.",
+      "source_id": "ca:1513:18370386983855189156.wav"
+    },
+    {
+      "start": 87.89,
+      "end": 97.01,
+      "language": "es",
+      "speaker": null,
+      "text": "Algunos festivales cuentan con áreas especiales de acampe, destinadas a los grupos familiares con hijos pequeños.",
+      "source_id": "es:1528:11194000883953281859.wav"
+    },
+    {
+      "start": 97.36,
+      "end": 110.9,
+      "language": "ca",
+      "speaker": null,
+      "text": "Uns quaranta interns es van quedar al pati i es van negar a tornar a les seves cel·les després que s'acabessin els combats i els ferits fossin traslladats a l'hospital.",
+      "source_id": "ca:1514:16517109034337794132.wav"
+    },
+    {
+      "start": 111.25,
+      "end": 130.21,
+      "language": "es",
+      "speaker": null,
+      "text": "Baba Shyam fue honrado con 108 platos de Chhappan Bhog que, en la religión hindú, consiste en 56 piezas comestibles distintas, como dulces, frutas, nueces, platos, entre otros, que se sirven como ofrenda al dios.",
+      "source_id": "es:1532:9842251981325830682.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1510,
+      "source_file": "15030145326853713488.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1526,
+      "source_file": "13388429922015955649.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1511,
+      "source_file": "2683743691961638143.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1527,
+      "source_file": "8590370792323234470.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1512,
+      "source_file": "10969426192817589062.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1529,
+      "source_file": "6735847874517424555.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1513,
+      "source_file": "18370386983855189156.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1528,
+      "source_file": "11194000883953281859.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1514,
+      "source_file": "16517109034337794132.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1532,
+      "source_file": "9842251981325830682.wav"
+    }
+  ]
+}

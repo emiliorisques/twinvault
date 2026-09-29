@@ -22,11 +22,13 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
         )
         let speechTurns = try LocalEnergySpeechTurnDetector().detectTurns(in: audioURL)
         let provider: any SpeechToTextProvider
+        let localeIdentifiers: [String]
         switch providerName {
         case "apple":
             provider = AppleSpeechTranscriptionProvider(
                 audioDirectory: audioURL.deletingLastPathComponent()
             )
+            localeIdentifiers = Meeting.defaultTranscriptionLocaleIdentifiers
         case "whisperkit":
             let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
                 .map { URL(fileURLWithPath: $0) }
@@ -36,6 +38,17 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
                 audioDirectory: audioURL.deletingLastPathComponent(),
                 modelsDirectory: modelsDirectory
             )
+            localeIdentifiers = Meeting.defaultTranscriptionLocaleIdentifiers
+        case "parakeet":
+            let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
+                .map { URL(fileURLWithPath: $0) }
+                ?? FileManager.default.temporaryDirectory.appending(path: "TwinVaultBenchmarkModels")
+            try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+            provider = ParakeetSpeechToTextProvider(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                modelsDirectory: modelsDirectory
+            )
+            localeIdentifiers = ["es-ES", "en-US"]
         default:
             XCTFail("Unknown benchmark provider: \(providerName)")
             return
@@ -45,13 +58,15 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
         do {
             let output = try await provider.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
-                recordings: [recording]
+                recordings: [recording],
+                localeIdentifiers: localeIdentifiers
             ))
             try write(BenchmarkResult(
                 providerIdentifier: provider.identifier,
                 elapsedSeconds: startedAt.duration(to: .now).seconds,
                 speechTurns: speechTurns,
                 unavailableLocaleIdentifiers: output.unavailableLocaleIdentifiers,
+                reviewIntervals: output.reviewIntervals,
                 segments: output.segments,
                 error: nil
             ), to: outputURL)
@@ -61,6 +76,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
                 elapsedSeconds: startedAt.duration(to: .now).seconds,
                 speechTurns: speechTurns,
                 unavailableLocaleIdentifiers: [],
+                reviewIntervals: [],
                 segments: [],
                 error: error.localizedDescription
             ), to: outputURL)
@@ -80,6 +96,7 @@ private struct BenchmarkResult: Codable {
     let elapsedSeconds: Double
     let speechTurns: [SpeechTurn]
     let unavailableLocaleIdentifiers: [String]
+    let reviewIntervals: [TranscriptReviewInterval]
     let segments: [TranscriptSegment]
     let error: String?
 }

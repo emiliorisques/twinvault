@@ -3,3 +3,5 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 .DS_Store
+benchmark_asr/audio/
+benchmark_asr.zip

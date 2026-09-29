@@ -1,0 +1,598 @@
+{
+  "audio": "07_meeting.wav",
+  "duration_seconds": 150.0,
+  "languages": [
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 5.64,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "IS IT POSSIBLE THAT THAT FOR THE OLDER GENERATION YOU COULD HAVE LIKE AN EXTRA BUTTON THAT YOU PRESS FOR LARGE PRINT LIKE YOU DO IN LARGE PRINT BOOKS",
+      "source_id": "AMI_ES2004a_H03_FEE016_0089871_0090564"
+    },
+    {
+      "start": 5.64,
+      "end": 11.78,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "OBVIOUSLY IT DISPLAYS LESS ON THE SCREEN IT DISPLAYS LESS ON THE SCREEN BUT AS LONG AS THEY CAN READ IT THAT'S THE MAIN THING",
+      "source_id": "AMI_ES2004a_H03_FEE016_0090564_0091178"
+    },
+    {
+      "start": 5.77,
+      "end": 7.5,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "TELETEXT HAS GOT THAT OPTION AS WELL",
+      "source_id": "AMI_ES2004a_H01_FEE013_0090577_0090750"
+    },
+    {
+      "start": 11.86,
+      "end": 12.35,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H01_FEE013_0091186_0091235"
+    },
+    {
+      "start": 13.69,
+      "end": 17.37,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OR WHAT ABOUT KIND OF A DUAL FUNCTION",
+      "source_id": "AMI_ES2004a_H01_FEE013_0091369_0091737"
+    },
+    {
+      "start": 17.37,
+      "end": 29.64,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "IN THAT YOU'VE GOT THE BASIC BUTTONS JUST FOR YOUR PLAY VOLUME PROGRAMME THINGS AND ALSO AND THEN A MENU TO GO INTO WITH OBVIOUS PICTURES",
+      "source_id": "AMI_ES2004a_H01_FEE013_0091737_0092964"
+    },
+    {
+      "start": 23.65,
+      "end": 24.04,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "MM-HMM",
+      "source_id": "AMI_ES2004a_H03_FEE016_0092365_0092404"
+    },
+    {
+      "start": 29.64,
+      "end": 34.88,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OBVIOUS SYMBOLS AND THAT'S WHERE YOU CONTROL RECORDING AND THINGS LIKE THAT",
+      "source_id": "AMI_ES2004a_H01_FEE013_0092964_0093488"
+    },
+    {
+      "start": 30.7,
+      "end": 31.44,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H03_FEE016_0093070_0093144"
+    },
+    {
+      "start": 32.99,
+      "end": 33.37,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "MM-HMM",
+      "source_id": "AMI_ES2004a_H03_FEE016_0093299_0093337"
+    },
+    {
+      "start": 34.74,
+      "end": 35.18,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "MM",
+      "source_id": "AMI_ES2004a_H03_FEE016_0093474_0093518"
+    },
+    {
+      "start": 35.18,
+      "end": 40.12,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "THE OTHER THING IS JUST CH CHUCKING INTO MOBILE PHONE F DESIGN FEATURES AGAIN",
+      "source_id": "AMI_ES2004a_H03_FEE016_0093518_0094012"
+    },
+    {
+      "start": 40.12,
+      "end": 43.53,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "IT COULD HAVE A FLIP TOP REMOTE CONTROL SO THAT WHEN YOU FLIP OVER THE TOP",
+      "source_id": "AMI_ES2004a_H03_FEE016_0094012_0094353"
+    },
+    {
+      "start": 43.53,
+      "end": 47.56,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YOUR SCREEN IS YOU CAN HAVE A BIGGER SCREEN IN THE THE FLIP OVER",
+      "source_id": "AMI_ES2004a_H03_FEE016_0094353_0094756"
+    },
+    {
+      "start": 45.43,
+      "end": 45.84,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "MM-HMM",
+      "source_id": "AMI_ES2004a_H01_FEE013_0094543_0094584"
+    },
+    {
+      "start": 48.48,
+      "end": 53.16,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "I THINK THAT'S A COST THING I DON'T I DON'T KNOW HOW MUCH WE'RE GONNA KNOW ABOUT",
+      "source_id": "AMI_ES2004a_H01_FEE013_0094848_0095316"
+    },
+    {
+      "start": 49.9,
+      "end": 50.21,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "Y",
+      "source_id": "AMI_ES2004a_H02_MEE014_0094990_0095021"
+    },
+    {
+      "start": 51.06,
+      "end": 51.41,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H03_FEE016_0095106_0095141"
+    },
+    {
+      "start": 54.93,
+      "end": 55.27,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "MM-HMM",
+      "source_id": "AMI_ES2004a_H03_FEE016_0095493_0095527"
+    },
+    {
+      "start": 56.02,
+      "end": 58.07,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "YES NO THAT'S IMPORTANT",
+      "source_id": "AMI_ES2004a_H01_FEE013_0095602_0095807"
+    },
+    {
+      "start": 56.78,
+      "end": 58.6,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YEAH LIKE SMALLER",
+      "source_id": "AMI_ES2004a_H03_FEE016_0095678_0095860"
+    },
+    {
+      "start": 57.25,
+      "end": 57.6,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0095725_0095760"
+    },
+    {
+      "start": 59.48,
+      "end": 60.29,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H01_FEE013_0095948_0096029"
+    },
+    {
+      "start": 59.69,
+      "end": 66.35,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "AND THERE'S NO REASON WE NEED TO MAKE IT LOOK AS FASHIONABLE AND STYLISH AS A MOBILE PHONE IT CAN STILL BE LIGHTWEIGHT PLASTIC YOU KNOW",
+      "source_id": "AMI_ES2004a_H03_FEE016_0095969_0096635"
+    },
+    {
+      "start": 65.1,
+      "end": 65.57,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "MM",
+      "source_id": "AMI_ES2004a_H01_FEE013_0096510_0096557"
+    },
+    {
+      "start": 66.35,
+      "end": 69.16,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "SOMETHING THAT'S EASILY MOULDED AND PRODUCED",
+      "source_id": "AMI_ES2004a_H03_FEE016_0096635_0096916"
+    },
+    {
+      "start": 68.84,
+      "end": 69.23,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H01_FEE013_0096884_0096923"
+    },
+    {
+      "start": 69.16,
+      "end": 72.45,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "SORRY I'M TREADING ON YOUR TERRITORY GUYS",
+      "source_id": "AMI_ES2004a_H03_FEE016_0096916_0097245"
+    },
+    {
+      "start": 70.68,
+      "end": 71.79,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "NO UH UH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0097068_0097179"
+    },
+    {
+      "start": 70.97,
+      "end": 79.35,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "UM RIGHT OKAY WE'VE GOT HALF AN HOUR BEFORE THE NEXT MEETING SO WE'RE ALL GONNA GO OFF AND DO OUR INDIVIDUAL THINGS",
+      "source_id": "AMI_ES2004a_H01_FEE013_0097097_0097935"
+    },
+    {
+      "start": 79.35,
+      "end": 79.94,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "UM",
+      "source_id": "AMI_ES2004a_H01_FEE013_0097935_0097994"
+    },
+    {
+      "start": 81.2,
+      "end": 89.51,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "I THINK THAT'S PROBABLY ABOUT IT AND THEN WE'LL COME BACK AND LIAISE AGAIN AND I GET TO DO ANOTHER FANTASTIC POWERPOINT PRESENTATION",
+      "source_id": "AMI_ES2004a_H01_FEE013_0098120_0098951"
+    },
+    {
+      "start": 85.49,
+      "end": 88.8,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0098549_0098880"
+    },
+    {
+      "start": 88.8,
+      "end": 96.66,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "JUST JUST A QUICK THING ABOUT THE UM ABOUT WHAT YOU'RE SAYING ABOUT THE UH DOES DOES IT NEED TO BE FASHIONABLE",
+      "source_id": "AMI_ES2004a_H02_MEE014_0098880_0099666"
+    },
+    {
+      "start": 91.07,
+      "end": 91.47,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "SURE",
+      "source_id": "AMI_ES2004a_H01_FEE013_0099107_0099147"
+    },
+    {
+      "start": 96.66,
+      "end": 105.24,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "THE SORT OF I I HAD A QUICK LOOK AT THE COMPANY WEBSITE AND IT'S LIKE THE THE UH WE PUT THE FASHION INTO ELECTRONICS",
+      "source_id": "AMI_ES2004a_H02_MEE014_0099666_0100524"
+    },
+    {
+      "start": 105.06,
+      "end": 105.74,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "AH RIGHT",
+      "source_id": "AMI_ES2004a_H03_FEE016_0100506_0100574"
+    },
+    {
+      "start": 105.24,
+      "end": 114.84,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "SO I THINK THINK THE WHOLE DESIGN THING MIGHT BE QUI I MEAN YOU DON'T YOU YOU CAN STILL HAVE PLASTIC AND IT'D LOOK QUITE GOOD BUT",
+      "source_id": "AMI_ES2004a_H02_MEE014_0100524_0101484"
+    },
+    {
+      "start": 105.86,
+      "end": 106.44,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H01_FEE013_0100586_0100644"
+    },
+    {
+      "start": 106.9,
+      "end": 107.5,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H03_FEE016_0100690_0100750"
+    },
+    {
+      "start": 109.16,
+      "end": 111.3,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "SURE B Y YEAH",
+      "source_id": "AMI_ES2004a_H03_FEE016_0100916_0101130"
+    },
+    {
+      "start": 113.7,
+      "end": 117.2,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "BUT YEAH I MEAN IT DOESN'T HAVE TO BE THAT",
+      "source_id": "AMI_ES2004a_H03_FEE016_0101370_0101720"
+    },
+    {
+      "start": 117.2,
+      "end": 119.45,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YOU KNOW TH THAT WAS MY MAIN POINT WE DON'T HAVE TO USE METAL",
+      "source_id": "AMI_ES2004a_H03_FEE016_0101720_0101945"
+    },
+    {
+      "start": 118.54,
+      "end": 118.91,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0101854_0101891"
+    },
+    {
+      "start": 119.45,
+      "end": 122.1,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "I DON'T KNOW IF USING PLASTIC DOES MAKE IT CHEAPER I PRESUME IT WOULD",
+      "source_id": "AMI_ES2004a_H03_FEE016_0101945_0102210"
+    },
+    {
+      "start": 119.99,
+      "end": 120.49,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "MM",
+      "source_id": "AMI_ES2004a_H01_FEE013_0101999_0102049"
+    },
+    {
+      "start": 122.0,
+      "end": 122.74,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0102200_0102274"
+    },
+    {
+      "start": 122.1,
+      "end": 124.41,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YEAH YEAH YEAH",
+      "source_id": "AMI_ES2004a_H03_FEE016_0102210_0102441"
+    },
+    {
+      "start": 122.32,
+      "end": 123.99,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "I WOULD IT WOULD PROBABLY",
+      "source_id": "AMI_ES2004a_H01_FEE013_0102232_0102399"
+    },
+    {
+      "start": 122.74,
+      "end": 122.96,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "YEAH",
+      "source_id": "AMI_ES2004a_H02_MEE014_0102274_0102296"
+    },
+    {
+      "start": 125.04,
+      "end": 126.89,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "I MEAN THERE'S SKY REMOTE CONTROLS AND EVERYTHING",
+      "source_id": "AMI_ES2004a_H01_FEE013_0102504_0102689"
+    },
+    {
+      "start": 126.89,
+      "end": 132.58,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "THEY'RE KIND OF MOULDED AND LOOK A BIT DIFFERENT AND THE TELEWEST REMOTE CONTROLS ARE SILVER PLASTIC",
+      "source_id": "AMI_ES2004a_H01_FEE013_0102689_0103258"
+    },
+    {
+      "start": 132.58,
+      "end": 138.65,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "WHICH LOOKS A BIT SMARTER SO YEAH I GUESS THAT'S STUFF WE CAN THINK ABOUT",
+      "source_id": "AMI_ES2004a_H01_FEE013_0103258_0103865"
+    },
+    {
+      "start": 132.93,
+      "end": 133.34,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "RIGHT",
+      "source_id": "AMI_ES2004a_H03_FEE016_0103293_0103334"
+    },
+    {
+      "start": 137.32,
+      "end": 137.95,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H03_FEE016_0103732_0103795"
+    },
+    {
+      "start": 138.65,
+      "end": 141.56,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OKAY SO LET'S BREAK IT UP THERE",
+      "source_id": "AMI_ES2004a_H01_FEE013_0103865_0104156"
+    },
+    {
+      "start": 142.19,
+      "end": 142.3,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "'KAY",
+      "source_id": "AMI_ES2004a_H03_FEE016_0104219_0104230"
+    },
+    {
+      "start": 142.4,
+      "end": 143.13,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H01_FEE013_0104240_0104313"
+    },
+    {
+      "start": 142.58,
+      "end": 143.43,
+      "language": "en",
+      "speaker": "MEE014",
+      "text": "OKAY",
+      "source_id": "AMI_ES2004a_H02_MEE014_0104258_0104343"
+    },
+    {
+      "start": 143.13,
+      "end": 144.16,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "SO SEE YOU IN HALF AN HOUR",
+      "source_id": "AMI_ES2004a_H01_FEE013_0104313_0104416"
+    },
+    {
+      "start": 146.42,
+      "end": 148.29,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "DO WE GO BACK TO OUR ROOM",
+      "source_id": "AMI_ES2004a_H03_FEE016_0104642_0104829"
+    },
+    {
+      "start": 147.76,
+      "end": 149.04,
+      "language": "en",
+      "speaker": "FEE013",
+      "text": "I THINK SO YEAH",
+      "source_id": "AMI_ES2004a_H01_FEE013_0104776_0104904"
+    },
+    {
+      "start": 148.29,
+      "end": 148.48,
+      "language": "en",
+      "speaker": "FEE016",
+      "text": "YEP",
+      "source_id": "AMI_ES2004a_H03_FEE016_0104829_0104848"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "AMI Meeting Corpus",
+      "meeting": "ES2004a",
+      "partition": "eval",
+      "window_seconds": [
+        900.0,
+        1050.0
+      ],
+      "microphones": "individual headset channels mixed on the original timeline",
+      "source_ids": [
+        "AMI_ES2004a_H03_FEE016_0089871_0090564",
+        "AMI_ES2004a_H03_FEE016_0090564_0091178",
+        "AMI_ES2004a_H01_FEE013_0090577_0090750",
+        "AMI_ES2004a_H01_FEE013_0091186_0091235",
+        "AMI_ES2004a_H01_FEE013_0091369_0091737",
+        "AMI_ES2004a_H01_FEE013_0091737_0092964",
+        "AMI_ES2004a_H03_FEE016_0092365_0092404",
+        "AMI_ES2004a_H01_FEE013_0092964_0093488",
+        "AMI_ES2004a_H03_FEE016_0093070_0093144",
+        "AMI_ES2004a_H03_FEE016_0093299_0093337",
+        "AMI_ES2004a_H03_FEE016_0093474_0093518",
+        "AMI_ES2004a_H03_FEE016_0093518_0094012",
+        "AMI_ES2004a_H03_FEE016_0094012_0094353",
+        "AMI_ES2004a_H03_FEE016_0094353_0094756",
+        "AMI_ES2004a_H01_FEE013_0094543_0094584",
+        "AMI_ES2004a_H01_FEE013_0094848_0095316",
+        "AMI_ES2004a_H02_MEE014_0094990_0095021",
+        "AMI_ES2004a_H03_FEE016_0095106_0095141",
+        "AMI_ES2004a_H03_FEE016_0095493_0095527",
+        "AMI_ES2004a_H01_FEE013_0095602_0095807",
+        "AMI_ES2004a_H03_FEE016_0095678_0095860",
+        "AMI_ES2004a_H02_MEE014_0095725_0095760",
+        "AMI_ES2004a_H01_FEE013_0095948_0096029",
+        "AMI_ES2004a_H03_FEE016_0095969_0096635",
+        "AMI_ES2004a_H01_FEE013_0096510_0096557",
+        "AMI_ES2004a_H03_FEE016_0096635_0096916",
+        "AMI_ES2004a_H01_FEE013_0096884_0096923",
+        "AMI_ES2004a_H03_FEE016_0096916_0097245",
+        "AMI_ES2004a_H02_MEE014_0097068_0097179",
+        "AMI_ES2004a_H01_FEE013_0097097_0097935",
+        "AMI_ES2004a_H01_FEE013_0097935_0097994",
+        "AMI_ES2004a_H01_FEE013_0098120_0098951",
+        "AMI_ES2004a_H02_MEE014_0098549_0098880",
+        "AMI_ES2004a_H02_MEE014_0098880_0099666",
+        "AMI_ES2004a_H01_FEE013_0099107_0099147",
+        "AMI_ES2004a_H02_MEE014_0099666_0100524",
+        "AMI_ES2004a_H03_FEE016_0100506_0100574",
+        "AMI_ES2004a_H02_MEE014_0100524_0101484",
+        "AMI_ES2004a_H01_FEE013_0100586_0100644",
+        "AMI_ES2004a_H03_FEE016_0100690_0100750",
+        "AMI_ES2004a_H03_FEE016_0100916_0101130",
+        "AMI_ES2004a_H03_FEE016_0101370_0101720",
+        "AMI_ES2004a_H03_FEE016_0101720_0101945",
+        "AMI_ES2004a_H02_MEE014_0101854_0101891",
+        "AMI_ES2004a_H03_FEE016_0101945_0102210",
+        "AMI_ES2004a_H01_FEE013_0101999_0102049",
+        "AMI_ES2004a_H02_MEE014_0102200_0102274",
+        "AMI_ES2004a_H03_FEE016_0102210_0102441",
+        "AMI_ES2004a_H01_FEE013_0102232_0102399",
+        "AMI_ES2004a_H02_MEE014_0102274_0102296",
+        "AMI_ES2004a_H01_FEE013_0102504_0102689",
+        "AMI_ES2004a_H01_FEE013_0102689_0103258",
+        "AMI_ES2004a_H01_FEE013_0103258_0103865",
+        "AMI_ES2004a_H03_FEE016_0103293_0103334",
+        "AMI_ES2004a_H03_FEE016_0103732_0103795",
+        "AMI_ES2004a_H01_FEE013_0103865_0104156",
+        "AMI_ES2004a_H03_FEE016_0104219_0104230",
+        "AMI_ES2004a_H01_FEE013_0104240_0104313",
+        "AMI_ES2004a_H02_MEE014_0104258_0104343",
+        "AMI_ES2004a_H01_FEE013_0104313_0104416",
+        "AMI_ES2004a_H03_FEE016_0104642_0104829",
+        "AMI_ES2004a_H01_FEE013_0104776_0104904",
+        "AMI_ES2004a_H03_FEE016_0104829_0104848"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,155 @@
+{
+  "audio": "03_es_en.wav",
+  "duration_seconds": 130.72,
+  "languages": [
+    "es",
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 15.84,
+      "language": "es",
+      "speaker": null,
+      "text": "En muchos casos, inscribirse en un programa de estudios en el extranjero durante un año sabático puede, en efecto, incrementar las posibilidades de acceder a la educación superior una vez se regresa al país de origen.",
+      "source_id": "es:1519:10823811276107540338.wav"
+    },
+    {
+      "start": 16.19,
+      "end": 29.57,
+      "language": "en",
+      "speaker": null,
+      "text": "Technology offers the solution with virtual field trips. Students can look at museum artifacts, visit an aquarium, or admire beautiful art while sitting with their class.",
+      "source_id": "en:1522:8364006913180567866.wav"
+    },
+    {
+      "start": 29.92,
+      "end": 38.32,
+      "language": "es",
+      "speaker": null,
+      "text": "El satélite en el espacio recibe la llamada y, luego, la refleja de vuelta casi de forma instantánea.",
+      "source_id": "es:1521:12550432088988018184.wav"
+    },
+    {
+      "start": 38.67,
+      "end": 48.75,
+      "language": "en",
+      "speaker": null,
+      "text": "The final score was a one-point victory, 21 to 20, ending the All Blacks' 15 game winning streak.",
+      "source_id": "en:1523:7691076933585556685.wav"
+    },
+    {
+      "start": 49.1,
+      "end": 65.9,
+      "language": "es",
+      "speaker": null,
+      "text": "La solución viene de la mano de la tecnología, a través de las excursiones virtuales. Los alumnos pueden observar los objetos exhibidos en un museo, visitar un acuario o contemplar hermosas obras de arte sentados con su clase.",
+      "source_id": "es:1522:7397935617289718584.wav"
+    },
+    {
+      "start": 66.25,
+      "end": 85.51,
+      "language": "en",
+      "speaker": null,
+      "text": "There are a lot of social and political effects such as the use of metric system, a shift from absolutism to republicanism, nationalism and the belief the country belongs to the people not to one sole ruler.",
+      "source_id": "en:1524:13212173517682821659.wav"
+    },
+    {
+      "start": 85.86,
+      "end": 98.16,
+      "language": "es",
+      "speaker": null,
+      "text": "El marcador final indicó un triunfo por un punto, 21 a 20, terminando con la sucesión de 15 victorias consecutivas para los All Blacks.",
+      "source_id": "es:1523:7467163006450930224.wav"
+    },
+    {
+      "start": 98.51,
+      "end": 113.99,
+      "language": "en",
+      "speaker": null,
+      "text": "The broad boulevards, glass-fronted buildings and modern shopping centers are dotted with traditional red-tiled roofs, the 18th century market, and old mosques and churches, although the city has an atmosphere more of Mediterranean Europe than traditional Turkey.",
+      "source_id": "en:1525:14353083584085318982.wav"
+    },
+    {
+      "start": 114.34,
+      "end": 130.72,
+      "language": "es",
+      "speaker": null,
+      "text": "Son muchas sus consecuencias políticas y sociales, tales como el uso del sistema métrico, el desplazamiento del absolutismo hacia el republicanismo, el nacionalismo y la convicción de que el país pertenece al pueblo, y no a un solo soberano.",
+      "source_id": "es:1524:11796734010502049729.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1519,
+      "source_file": "10823811276107540338.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1522,
+      "source_file": "8364006913180567866.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1521,
+      "source_file": "12550432088988018184.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1523,
+      "source_file": "7691076933585556685.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1522,
+      "source_file": "7397935617289718584.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1524,
+      "source_file": "13212173517682821659.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1523,
+      "source_file": "7467163006450930224.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1525,
+      "source_file": "14353083584085318982.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1524,
+      "source_file": "11796734010502049729.wav"
+    }
+  ]
+}

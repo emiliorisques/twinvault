@@ -1,0 +1,818 @@
+{
+  "fleurs_revision": "refs/convert/parquet",
+  "silence_seconds": 0.35,
+  "cases": [
+    {
+      "file": "01_es_clean.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1510,
+          "num_samples": 202560,
+          "raw_transcription": "La ONU tiene la intención de completar un fondo de asistencia en favor de los países víctima de los efectos del calentamiento global, a fin de poder enfrentar su impacto.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 12.66,
+          "source_file": "11152791453432915651.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1511,
+          "num_samples": 161280,
+          "raw_transcription": "Rápidamente, agentes munidos con equipos antidisturbios ingresaron al patio y abatieron a los presidiarios con gases lacrimógenos.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 10.08,
+          "source_file": "5491079664721900451.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1512,
+          "num_samples": 268800,
+          "raw_transcription": "El nuevo entorno cuenta con distintos recursos y competidores y, por lo tanto, una nueva población necesitará características o adaptaciones diferentes de las que tenía antes para ser un competidor fuerte.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 16.8,
+          "source_file": "12872201846763141698.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1513,
+          "num_samples": 158400,
+          "raw_transcription": "Argentina es famosa por contar con uno de los mejores equipos y los mejores jugadores de polo a nivel mundial.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 9.9,
+          "source_file": "2082414369732400386.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1514,
+          "num_samples": 248640,
+          "raw_transcription": "Una vez que cesaron los enfrentamientos, luego de que se trasladaran al hospital a los heridos, cerca de 40 de los prisioneros restantes permanecieron en el patio, resistiéndose a ir a sus celdas.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 15.54,
+          "source_file": "16764452883870702025.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1515,
+          "num_samples": 89280,
+          "raw_transcription": "En cuatro años, es el quinto CEP de Martelly.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 5.58,
+          "source_file": "16255658476875547265.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1516,
+          "num_samples": 135360,
+          "raw_transcription": "Dele al lugar toda la dignidad, la solemnidad y el respeto que amerita. No bromee acerca del Holocausto o el nazismo.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 8.46,
+          "source_file": "6018638038885268426.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1518,
+          "num_samples": 178560,
+          "raw_transcription": "En Manila, capital de Filipinas, un ex agente policial de ese país secuestró un autobús y mantuvo cautivos a turistas que venían de Hong Kong.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 11.16,
+          "source_file": "12495118209672785697.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1517,
+          "num_samples": 246720,
+          "raw_transcription": "La investigación en el campo de la IA supone el desarrollo de máquinas a fin de automatizar tareas que requieren un comportamiento inteligente.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 15.42,
+          "source_file": "18142468751126065192.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1520,
+          "num_samples": 242880,
+          "raw_transcription": "Desde 2008, entre los 1400 encuestados en forma previa a las elecciones federales de 2010 hubo un crecimiento del 8 % de quienes se oponen a que Australia se convierta en república.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 15.18,
+          "source_file": "7573338294611270642.wav",
+          "language_code": "es"
+        }
+      ]
+    },
+    {
+      "file": "02_en_clean.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1510,
+          "num_samples": 126720,
+          "raw_transcription": "The U.N. also hopes to finalize a fund to help countries affected by global warming to cope with the impacts.",
+          "gender": 0,
+          "language": "English",
+          "duration": 7.92,
+          "source_file": "1009709090964908274.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1511,
+          "num_samples": 151680,
+          "raw_transcription": "Soon, officers equipped with riot gear entered the yard and cornered the inmates with tear gas.",
+          "gender": 1,
+          "language": "English",
+          "duration": 9.48,
+          "source_file": "10927605878527486298.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1512,
+          "num_samples": 212800,
+          "raw_transcription": "This new environment has different resources and different competitors, so the new population will need different features or adaptations to be a strong competitor than what they had needed before.",
+          "gender": 0,
+          "language": "English",
+          "duration": 13.3,
+          "source_file": "7931741157330894890.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1513,
+          "num_samples": 93120,
+          "raw_transcription": "Argentina is well known for having one of the best polo teams and players in the world.",
+          "gender": 1,
+          "language": "English",
+          "duration": 5.82,
+          "source_file": "12541283768447528582.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1514,
+          "num_samples": 244800,
+          "raw_transcription": "When the fighting ceased after the wounded were transported to the hospital, about 40 of the other remaining inmates stayed in the yard and refused to return to their cells.",
+          "gender": 0,
+          "language": "English",
+          "duration": 15.3,
+          "source_file": "15472366452348613907.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1515,
+          "num_samples": 128640,
+          "raw_transcription": "It is Martelly's fifth CEP in four years.",
+          "gender": 1,
+          "language": "English",
+          "duration": 8.04,
+          "source_file": "1894240377480073066.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1516,
+          "num_samples": 193920,
+          "raw_transcription": "Please treat the site with all of the dignity, solemnity and respect it deserves. Do not make jokes about the Holocaust or Nazis.",
+          "gender": 0,
+          "language": "English",
+          "duration": 12.12,
+          "source_file": "17606651572533263873.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1517,
+          "num_samples": 112320,
+          "raw_transcription": "Research in AI involves making machines to automate tasks that require intelligent behavior.",
+          "gender": 1,
+          "language": "English",
+          "duration": 7.02,
+          "source_file": "10885549230041454053.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1518,
+          "num_samples": 188160,
+          "raw_transcription": "A former Filipino policeman has kept Hong Kong tourists hostage by hijacking their bus in Manila, the capital of the Philippines.",
+          "gender": 0,
+          "language": "English",
+          "duration": 11.76,
+          "source_file": "10807778671969097912.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1519,
+          "num_samples": 128640,
+          "raw_transcription": "In many cases, enrolling on a gap-year course abroad can actually improve your chances of moving into higher education back in your home country.",
+          "gender": 1,
+          "language": "English",
+          "duration": 8.04,
+          "source_file": "16685771406658302555.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1520,
+          "num_samples": 239040,
+          "raw_transcription": "Out of 1,400 people polled prior to the 2010 federal election, those who oppose Australia becoming a republic grew by 8 per cent since 2008.",
+          "gender": 0,
+          "language": "English",
+          "duration": 14.94,
+          "source_file": "608005572552850776.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1521,
+          "num_samples": 88320,
+          "raw_transcription": "The satellite in space gets the call and then reflects it back down, almost instantly.",
+          "gender": 1,
+          "language": "English",
+          "duration": 5.52,
+          "source_file": "11840539862172308240.wav",
+          "language_code": "en"
+        }
+      ]
+    },
+    {
+      "file": "03_es_en.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1519,
+          "num_samples": 253440,
+          "raw_transcription": "En muchos casos, inscribirse en un programa de estudios en el extranjero durante un año sabático puede, en efecto, incrementar las posibilidades de acceder a la educación superior una vez se regresa al país de origen.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 15.84,
+          "source_file": "10823811276107540338.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1522,
+          "num_samples": 214080,
+          "raw_transcription": "Technology offers the solution with virtual field trips. Students can look at museum artifacts, visit an aquarium, or admire beautiful art while sitting with their class.",
+          "gender": 0,
+          "language": "English",
+          "duration": 13.38,
+          "source_file": "8364006913180567866.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1521,
+          "num_samples": 134400,
+          "raw_transcription": "El satélite en el espacio recibe la llamada y, luego, la refleja de vuelta casi de forma instantánea.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 8.4,
+          "source_file": "12550432088988018184.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1523,
+          "num_samples": 161280,
+          "raw_transcription": "The final score was a one-point victory, 21 to 20, ending the All Blacks' 15 game winning streak.",
+          "gender": 1,
+          "language": "English",
+          "duration": 10.08,
+          "source_file": "7691076933585556685.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1522,
+          "num_samples": 268800,
+          "raw_transcription": "La solución viene de la mano de la tecnología, a través de las excursiones virtuales. Los alumnos pueden observar los objetos exhibidos en un museo, visitar un acuario o contemplar hermosas obras de arte sentados con su clase.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 16.8,
+          "source_file": "7397935617289718584.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1524,
+          "num_samples": 308160,
+          "raw_transcription": "There are a lot of social and political effects such as the use of metric system, a shift from absolutism to republicanism, nationalism and the belief the country belongs to the people not to one sole ruler.",
+          "gender": 0,
+          "language": "English",
+          "duration": 19.26,
+          "source_file": "13212173517682821659.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1523,
+          "num_samples": 196800,
+          "raw_transcription": "El marcador final indicó un triunfo por un punto, 21 a 20, terminando con la sucesión de 15 victorias consecutivas para los All Blacks.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 12.3,
+          "source_file": "7467163006450930224.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1525,
+          "num_samples": 247680,
+          "raw_transcription": "The broad boulevards, glass-fronted buildings and modern shopping centers are dotted with traditional red-tiled roofs, the 18th century market, and old mosques and churches, although the city has an atmosphere more of Mediterranean Europe than traditional Turkey.",
+          "gender": 1,
+          "language": "English",
+          "duration": 15.48,
+          "source_file": "14353083584085318982.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1524,
+          "num_samples": 262080,
+          "raw_transcription": "Son muchas sus consecuencias políticas y sociales, tales como el uso del sistema métrico, el desplazamiento del absolutismo hacia el republicanismo, el nacionalismo y la convicción de que el país pertenece al pueblo, y no a un solo soberano.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 16.38,
+          "source_file": "11796734010502049729.wav",
+          "language_code": "es"
+        }
+      ]
+    },
+    {
+      "file": "04_ca_es.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1510,
+          "num_samples": 168000,
+          "raw_transcription": "L'ONU també espera enllestir un fons per a ajudar als països afectats per l'escalfament global a fer front als impactes.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 10.5,
+          "source_file": "15030145326853713488.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1526,
+          "num_samples": 232320,
+          "raw_transcription": "Si viaja a las regiones árticas o antárticas en época invernal, vivirá la experiencia de la noche polar, que significa que el sol no se alza por encima del horizonte.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 14.52,
+          "source_file": "13388429922015955649.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1511,
+          "num_samples": 129600,
+          "raw_transcription": "Aviat, agents amb equipament antiavalots van entrar al pati i arraconaren els presos amb gas lacrimogen.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 8.1,
+          "source_file": "2683743691961638143.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1527,
+          "num_samples": 301440,
+          "raw_transcription": "El esquiador del grupo masculino con discapacidad visual, Maciej Krezel, y su guía, Anna Ogarzynska, de Polonia, terminaron en el decimotercer lugar en el Super-G. Jong Seork Park de Corea del Sur obtuvo el vigésimo cuarto puesto en el grupo masculino sentados.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 18.84,
+          "source_file": "8590370792323234470.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1512,
+          "num_samples": 200640,
+          "raw_transcription": "Aquest nou entorn té diferents recursos i competidors, de manera que la nova població necessitarà característiques o adaptacions diferents de les que necessitava abans per a ser un fort competidor.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 12.54,
+          "source_file": "10969426192817589062.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1529,
+          "num_samples": 211200,
+          "raw_transcription": "Con anterioridad, el director ejecutivo de Ring, Jamie Siminoff, mencionó que la compañía había iniciado a raíz de que el timbre de su entrada no podía oírse desde la tienda que tenía montada en su garaje.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 13.2,
+          "source_file": "6735847874517424555.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1513,
+          "num_samples": 123840,
+          "raw_transcription": "L'Argentina és famosa per comptar amb un dels millors equips i jugadors de polo de tot el món.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 7.74,
+          "source_file": "18370386983855189156.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1528,
+          "num_samples": 145920,
+          "raw_transcription": "Algunos festivales cuentan con áreas especiales de acampe, destinadas a los grupos familiares con hijos pequeños.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 9.12,
+          "source_file": "11194000883953281859.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1514,
+          "num_samples": 216640,
+          "raw_transcription": "Uns quaranta interns es van quedar al pati i es van negar a tornar a les seves cel·les després que s'acabessin els combats i els ferits fossin traslladats a l'hospital.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 13.54,
+          "source_file": "16517109034337794132.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1532,
+          "num_samples": 303360,
+          "raw_transcription": "Baba Shyam fue honrado con 108 platos de Chhappan Bhog que, en la religión hindú, consiste en 56 piezas comestibles distintas, como dulces, frutas, nueces, platos, entre otros, que se sirven como ofrenda al dios.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 18.96,
+          "source_file": "9842251981325830682.wav",
+          "language_code": "es"
+        }
+      ]
+    },
+    {
+      "file": "05_es_ca_en.wav",
+      "target_seconds": 150,
+      "clips": [
+        {
+          "id": 1530,
+          "num_samples": 124800,
+          "raw_transcription": "Su tala se había programado para el día martes, pero fue salvado después de un fallo judicial de emergencia.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 7.8,
+          "source_file": "15804215244889766538.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1515,
+          "num_samples": 116160,
+          "raw_transcription": "És el cinquè Consell Electoral Provisional de Martelly en quatre anys.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 7.26,
+          "source_file": "11052781499096610360.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1526,
+          "num_samples": 219840,
+          "raw_transcription": "If you visit the Arctic or Antarctic areas in the winter you will experience the polar night, which means that the sun doesn't rise above the horizon.",
+          "gender": 0,
+          "language": "English",
+          "duration": 13.74,
+          "source_file": "10796058897134434902.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1534,
+          "num_samples": 167040,
+          "raw_transcription": "Ello, sumado a que resulta relativamente inaccesible, ha dado a «Tombuctú» una imagen de tierra exótica y lejana.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 10.44,
+          "source_file": "3412089685058336461.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1516,
+          "num_samples": 150720,
+          "raw_transcription": "Si us plau, tracteu el lloc amb tota la dignitat, solemnitat i respecte que es mereix. No feu bromes sobre l'Holocaust o els nazis.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 9.42,
+          "source_file": "4963799897916233697.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1528,
+          "num_samples": 92160,
+          "raw_transcription": "Some festivals have special camping areas for families with young children.",
+          "gender": 1,
+          "language": "English",
+          "duration": 5.76,
+          "source_file": "6969469525741631060.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1531,
+          "num_samples": 182400,
+          "raw_transcription": "La ubicación de las islas de África Oriental es frente a la costa este de ese continente, en el Océano Índico.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 11.4,
+          "source_file": "12028938552784024884.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1517,
+          "num_samples": 137280,
+          "raw_transcription": "La recerca en IA implica fer màquines per a automatitzar tasques que necessiten un comportament intel·ligent.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 8.58,
+          "source_file": "4774101726606132014.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1531,
+          "num_samples": 106560,
+          "raw_transcription": "The East African Islands are in the Indian Ocean off the eastern coast of Africa.",
+          "gender": 0,
+          "language": "English",
+          "duration": 6.66,
+          "source_file": "13686274014595037536.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1537,
+          "num_samples": 136320,
+          "raw_transcription": "En la oscuridad, se pueden ver las pirámides y contemplarlas en silencio antes de que empiece el espectáculo.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 8.52,
+          "source_file": "14262524667189502772.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1518,
+          "num_samples": 162240,
+          "raw_transcription": "Un antic policia filipí ha mantingut com a ostatges turistes de Hong Kong per segrestar el seu autobús a Manila, la capital de les Filipines.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 10.14,
+          "source_file": "10712167215744995817.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1529,
+          "num_samples": 123840,
+          "raw_transcription": "Previously, Ring's CEO, Jamie Siminoff, remarked the company started when his doorbell wasn't audible from his shop in his garage.",
+          "gender": 1,
+          "language": "English",
+          "duration": 7.74,
+          "source_file": "2122127445238804615.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1533,
+          "num_samples": 140160,
+          "raw_transcription": "Muchos formatos típicos (verbigracia, el grupo de formatos APS) son iguales o se asemejan mucho a esta relación de aspecto.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 8.76,
+          "source_file": "16994510133031660238.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1519,
+          "num_samples": 142080,
+          "raw_transcription": "Matricular-se en un curs d'any sabàtic a l'estranger sovint pot millorar les possibilitats d'iniciar l'educació superior de nou al teu país.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 8.88,
+          "source_file": "10187252481255424266.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1532,
+          "num_samples": 297280,
+          "raw_transcription": "108 plates of Chhappan Bhog (in Hinduism, 56 different edible items, like, sweets, fruits, nuts, dishes etc. which are offered to deity) were served to Baba Shyam.",
+          "gender": 0,
+          "language": "English",
+          "duration": 18.58,
+          "source_file": "9393095557904752800.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1539,
+          "num_samples": 206400,
+          "raw_transcription": "Es frecuente que los integrantes de una subcultura exhiban rasgos de su pertenencia a esta recurriendo al uso distintivo y simbólico del estilo, como las modas, los gestos y le jerga.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 12.9,
+          "source_file": "4034085156870766205.wav",
+          "language_code": "es"
+        }
+      ]
+    },
+    {
+      "file": "06_noise.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1535,
+          "num_samples": 284160,
+          "raw_transcription": "Emplea tecnología satelital, en contraste con la vieja tecnología de radar terrestre, con el fin de posibilitar que los controladores de tráfico aéreos detecten aeronaves con mayor precisión y proporcionen datos más exactos a los pilotos.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 17.76,
+          "source_file": "5747381879939680811.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1520,
+          "num_samples": 253440,
+          "raw_transcription": "De les 1.400 persones preguntades abans de les eleccions federals de 2010, les que s'oposen que Austràlia es converteixi en una república van créixer un 8% des del 2008.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 15.84,
+          "source_file": "14654613933081777839.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1530,
+          "num_samples": 81600,
+          "raw_transcription": "It had been scheduled to be cut down on Tuesday, but was saved after an emergency court ruling.",
+          "gender": 1,
+          "language": "English",
+          "duration": 5.1,
+          "source_file": "12554742849849029631.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1540,
+          "num_samples": 197760,
+          "raw_transcription": "En términos generales, el laísmo es muy sencillo. Se basa en el kundalini yoga, la meditación y el camino del amor que todo lo abarca.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 12.36,
+          "source_file": "2091282180166302823.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1521,
+          "num_samples": 105600,
+          "raw_transcription": "El satèl·lit a l'espai rep la trucada i després la reflecteix de nou, quasi instantàniament.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 6.6,
+          "source_file": "13008269183711043251.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1533,
+          "num_samples": 163200,
+          "raw_transcription": "Many common formats (APS family of formats, for example) are equal to or closely approximate this aspect ratio.",
+          "gender": 0,
+          "language": "English",
+          "duration": 10.2,
+          "source_file": "13033938513680724611.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1536,
+          "num_samples": 201600,
+          "raw_transcription": "El gobierno local advierte a quienes residen en las cercanías de la planta que no salgan de sus hogares, mantengan apagados los aires acondicionados y no consuman agua del grifo.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 12.6,
+          "source_file": "3327916977671284207.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1522,
+          "num_samples": 256000,
+          "raw_transcription": "La tecnologia ofereix la solució amb viatges de camp virtuals. Els estudiants poden veure artefactes de museus, visitar un aquari o contemplar la bellesa de l'art mentre estan asseguts amb la seva classe.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 16.0,
+          "source_file": "4210077420562108744.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1534,
+          "num_samples": 164160,
+          "raw_transcription": "Combined with its relative inaccessibility, \"Timbuktu\" has come to be used as a metaphor for exotic, distant lands.",
+          "gender": 1,
+          "language": "English",
+          "duration": 10.26,
+          "source_file": "8889418333192167285.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1542,
+          "num_samples": 251520,
+          "raw_transcription": "Gordon Johndroe, vocero de Bush, se refirió al compromiso norcoreano como «un avance importante hacia el objetivo de alcanzar la desnuclearización constatable de la península de Corea».",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 15.72,
+          "source_file": "6697161375605464362.wav",
+          "language_code": "es"
+        }
+      ]
+    },
+    {
+      "file": "10_stress_test.wav",
+      "target_seconds": 120,
+      "clips": [
+        {
+          "id": 1538,
+          "num_samples": 237120,
+          "raw_transcription": "En la autopista de Búfalo-Pittsburgh, el tramo entre Point Marion y Fairmont es el de las condiciones de manejo más desafiantes y con frecuencia recorre terrenos apartados y solitarios.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 14.82,
+          "source_file": "11628447209919953063.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1523,
+          "num_samples": 170560,
+          "raw_transcription": "La puntuació final fou una victòria d'un punt, 21 a 20, finalitzant la ratxa de 15 victòries dels All Black.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 10.66,
+          "source_file": "2057094869634011850.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1535,
+          "num_samples": 290880,
+          "raw_transcription": "It uses satellite-based technology as opposed to older ground-radar-based technology to allow air traffic controllers to pinpoint aircraft with greater precision and give pilots more accurate information.",
+          "gender": 0,
+          "language": "English",
+          "duration": 18.18,
+          "source_file": "17020026058488269738.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1543,
+          "num_samples": 117120,
+          "raw_transcription": "El paciente había estado en Nigeria, donde hubo algunos casos de Ébola.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 7.32,
+          "source_file": "16415711602924019767.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1536,
+          "num_samples": 130560,
+          "raw_transcription": "Local authorities are warning residents in the vicinity of the plant to stay indoors, turn off air-conditioners and not to drink tap water.",
+          "gender": 1,
+          "language": "English",
+          "duration": 8.16,
+          "source_file": "10408474834696432538.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1524,
+          "num_samples": 180480,
+          "raw_transcription": "Hi ha molts d'efectes socials i polítics com l'ús del sistema mètric, un canvi de l'absolutisme al republicanisme, nacionalisme i la creença que el país pertany al poble i no a un sol governant.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 11.28,
+          "source_file": "1305706724210013690.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1541,
+          "num_samples": 263040,
+          "raw_transcription": "Se les paga muy bien a las empresas de mensajería por hacer entregas veloces. Con frecuencia, el tiempo es muy importante cuando se trata de documentos comerciales, mercadería o repuestos para reparaciones urgentes.",
+          "gender": 0,
+          "language": "Spanish",
+          "duration": 16.44,
+          "source_file": "2541757592169628141.wav",
+          "language_code": "es"
+        },
+        {
+          "id": 1525,
+          "num_samples": 318720,
+          "raw_transcription": "Els amplis passejos, els edificis amb façanes de vidre i els centres comercials moderns estan esquitxats de teulats tradicionals de teules vermelles, el mercat del segle XVIII i les antigues mesquites i esglésies, tot i que la ciutat exhala una atmosfera més de l'Europa mediterrània que de la Turquia tradicional.",
+          "gender": 1,
+          "language": "Catalan",
+          "duration": 19.92,
+          "source_file": "13741747639777813627.wav",
+          "language_code": "ca"
+        },
+        {
+          "id": 1537,
+          "num_samples": 122240,
+          "raw_transcription": "You can see the pyramids in the dark and you can see them in silence before the show begins.",
+          "gender": 0,
+          "language": "English",
+          "duration": 7.64,
+          "source_file": "14212474766306388319.wav",
+          "language_code": "en"
+        },
+        {
+          "id": 1545,
+          "num_samples": 96000,
+          "raw_transcription": "Podemos encontrar curry «seco» y «húmedo», en función del volumen de líquido.",
+          "gender": 1,
+          "language": "Spanish",
+          "duration": 6.0,
+          "source_file": "9636595379511704367.wav",
+          "language_code": "es"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,176 @@
+{
+  "audio": "06_noise.wav",
+  "duration_seconds": 125.59,
+  "languages": [
+    "es",
+    "ca",
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 17.76,
+      "language": "es",
+      "speaker": null,
+      "text": "Emplea tecnología satelital, en contraste con la vieja tecnología de radar terrestre, con el fin de posibilitar que los controladores de tráfico aéreos detecten aeronaves con mayor precisión y proporcionen datos más exactos a los pilotos.",
+      "source_id": "es:1535:5747381879939680811.wav"
+    },
+    {
+      "start": 18.11,
+      "end": 33.95,
+      "language": "ca",
+      "speaker": null,
+      "text": "De les 1.400 persones preguntades abans de les eleccions federals de 2010, les que s'oposen que Austràlia es converteixi en una república van créixer un 8% des del 2008.",
+      "source_id": "ca:1520:14654613933081777839.wav"
+    },
+    {
+      "start": 34.3,
+      "end": 39.4,
+      "language": "en",
+      "speaker": null,
+      "text": "It had been scheduled to be cut down on Tuesday, but was saved after an emergency court ruling.",
+      "source_id": "en:1530:12554742849849029631.wav"
+    },
+    {
+      "start": 39.75,
+      "end": 52.11,
+      "language": "es",
+      "speaker": null,
+      "text": "En términos generales, el laísmo es muy sencillo. Se basa en el kundalini yoga, la meditación y el camino del amor que todo lo abarca.",
+      "source_id": "es:1540:2091282180166302823.wav"
+    },
+    {
+      "start": 52.46,
+      "end": 59.06,
+      "language": "ca",
+      "speaker": null,
+      "text": "El satèl·lit a l'espai rep la trucada i després la reflecteix de nou, quasi instantàniament.",
+      "source_id": "ca:1521:13008269183711043251.wav"
+    },
+    {
+      "start": 59.41,
+      "end": 69.61,
+      "language": "en",
+      "speaker": null,
+      "text": "Many common formats (APS family of formats, for example) are equal to or closely approximate this aspect ratio.",
+      "source_id": "en:1533:13033938513680724611.wav"
+    },
+    {
+      "start": 69.96,
+      "end": 82.56,
+      "language": "es",
+      "speaker": null,
+      "text": "El gobierno local advierte a quienes residen en las cercanías de la planta que no salgan de sus hogares, mantengan apagados los aires acondicionados y no consuman agua del grifo.",
+      "source_id": "es:1536:3327916977671284207.wav"
+    },
+    {
+      "start": 82.91,
+      "end": 98.91,
+      "language": "ca",
+      "speaker": null,
+      "text": "La tecnologia ofereix la solució amb viatges de camp virtuals. Els estudiants poden veure artefactes de museus, visitar un aquari o contemplar la bellesa de l'art mentre estan asseguts amb la seva classe.",
+      "source_id": "ca:1522:4210077420562108744.wav"
+    },
+    {
+      "start": 99.26,
+      "end": 109.52,
+      "language": "en",
+      "speaker": null,
+      "text": "Combined with its relative inaccessibility, \"Timbuktu\" has come to be used as a metaphor for exotic, distant lands.",
+      "source_id": "en:1534:8889418333192167285.wav"
+    },
+    {
+      "start": 109.87,
+      "end": 125.59,
+      "language": "es",
+      "speaker": null,
+      "text": "Gordon Johndroe, vocero de Bush, se refirió al compromiso norcoreano como «un avance importante hacia el objetivo de alcanzar la desnuclearización constatable de la península de Corea».",
+      "source_id": "es:1542:6697161375605464362.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1535,
+      "source_file": "5747381879939680811.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1520,
+      "source_file": "14654613933081777839.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1530,
+      "source_file": "12554742849849029631.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1540,
+      "source_file": "2091282180166302823.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1521,
+      "source_file": "13008269183711043251.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1533,
+      "source_file": "13033938513680724611.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1536,
+      "source_file": "3327916977671284207.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1522,
+      "source_file": "4210077420562108744.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1534,
+      "source_file": "8889418333192167285.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1542,
+      "source_file": "6697161375605464362.wav"
+    },
+    {
+      "dataset": "MUSAN",
+      "source_file": "noise-sound-bible-0009.wav",
+      "snr_db": 10.0
+    }
+  ]
+}

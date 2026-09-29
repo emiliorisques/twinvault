@@ -1,0 +1,261 @@
+{
+  "audio": "05_es_ca_en.wav",
+  "duration_seconds": 161.83,
+  "languages": [
+    "es",
+    "ca",
+    "en"
+  ],
+  "reference_status": "dataset_provided_unreviewed",
+  "requires_human_review": true,
+  "segments": [
+    {
+      "start": 0.0,
+      "end": 7.8,
+      "language": "es",
+      "speaker": null,
+      "text": "Su tala se había programado para el día martes, pero fue salvado después de un fallo judicial de emergencia.",
+      "source_id": "es:1530:15804215244889766538.wav"
+    },
+    {
+      "start": 8.15,
+      "end": 15.41,
+      "language": "ca",
+      "speaker": null,
+      "text": "És el cinquè Consell Electoral Provisional de Martelly en quatre anys.",
+      "source_id": "ca:1515:11052781499096610360.wav"
+    },
+    {
+      "start": 15.76,
+      "end": 29.5,
+      "language": "en",
+      "speaker": null,
+      "text": "If you visit the Arctic or Antarctic areas in the winter you will experience the polar night, which means that the sun doesn't rise above the horizon.",
+      "source_id": "en:1526:10796058897134434902.wav"
+    },
+    {
+      "start": 29.85,
+      "end": 40.29,
+      "language": "es",
+      "speaker": null,
+      "text": "Ello, sumado a que resulta relativamente inaccesible, ha dado a «Tombuctú» una imagen de tierra exótica y lejana.",
+      "source_id": "es:1534:3412089685058336461.wav"
+    },
+    {
+      "start": 40.64,
+      "end": 50.06,
+      "language": "ca",
+      "speaker": null,
+      "text": "Si us plau, tracteu el lloc amb tota la dignitat, solemnitat i respecte que es mereix. No feu bromes sobre l'Holocaust o els nazis.",
+      "source_id": "ca:1516:4963799897916233697.wav"
+    },
+    {
+      "start": 50.41,
+      "end": 56.17,
+      "language": "en",
+      "speaker": null,
+      "text": "Some festivals have special camping areas for families with young children.",
+      "source_id": "en:1528:6969469525741631060.wav"
+    },
+    {
+      "start": 56.52,
+      "end": 67.92,
+      "language": "es",
+      "speaker": null,
+      "text": "La ubicación de las islas de África Oriental es frente a la costa este de ese continente, en el Océano Índico.",
+      "source_id": "es:1531:12028938552784024884.wav"
+    },
+    {
+      "start": 68.27,
+      "end": 76.85,
+      "language": "ca",
+      "speaker": null,
+      "text": "La recerca en IA implica fer màquines per a automatitzar tasques que necessiten un comportament intel·ligent.",
+      "source_id": "ca:1517:4774101726606132014.wav"
+    },
+    {
+      "start": 77.2,
+      "end": 83.86,
+      "language": "en",
+      "speaker": null,
+      "text": "The East African Islands are in the Indian Ocean off the eastern coast of Africa.",
+      "source_id": "en:1531:13686274014595037536.wav"
+    },
+    {
+      "start": 84.21,
+      "end": 92.73,
+      "language": "es",
+      "speaker": null,
+      "text": "En la oscuridad, se pueden ver las pirámides y contemplarlas en silencio antes de que empiece el espectáculo.",
+      "source_id": "es:1537:14262524667189502772.wav"
+    },
+    {
+      "start": 93.08,
+      "end": 103.22,
+      "language": "ca",
+      "speaker": null,
+      "text": "Un antic policia filipí ha mantingut com a ostatges turistes de Hong Kong per segrestar el seu autobús a Manila, la capital de les Filipines.",
+      "source_id": "ca:1518:10712167215744995817.wav"
+    },
+    {
+      "start": 103.57,
+      "end": 111.31,
+      "language": "en",
+      "speaker": null,
+      "text": "Previously, Ring's CEO, Jamie Siminoff, remarked the company started when his doorbell wasn't audible from his shop in his garage.",
+      "source_id": "en:1529:2122127445238804615.wav"
+    },
+    {
+      "start": 111.66,
+      "end": 120.42,
+      "language": "es",
+      "speaker": null,
+      "text": "Muchos formatos típicos (verbigracia, el grupo de formatos APS) son iguales o se asemejan mucho a esta relación de aspecto.",
+      "source_id": "es:1533:16994510133031660238.wav"
+    },
+    {
+      "start": 120.77,
+      "end": 129.65,
+      "language": "ca",
+      "speaker": null,
+      "text": "Matricular-se en un curs d'any sabàtic a l'estranger sovint pot millorar les possibilitats d'iniciar l'educació superior de nou al teu país.",
+      "source_id": "ca:1519:10187252481255424266.wav"
+    },
+    {
+      "start": 130.0,
+      "end": 148.58,
+      "language": "en",
+      "speaker": null,
+      "text": "108 plates of Chhappan Bhog (in Hinduism, 56 different edible items, like, sweets, fruits, nuts, dishes etc. which are offered to deity) were served to Baba Shyam.",
+      "source_id": "en:1532:9393095557904752800.wav"
+    },
+    {
+      "start": 148.93,
+      "end": 161.83,
+      "language": "es",
+      "speaker": null,
+      "text": "Es frecuente que los integrantes de una subcultura exhiban rasgos de su pertenencia a esta recurriendo al uso distintivo y simbólico del estilo, como las modas, los gestos y le jerga.",
+      "source_id": "es:1539:4034085156870766205.wav"
+    }
+  ],
+  "entities": {
+    "names": [],
+    "dates": [],
+    "amounts": [],
+    "commitments": []
+  },
+  "provenance": [
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1530,
+      "source_file": "15804215244889766538.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1515,
+      "source_file": "11052781499096610360.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1526,
+      "source_file": "10796058897134434902.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1534,
+      "source_file": "3412089685058336461.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1516,
+      "source_file": "4963799897916233697.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1528,
+      "source_file": "6969469525741631060.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1531,
+      "source_file": "12028938552784024884.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1517,
+      "source_file": "4774101726606132014.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1531,
+      "source_file": "13686274014595037536.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1537,
+      "source_file": "14262524667189502772.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1518,
+      "source_file": "10712167215744995817.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1529,
+      "source_file": "2122127445238804615.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1533,
+      "source_file": "16994510133031660238.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "ca_es",
+      "split": "validation",
+      "row_id": 1519,
+      "source_file": "10187252481255424266.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "en_us",
+      "split": "validation",
+      "row_id": 1532,
+      "source_file": "9393095557904752800.wav"
+    },
+    {
+      "dataset": "Google FLEURS",
+      "config": "es_419",
+      "split": "validation",
+      "row_id": 1539,
+      "source_file": "4034085156870766205.wav"
+    }
+  ]
+}

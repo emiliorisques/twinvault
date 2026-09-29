@@ -1,0 +1,29 @@
+CASO 08 — GUION PARA GRABACIÓN MANUAL (aprox. 2 minutos)
+
+Objetivo: probar nombres propios, empresas, fechas, horas, importes y compromisos.
+Grabar con voces humanas; no sustituir por TTS. Leer de forma natural y conservar los
+cambios de idioma. Tras grabarlo, crear 08_entities.wav y revisar la referencia palabra
+por palabra antes de incorporarla al benchmark.
+
+ES: Buenos días, Marta Soler. La reunión con Jordi Puig de Atlas Robotics será el martes
+14 de octubre de 2026 a las nueve y media. El presupuesto inicial asciende a doce mil
+cuatrocientos cincuenta euros, IVA no incluido. Yo enviaré la propuesta revisada antes
+del viernes 9 de octubre y llamaré a la oficina de Barcelona al terminar.
+
+CA: Perfecte. L'empresa es diu Atlas Robotics Europe, societat limitada, i el projecte
+intern és Aurora 27. La Laia Ferrer prepararà tres escenaris: trenta-cinc mil euros,
+quaranta-dos mil cinc-cents euros i cinquanta-un mil euros. Ens comprometem a validar
+les xifres abans de les disset hores del 12 d'octubre.
+
+EN: Please add Daniel O'Connor and Priya Shah to the follow-up call on Wednesday,
+October twenty-first, at four fifteen p.m. Central European Time. The customer reference
+is ACME dash seven four nine two, and the renewal value is ninety-eight thousand six
+hundred euros. Daniel will send the signed contract by November second.
+
+ES: Queda pendiente confirmar si el pago será en dos plazos: el cuarenta por ciento al
+firmar y el sesenta por ciento el 15 de diciembre. La dirección de entrega es avenida
+Diagonal 640, planta quinta, Barcelona.
+
+CA: D'acord. Jo confirmaré el calendari amb la Núria Bosch demà abans de les dotze.
+Si no rebem resposta, obrirem la incidència TV-2026-031 i ajornarem la demostració fins
+al 3 de novembre.
