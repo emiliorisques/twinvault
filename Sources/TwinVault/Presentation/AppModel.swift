@@ -239,6 +239,11 @@ final class AppModel {
             }
             meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recordingID }
             meeting.transcriptReviewIntervals.append(contentsOf: output.reviewIntervals)
+            meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
+                meetingID: meeting.id,
+                recordings: meeting.audioRecordings,
+                segments: meeting.transcriptSegments
+            )
             meeting.transcriptionLocaleIdentifiers = profile.localeIdentifiers
             meeting.updatedAt = .now
             try await repository.save(meeting)

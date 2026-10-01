@@ -68,7 +68,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 6)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 7)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -94,11 +94,19 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             startTime: 12,
             endTime: 24
         )
+        let finding = CrossChannelTranscriptFinding(
+            meetingID: meetingID,
+            microphoneSegmentID: segment.id,
+            systemAudioSegmentIDs: [UUID()],
+            textSimilarity: 0.91,
+            timelineOverlap: 0.88
+        )
         let meeting = Meeting(
             id: meetingID, title: "Stored transcript",
             audioRecordings: [recording],
             transcriptSegments: [segment],
             transcriptReviewIntervals: [reviewInterval],
+            crossChannelTranscriptFindings: [finding],
             transcriptionLocaleIdentifiers: ["ca-ES", "en-US"],
             status: .completed
         )
@@ -108,6 +116,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
         XCTAssertEqual(loaded?.transcriptReviewIntervals, [reviewInterval])
+        XCTAssertEqual(loaded?.crossChannelTranscriptFindings, [finding])
         XCTAssertEqual(loaded?.audioRecordings.first?.meetingTimelineOffset, 1.25)
         XCTAssertEqual(loaded?.transcriptionLocaleIdentifiers, ["ca-ES", "en-US"])
     }

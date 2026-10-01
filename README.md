@@ -16,6 +16,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
 - Mark long transcript intervals without text for human review instead of presenting the transcript as complete.
+- Mark strongly aligned duplicate text across system and microphone channels as possible speaker playback leakage; microphone capture is never treated as proof of the user's identity.
 
 ## Development
 
@@ -62,6 +63,8 @@ Phase 2L restores whole-recording decoding for WhisperKit. Splitting a multiling
 Phase 2M adds conservative recording-level routing. WhisperKit inspects bounded acoustically active windows and returns language observations with time ranges and confidence; transcript text is never used to choose an engine. Any Catalan, unsupported language, missing evidence, or low-confidence result routes the complete recording to WhisperKit. Only consistently confident Spanish/English evidence routes the complete recording to Parakeet. The two engines still transcribe whole recordings, and diarization remains a separate future stage. On the eight-case suite the detector routed all cases as expected and the resulting hybrid selection reduced directional micro-WER to 19.8%. The profile is visible as experimental because the fixture references still require human verification.
 
 Phase 2N evaluates NVIDIA Nemotron 3.5 through FluidAudio without registering it as a product profile. The adapter is local, replaceable, provenance-preserving, and covered by deterministic tests, but remains an evaluation tool because the converted model's distribution terms require a separate shipping review. On the same eight-case suite Nemotron scored 12.0% WER on the ES/EN slice, 43.0% when Catalan was present, and 29.6% overall. It was fast after model preparation, but did not beat Parakeet for ES/EN or WhisperKit for Catalan and did not return reliable language labels for every recording. The automatic product policy is therefore unchanged.
+
+Phase 2O adds a conservative cross-channel attribution guard. Once both microphone and system channels have transcripts, TwinVault compares only segments that can be placed on the same meeting timeline. Strong ordered-word similarity plus strong temporal overlap produces a persisted `possiblePlaybackLeakage` finding linked to the microphone segment and every matching system segment. The UI exposes the warning, but no transcript is deleted or assigned to a person. A microphone segment without such a finding still requires separate speaker-identification evidence; capture channel is never identity. This transcript-level safeguard is not acoustic echo cancellation and must later be complemented by sample-timestamp calibration and acoustic correlation.
 
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 

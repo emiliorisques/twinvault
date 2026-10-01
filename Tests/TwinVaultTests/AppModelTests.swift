@@ -145,6 +145,47 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    func testTranscribingBothChannelsPersistsPossiblePlaybackLeakageWithoutIdentity() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Cross-channel evidence",
+            audioRecordings: [microphone, system],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(
+                transcript: "This sentence came from the speakers"
+            ),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.transcribe(meetingID: meetingID, recordingID: microphone.id)
+        await model.transcribe(meetingID: meetingID, recordingID: system.id)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments.count, 2)
+        XCTAssertEqual(stored?.crossChannelTranscriptFindings.count, 1)
+        XCTAssertNil(stored?.transcriptSegments.first?.temporarySpeakerID)
+    }
+
     func testPartialMultilingualTranscriptionIsSavedAndWarnsUser() async {
         let repository = InMemoryMeetingRepository()
         let meetingID = UUID()

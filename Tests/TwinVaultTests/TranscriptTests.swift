@@ -33,6 +33,118 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(turn.temporarySpeakerID, "speaker-3")
     }
 
+    func testCrossChannelReconcilerMarksOnlyAlignedMatchingMicrophoneText() {
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "mic.m4a",
+            meetingTimelineOffset: 0.2
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let microphoneSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 10,
+            endTime: 13,
+            text: "Te envío el presupuesto el viernes",
+            sourceRecordingID: microphone.id
+        )
+        let systemSegments = [
+            TranscriptSegment(
+                meetingID: meetingID,
+                startTime: 9.8,
+                endTime: 11.5,
+                text: "Te envio el",
+                sourceRecordingID: system.id
+            ),
+            TranscriptSegment(
+                meetingID: meetingID,
+                startTime: 11.5,
+                endTime: 13.1,
+                text: "presupuesto el viernes",
+                sourceRecordingID: system.id
+            )
+        ]
+
+        let findings = CrossChannelTranscriptReconciler().findings(
+            meetingID: meetingID,
+            recordings: [microphone, system],
+            segments: [microphoneSegment] + systemSegments
+        )
+
+        XCTAssertEqual(findings.count, 1)
+        XCTAssertEqual(findings.first?.microphoneSegmentID, microphoneSegment.id)
+        XCTAssertEqual(findings.first?.systemAudioSegmentIDs, systemSegments.map(\.id))
+        XCTAssertEqual(findings.first?.textSimilarity, 1)
+        XCTAssertEqual(
+            SpeakerAttributionPolicy().eligibility(
+                for: microphoneSegment,
+                findings: findings
+            ),
+            .blockedByPossiblePlaybackLeakage
+        )
+    }
+
+    func testCrossChannelReconcilerDoesNotMatchUnalignedOrUnanchoredText() {
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "mic.m4a",
+            meetingTimelineOffset: 0
+        )
+        let unanchoredSystem = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio
+        )
+        let microphoneSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 3,
+            text: "the same four spoken words",
+            sourceRecordingID: microphone.id
+        )
+        let unanchoredSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 3,
+            text: "the same four spoken words",
+            sourceRecordingID: unanchoredSystem.id
+        )
+        let lateSystem = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "late.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let lateSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 20,
+            endTime: 22,
+            text: "the same four spoken words",
+            sourceRecordingID: lateSystem.id
+        )
+
+        let findings = CrossChannelTranscriptReconciler().findings(
+            meetingID: meetingID,
+            recordings: [microphone, unanchoredSystem, lateSystem],
+            segments: [microphoneSegment, unanchoredSegment, lateSegment]
+        )
+
+        XCTAssertTrue(findings.isEmpty)
+        XCTAssertEqual(
+            SpeakerAttributionPolicy().eligibility(
+                for: microphoneSegment,
+                findings: findings
+            ),
+            .requiresSpeakerIdentification
+        )
+    }
+
     func testSegmentRetainsAudioAndProviderProvenance() {
         let recordingID = UUID()
         let segment = TranscriptSegment(

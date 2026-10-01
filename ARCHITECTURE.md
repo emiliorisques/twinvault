@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2N Nemotron evaluation
+# TwinVault Architecture — Phase 2O cross-channel attribution guard
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H introduced a shared local pause detector. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. Phase 2K exposes model/transcription progress and cooperative cancellation. Phase 2L keeps the detector as Apple input segmentation and Whisper coverage analysis while restoring whole-recording context for WhisperKit. Phase 2M adds conservative recording-level routing from independent acoustic language evidence. Phase 2N evaluates Nemotron as an unregistered provider and rejects it as the current automatic default. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H introduced a shared local pause detector. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. Phase 2K exposes model/transcription progress and cooperative cancellation. Phase 2L keeps the detector as Apple input segmentation and Whisper coverage analysis while restoring whole-recording context for WhisperKit. Phase 2M adds conservative recording-level routing from independent acoustic language evidence. Phase 2N evaluates Nemotron as an unregistered provider and rejects it as the current automatic default. Phase 2O persists conservative transcript-level evidence of possible system-audio playback leaking into the microphone and blocks identity inference from that channel. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -28,7 +28,8 @@ AppModel (use-case coordination)
                     │
                     ▼
 Domain: Meeting, MeetingNote, ImportantMoment, AudioRecordingReference,
-        RecordingSession, TranscriptSegment, provider protocols
+        RecordingSession, TranscriptSegment, CrossChannelTranscriptFinding,
+        provider protocols
 ```
 
 The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation, nor persistence format. UI mutation goes through `RecordingSession`, which owns meeting-state invariants. Actor-isolated persistence serializes all disk access. AVFoundation stays behind a main-actor service because microphone authorization and recording are UI-driven platform operations.
@@ -61,13 +62,15 @@ Automatic routing operates at recording scope. `WhisperKitAcousticLanguageIdenti
 
 `NemotronSpeechToTextProvider` is an evaluation-only FluidAudio adapter for automatic, forced-Spanish, and forced-English runs. It performs the same path and locale validation and stores recording/provider/time provenance, but it is not registered with `TranscriptionPolicy` or exposed in the UI. The eight-case comparison showed worse ES/EN accuracy than Parakeet and worse Catalan accuracy than WhisperKit. Its automatic mode also returned no detected language for several successful transcripts, so it cannot replace the independent acoustic language identifier. FluidAudio's source is Apache 2.0, while the downloaded converted model requires a separate distribution-license review before any product release.
 
+`CrossChannelTranscriptReconciler` is a pure domain service run whenever one channel's transcript is replaced. It requires timeline anchors for both recordings, strong temporal overlap, a minimum word count, and strong ordered-token coverage before creating a `possiblePlaybackLeakage` finding. The finding links the microphone segment to the exact system-audio segment IDs and persists both similarity measures. It never removes evidence and never claims echo as fact. `SpeakerAttributionPolicy` blocks any such microphone segment and requires independent speaker-identification evidence for every other segment. Therefore “microphone” means only the local capture channel, never “me.” Buffer timestamp calibration and acoustic correlation remain required before this can become verified echo detection.
+
 `TranscriptionRequest` carries an optional `Sendable` progress sink. Providers report semantic stages without coupling the domain to SwiftUI. FluidAudio supplies Parakeet's determinate download fraction; WhisperKit and Apple Speech report indeterminate preparation/loading stages because their adapters cannot obtain a trustworthy equivalent fraction. `AppModel` owns the single active task and cancellation boundary. It checks cancellation before replacing transcript data, suppresses cancellation as a user-requested error, and keeps all previously persisted evidence unchanged. Provider cancellation is cooperative, so a Core ML call may return only after its current non-interruptible operation finishes.
 
 ## ADR-001: versioned JSON before SQLite
 
 Phase 1 has four small aggregate types and no relational query workload. A schema-versioned JSON document with atomic replacement is transparent, testable, backup-friendly, and avoids a dependency or premature migration system. Large audio files are never placed in metadata.
 
-The cost is whole-document reads/writes and weak multi-process support. `MeetingRepository` makes the choice reversible. Schema 2 migrates Phase 1's single microphone reference into a channel-aware array; schema 3 adds transcript segments; schema 4 stores the meeting's requested transcription locales; schema 5 adds optional audio timeline anchors; schema 6 persists transcript review intervals. Older meetings decode to the three default locales, an unknown audio offset, and no invented review findings. JSON remains acceptable for short development fixtures, but move to SQLite before storing production-volume transcripts. Domain/UI code must not change during that migration.
+The cost is whole-document reads/writes and weak multi-process support. `MeetingRepository` makes the choice reversible. Schema 2 migrates Phase 1's single microphone reference into a channel-aware array; schema 3 adds transcript segments; schema 4 stores the meeting's requested transcription locales; schema 5 adds optional audio timeline anchors; schema 6 persists transcript review intervals; schema 7 persists cross-channel playback-leakage findings. Older meetings decode to the three default locales, an unknown audio offset, and no invented review or leakage findings. JSON remains acceptable for short development fixtures, but move to SQLite before storing production-volume transcripts. Domain/UI code must not change during that migration.
 
 ## Data integrity and provenance
 
@@ -78,6 +81,7 @@ The cost is whole-document reads/writes and weak multi-process support. `Meeting
 - Important moments store elapsed source time, enabling later audio/transcript evidence links.
 - Paths stored in metadata are relative to the controlled audio directory.
 - Meeting completion is idempotent and end time cannot precede start time.
+- Cross-channel findings retain both microphone and system transcript IDs and remain hypotheses, not speaker identities.
 - Store schema version is validated before decoding is accepted.
 
 This is provenance scaffolding, not the future Memory model. Facts, inferences, twins, and biometric identity are intentionally absent.

@@ -32,6 +32,7 @@
 		A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */; };
 		A10000000000000000000024 /* AcousticLanguageRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* AcousticLanguageRouting.swift */; };
 		A10000000000000000000025 /* NemotronSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* NemotronSpeechToTextProvider.swift */; };
+		A10000000000000000000026 /* CrossChannelEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* CrossChannelEvidence.swift */; };
 		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
 		A20000000000000000000002 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
@@ -75,6 +76,7 @@
 		B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetSpeechToTextProvider.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 /* AcousticLanguageRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticLanguageRouting.swift; sourceTree = "<group>"; };
 		B10000000000000000000028 /* NemotronSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NemotronSpeechToTextProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000029 /* CrossChannelEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrossChannelEvidence.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +130,7 @@
 				B10000000000000000000002 /* MeetingRepository.swift */,
 				B10000000000000000000003 /* RecordingSession.swift */,
 				B10000000000000000000015 /* Transcript.swift */,
+				B10000000000000000000029 /* CrossChannelEvidence.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -329,6 +332,7 @@
 				A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */,
 				A10000000000000000000024 /* AcousticLanguageRouting.swift in Sources */,
 				A10000000000000000000025 /* NemotronSpeechToTextProvider.swift in Sources */,
+				A10000000000000000000026 /* CrossChannelEvidence.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

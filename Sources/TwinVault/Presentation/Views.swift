@@ -202,6 +202,14 @@ struct MeetingDetailView: View {
                         }
                         .foregroundStyle(.orange)
                     }
+                    if !meeting.crossChannelTranscriptFindings.isEmpty {
+                        Label(
+                            "Possible speaker playback was also captured by the microphone. It remains unassigned and will not be treated as your voice.",
+                            systemImage: "speaker.wave.2.trianglebadge.exclamationmark"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.orange)
+                    }
                     ForEach(meeting.transcriptSegments) { segment in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {
@@ -212,6 +220,13 @@ struct MeetingDetailView: View {
                                 }
                                 if let localeIdentifier = segment.localeIdentifier {
                                     Text(languageLabel(localeIdentifier)).fontWeight(.semibold)
+                                }
+                                if meeting.crossChannelTranscriptFindings.contains(where: {
+                                    $0.microphoneSegmentID == segment.id
+                                }) {
+                                    Text("Possible playback leakage")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.orange)
                                 }
                             }
                             .font(.caption)
