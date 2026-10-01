@@ -394,6 +394,73 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(selected.first?.endTime, 2)
     }
 
+    func testAcousticChannelAlignmentFindsDelayedSystemPlaybackInMicrophone() throws {
+        let systemValues = (0..<240).map { index -> Float in
+            let broadVariation = sin(Double(index) * 0.19) * 0.7
+            let shortVariation = cos(Double(index) * 0.73) * 0.25
+            let distinctivePulse = index.isMultiple(of: 37) ? 1.4 : 0
+            return Float(broadVariation + shortVariation + distinctivePulse)
+        }
+        let delayFrames = 4
+        let microphoneValues = (0..<systemValues.count).map { index -> Float in
+            guard index >= delayFrames else { return -0.4 }
+            let deterministicNoise = Float((index % 7) - 3) * 0.002
+            return systemValues[index - delayFrames] + deterministicNoise
+        }
+        let estimator = ChannelAlignmentEstimator(
+            maximumDelay: 1,
+            analysisWindowDuration: 12,
+            minimumCorrelation: 0.65,
+            minimumComparedFrames: 30
+        )
+
+        let estimate = try XCTUnwrap(estimator.estimate(
+            systemAudio: AudioEnergyFingerprint(frameDuration: 0.1, values: systemValues),
+            microphone: AudioEnergyFingerprint(frameDuration: 0.1, values: microphoneValues)
+        ))
+
+        XCTAssertEqual(estimate.microphoneDelayAtStart, 0.4, accuracy: 0.02)
+        XCTAssertGreaterThan(estimate.confidence, 0.9)
+        XCTAssertTrue(estimate.isReliable)
+    }
+
+    func testAcousticChannelAlignmentRejectsFlatUninformativeAudio() {
+        let silence = AudioEnergyFingerprint(
+            frameDuration: 0.1,
+            values: Array(repeating: -7, count: 120)
+        )
+
+        XCTAssertNil(ChannelAlignmentEstimator().estimate(
+            systemAudio: silence,
+            microphone: silence
+        ))
+    }
+
+    func testAudioChannelAlignmentAnalyzerRejectsPathTraversal() async {
+        let meetingID = UUID()
+        let analyzer = LocalAudioChannelAlignmentAnalyzer(
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "../microphone.m4a"
+        )
+        let systemAudio = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio
+        )
+
+        do {
+            _ = try await analyzer.analyze(microphone: microphone, systemAudio: systemAudio)
+            XCTFail("Path traversal must be rejected")
+        } catch AudioChannelAlignmentError.invalidRecordingReference {
+            // Expected.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+    }
+
     private func candidate(
         _ meetingID: UUID, _ recordingID: UUID,
         _ start: TimeInterval, _ end: TimeInterval,

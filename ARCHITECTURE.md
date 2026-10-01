@@ -1,8 +1,8 @@
-# TwinVault Architecture — Phase 2Q identity evidence gate
+# TwinVault Architecture — Phase 2R acoustic channel alignment foundation
 
 ## Scope
 
-Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H introduced a shared local pause detector. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. Phase 2K exposes model/transcription progress and cooperative cancellation. Phase 2L keeps the detector as Apple input segmentation and Whisper coverage analysis while restoring whole-recording context for WhisperKit. Phase 2M adds conservative recording-level routing from independent acoustic language evidence. Phase 2N evaluates Nemotron as an unregistered provider and rejects it as the current automatic default. Phase 2O persists conservative transcript-level evidence of possible system-audio playback leaking into the microphone and blocks identity inference from that channel. Phase 2P retries only acoustically active fast-provider coverage gaps and adds bounded explicit vocabulary prompts. Phase 2Q adds provenance and mandatory confirmation gates between diarization and stable identity. No cloud inference or audio upload exists in the application.
+Phase 1 is one vertical slice: create a meeting, record microphone audio, annotate it, stop it, persist it locally, and inspect it later. Phase 2A evolved the data boundary for multiple audio channels and timestamped transcripts. Phase 2B implements optional local system-audio capture. Phase 2C implements user-triggered, on-device transcription of a selected recording. Phase 2D enables Spanish, Catalan, and English transcription by default. Phase 2E anchors new audio files to the meeting timeline. Phase 2F adds a second local transcription implementation using WhisperKit. Phase 2G hardens system-audio finalization and makes incomplete transcript coverage inspectable. Phase 2H introduced a shared local pause detector. Phase 2I introduces explicit transcription profiles and a safe provider-routing policy. Phase 2J integrates Parakeet as an experimental, manually selected ES/EN-only profile. Phase 2K exposes model/transcription progress and cooperative cancellation. Phase 2L keeps the detector as Apple input segmentation and Whisper coverage analysis while restoring whole-recording context for WhisperKit. Phase 2M adds conservative recording-level routing from independent acoustic language evidence. Phase 2N evaluates Nemotron as an unregistered provider and rejects it as the current automatic default. Phase 2O persists conservative transcript-level evidence of possible system-audio playback leaking into the microphone and blocks identity inference from that channel. Phase 2P retries only acoustically active fast-provider coverage gaps and adds bounded explicit vocabulary prompts. Phase 2Q adds provenance and mandatory confirmation gates between diarization and stable identity. Phase 2R adds a bounded post-recording acoustic alignment boundary for the microphone and system-audio clocks. No cloud inference or audio upload exists in the application.
 
 ## Boundaries
 
@@ -15,6 +15,7 @@ AppModel (use-case coordination)
     ├── AudioRecordingService ── LocalAudioRecordingService
     ├── SystemAudioCaptureService ── ScreenCaptureSystemAudioService
     ├── AudioPlaybackService ── LocalAudioPlaybackService
+    ├── AudioChannelAlignmentAnalyzing ── LocalAudioChannelAlignmentAnalyzer
     └── SpeechToTextProvider ─┬─ AppleSpeechTranscriptionProvider
                               ├─ WhisperKitSpeechToTextProvider
                               ├─ ParakeetSpeechToTextProvider
@@ -37,6 +38,8 @@ The domain imports Foundation only. It neither knows about SwiftUI, AVFoundation
 System audio uses ScreenCaptureKit with only an `.audio` stream output. TwinVault does not register a `.screen` output, so captured video frames never enter the process or vault. The current application is excluded from its own audio capture. Audio is encoded as 48 kHz stereo AAC in a channel-specific M4A file. If ScreenCaptureKit authorization or startup fails, the meeting continues with microphone audio and surfaces a warning. An `SCStreamDelegate` reports unexpected termination immediately. Stop is idempotent, M4A finalization runs even if ScreenCaptureKit's stop call throws, sample delivery and finalization share one serial queue, and a completed file is reopened with AVFoundation before acceptance.
 
 New microphone and system-audio references persist `meetingTimelineOffset`, measured from the meeting start to the point where each capture service reports successful startup. RecordingSession creation occurs only after microphone permission is resolved. Legacy recordings decode with no timeline anchor instead of inventing an offset. The domain can map a file-relative timestamp onto the meeting timeline when an anchor exists. This is a wall-clock startup-boundary estimate; it does not yet account for encoder priming, the first sample's presentation timestamp, device latency, or clock drift. Automatic channel fusion must wait for buffer-level calibration and fixture measurements.
+
+Phase 2R adds post-recording acoustic calibration without changing the live capture path. `LocalAudioEnergyFingerprintExtractor` streams each file in 100 ms frames and retains only a logarithmic RMS envelope, so analysis memory grows at roughly ten scalar values per second rather than with decoded PCM size. `ChannelAlignmentEstimator` correlates bounded overlapping windows, produces timing anchors, estimates microphone delay and drift per hour, and reports confidence. Flat audio, weak matches, mismatched meetings, wrong channel roles, and unsafe paths fail closed. A positive delay means system playback appears later in the microphone file. The result is evidence for later echo/leakage analysis; it is not persisted or used to delete, merge, or attribute transcript text in this increment.
 
 Playback uses `AVAudioPlayer` behind an async service boundary. Stored paths must be a single relative filename and are resolved only inside the vault audio directory; traversal and missing files are rejected before AVFoundation receives a URL.
 
@@ -103,9 +106,9 @@ Types crossing boundaries conform to `Sendable`. The repository is an actor. Pre
 ## Next increments (not implemented)
 
 1. Build human-corrected multilingual and cross-channel evaluation fixtures and enforce quality gates.
-2. Add buffer-level host-time calibration and measure microphone/system drift.
-3. Transcribe both channels while retaining independent evidence.
-4. Deduplicate overlapping channel hypotheses only after timing accuracy is measured.
+2. Validate acoustic alignment against consented real two-channel fixtures and compare it with buffer host-time anchors.
+3. Persist reliable alignment evidence and transcribe both channels independently.
+4. Add acoustic echo/leakage classification, then deduplicate only when timing and content evidence agree.
 5. Add diarization independently and align turns through the common meeting timeline.
 6. Require review/confirmation before transcript-derived facts enter Twin memory.
 7. Move metadata and transcript persistence to SQLite before production-volume transcripts.
