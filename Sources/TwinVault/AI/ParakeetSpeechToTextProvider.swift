@@ -181,25 +181,30 @@ actor ParakeetSpeechToTextProvider: SpeechToTextProvider {
     private let audioDirectory: URL
     private let fileManager: FileManager
     private let engine: any ParakeetTranscribingEngine
+    private let turnDetector: any SpeechTurnDetecting
 
     init(
         audioDirectory: URL,
         modelsDirectory: URL,
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = LocalParakeetEngine(modelsDirectory: modelsDirectory)
+        self.turnDetector = turnDetector
     }
 
     init(
         audioDirectory: URL,
         fileManager: FileManager = .default,
-        engine: any ParakeetTranscribingEngine
+        engine: any ParakeetTranscribingEngine,
+        turnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector()
     ) {
         self.audioDirectory = audioDirectory.standardizedFileURL
         self.fileManager = fileManager
         self.engine = engine
+        self.turnDetector = turnDetector
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
@@ -237,11 +242,17 @@ actor ParakeetSpeechToTextProvider: SpeechToTextProvider {
                 localeIdentifier: nil
             )
         }
-        let audioFile = try AVAudioFile(forReading: fileURL)
-        let duration = TimeInterval(audioFile.length) / audioFile.fileFormat.sampleRate
-        let reviewIntervals = TranscriptGapRepairPlanner.gaps(
-            in: engineSegments,
-            audioDuration: duration
+        let speechTurns: [SpeechTurn]
+        do {
+            speechTurns = try turnDetector.detectTurns(in: fileURL)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            speechTurns = []
+        }
+        let reviewIntervals = TranscriptCoveragePlanner.uncoveredSpeechIntervals(
+            speechTurns: speechTurns,
+            transcriptSegments: engineSegments
         ).map {
             TranscriptReviewInterval(
                 meetingID: request.meetingID,

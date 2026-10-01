@@ -85,7 +85,8 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
 
         let output = try await provider.transcribe(TranscriptionRequest(
             meetingID: meetingID,
-            recordings: [recording]
+            recordings: [recording],
+            contextualTerms: ["  Projecte Àgora  ", "projecte agora", "ab"]
         ))
 
         XCTAssertEqual(output.segments.count, 1)
@@ -97,6 +98,8 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         XCTAssertEqual(output.segments[0].localeIdentifier, "ca")
         let receivedPath = await engine.receivedPath()
         XCTAssertEqual(receivedPath, fileURL.path)
+        let receivedTerms = await engine.receivedContextualTerms()
+        XCTAssertEqual(receivedTerms, ["Projecte Àgora"])
     }
 
     func testRejectsPathTraversalBeforeCallingEngine() async {
@@ -214,6 +217,37 @@ final class ParakeetSpeechToTextProviderTests: XCTestCase {
         }
         let receivedURL = await engine.receivedURL()
         XCTAssertNil(receivedURL)
+    }
+
+    func testProviderMarksOnlyAcousticallyActiveUncoveredIntervals() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "meeting.caf")
+        try makeSilentAudio(at: fileURL, duration: 30)
+        let engine = FakeParakeetEngine(segments: [
+            ParakeetEngineSegment(startTime: 0, endTime: 2, text: "Opening words")
+        ])
+        let provider = ParakeetSpeechToTextProvider(
+            audioDirectory: directory,
+            engine: engine,
+            turnDetector: FixedSpeechTurnDetector(turns: [
+                SpeechTurn(startTime: 10, endTime: 20)
+            ])
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: fileURL.lastPathComponent
+        )
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording],
+            localeIdentifiers: ["es-ES", "en-US"]
+        ))
+
+        XCTAssertEqual(output.reviewIntervals.map { $0.startTime...$0.endTime }, [10...20])
     }
 
     private func makeSilentAudio(at url: URL, duration: TimeInterval) throws {
@@ -435,6 +469,43 @@ final class AcousticLanguageRoutingTests: XCTestCase {
         let fastLocales = await fast.receivedLocales()
         XCTAssertNil(fastLocales)
     }
+
+    func testAutomaticProviderUsesMultilingualSecondPassOnlyForUncoveredSpeech() async throws {
+        let languageIdentifier = FakeLanguageIdentifier(observations: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 20, languageCode: "es", confidence: 0.96
+            )
+        ])
+        let fast = TrackingSpeechProvider(
+            identifier: "test.fast",
+            segmentRange: 0...2,
+            reviewRange: 10...20
+        )
+        let multilingual = TrackingSpeechProvider(
+            identifier: "test.multilingual",
+            segmentRange: 10...20
+        )
+        let provider = RoutingSpeechToTextProvider(
+            languageIdentifier: languageIdentifier,
+            fastProvider: fast,
+            multilingualProvider: multilingual
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording],
+            contextualTerms: ["ACME Europe"]
+        ))
+
+        XCTAssertEqual(output.segments.map(\.providerIdentifier), [fast.identifier, multilingual.identifier])
+        XCTAssertTrue(output.reviewIntervals.isEmpty)
+        let fastTerms = await fast.receivedContextualTerms()
+        let multilingualTerms = await multilingual.receivedContextualTerms()
+        XCTAssertEqual(fastTerms, ["ACME Europe"])
+        XCTAssertEqual(multilingualTerms, ["ACME Europe"])
+    }
 }
 
 private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
@@ -446,6 +517,7 @@ private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
 private actor FakeWhisperEngine: WhisperTranscribingEngine {
     private let segments: [WhisperEngineSegment]
     private var path: String?
+    private var contextualTerms: [String] = []
 
     init(segments: [WhisperEngineSegment]) {
         self.segments = segments
@@ -453,14 +525,17 @@ private actor FakeWhisperEngine: WhisperTranscribingEngine {
 
     func transcribe(
         audioPath: String,
+        contextualTerms: [String],
         progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
     ) -> [WhisperEngineSegment] {
         path = audioPath
+        self.contextualTerms = contextualTerms
         progressHandler?(TranscriptionProgress(stage: .transcribing))
         return segments
     }
 
     func receivedPath() -> String? { path }
+    func receivedContextualTerms() -> [String] { contextualTerms }
 }
 
 private actor FakeParakeetEngine: ParakeetTranscribingEngine {
@@ -533,23 +608,42 @@ private struct FakeLanguageIdentifier: AcousticLanguageIdentifying {
 private actor TrackingSpeechProvider: SpeechToTextProvider {
     nonisolated let identifier: String
     private var locales: [String]?
+    private var contextualTerms: [String]?
+    private let segmentRange: ClosedRange<TimeInterval>
+    private let reviewRange: ClosedRange<TimeInterval>?
 
-    init(identifier: String) {
+    init(
+        identifier: String,
+        segmentRange: ClosedRange<TimeInterval> = 0...1,
+        reviewRange: ClosedRange<TimeInterval>? = nil
+    ) {
         self.identifier = identifier
+        self.segmentRange = segmentRange
+        self.reviewRange = reviewRange
     }
 
     func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
         locales = request.localeIdentifiers
+        contextualTerms = request.contextualTerms
         let recording = try XCTUnwrap(request.recordings.first)
+        let reviewIntervals = reviewRange.map { range in
+            [TranscriptReviewInterval(
+                meetingID: request.meetingID,
+                sourceRecordingID: recording.id,
+                startTime: range.lowerBound,
+                endTime: range.upperBound
+            )]
+        } ?? []
         return TranscriptionOutput(segments: [TranscriptSegment(
             meetingID: request.meetingID,
-            startTime: 0,
-            endTime: 1,
+            startTime: segmentRange.lowerBound,
+            endTime: segmentRange.upperBound,
             text: identifier,
             sourceRecordingID: recording.id,
             providerIdentifier: identifier
-        )])
+        )], reviewIntervals: reviewIntervals)
     }
 
     func receivedLocales() -> [String]? { locales }
+    func receivedContextualTerms() -> [String]? { contextualTerms }
 }

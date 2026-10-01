@@ -221,6 +221,7 @@ final class AppModel {
                 meetingID: meetingID,
                 recordings: [recording],
                 localeIdentifiers: profile.localeIdentifiers,
+                contextualTerms: [meeting.title],
                 progressHandler: { [weak self] progress in
                     Task { @MainActor [weak self] in
                         guard self?.transcriptionActivity?.id == activityID else { return }

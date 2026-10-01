@@ -212,15 +212,67 @@ actor RoutingSpeechToTextProvider: SpeechToTextProvider {
         case .multilingual:
             return try await multilingualProvider.transcribe(request)
         case .fastSpanishEnglish:
-            return try await fastProvider.transcribe(TranscriptionRequest(
+            let fastOutput = try await fastProvider.transcribe(TranscriptionRequest(
                 meetingID: request.meetingID,
                 recordings: request.recordings,
                 localeIdentifiers: request.localeIdentifiers.filter {
                     let code = $0.split(whereSeparator: { $0 == "-" || $0 == "_" }).first
                     return code == "es" || code == "en"
                 },
+                contextualTerms: request.contextualTerms,
                 progressHandler: request.progressHandler
             ))
+            guard !fastOutput.reviewIntervals.isEmpty else { return fastOutput }
+            return try await repairFastCoverage(
+                fastOutput,
+                request: request,
+                recording: recording
+            )
         }
+    }
+
+    private func repairFastCoverage(
+        _ fastOutput: TranscriptionOutput,
+        request: TranscriptionRequest,
+        recording: AudioRecordingReference
+    ) async throws -> TranscriptionOutput {
+        let multilingualOutput: TranscriptionOutput
+        do {
+            multilingualOutput = try await multilingualProvider.transcribe(request)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            return fastOutput
+        }
+        let repairedSegments = multilingualOutput.segments.filter { segment in
+            let midpoint = (segment.startTime + segment.endTime) / 2
+            return fastOutput.reviewIntervals.contains {
+                midpoint >= $0.startTime && midpoint <= $0.endTime
+            }
+        }
+        guard !repairedSegments.isEmpty else { return fastOutput }
+        let remainingGaps = TranscriptCoveragePlanner.uncoveredSpeechIntervals(
+            speechTurns: fastOutput.reviewIntervals.map {
+                SpeechTurn(startTime: $0.startTime, endTime: $0.endTime)
+            },
+            transcriptSegments: repairedSegments
+        )
+        let reviewIntervals = remainingGaps.map {
+            TranscriptReviewInterval(
+                meetingID: request.meetingID,
+                sourceRecordingID: recording.id,
+                startTime: $0.startTime,
+                endTime: $0.endTime
+            )
+        }
+        return TranscriptionOutput(
+            segments: (fastOutput.segments + repairedSegments).sorted { $0.startTime < $1.startTime },
+            reviewIntervals: reviewIntervals,
+            unavailableLocaleIdentifiers: Array(Set(
+                fastOutput.unavailableLocaleIdentifiers
+                    + multilingualOutput.unavailableLocaleIdentifiers
+            )).sorted()
+        )
     }
 }

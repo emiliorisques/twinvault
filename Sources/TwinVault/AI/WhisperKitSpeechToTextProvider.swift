@@ -27,6 +27,8 @@ protocol TranscriptTimedUnit {
     var endTime: TimeInterval { get }
 }
 
+extension TranscriptSegment: TranscriptTimedUnit {}
+
 struct WhisperEngineSegment: Equatable, Sendable, TranscriptTimedUnit {
     let startTime: TimeInterval
     let endTime: TimeInterval
@@ -37,6 +39,7 @@ struct WhisperEngineSegment: Equatable, Sendable, TranscriptTimedUnit {
 protocol WhisperTranscribingEngine: Sendable {
     func transcribe(
         audioPath: String,
+        contextualTerms: [String],
         progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
     ) async throws -> [WhisperEngineSegment]
 }
@@ -63,12 +66,16 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
 
     func transcribe(
         audioPath: String,
+        contextualTerms: [String],
         progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
     ) async throws -> [WhisperEngineSegment] {
         progressHandler?(TranscriptionProgress(stage: .preparingModel))
         let pipeline = try await loadPipeline()
         try Task.checkCancellation()
         progressHandler?(TranscriptionProgress(stage: .transcribing))
+        let promptTokens = pipeline.tokenizer?.encode(
+            text: contextualTerms.joined(separator: ", ")
+        )
         let results = try await pipeline.transcribe(
             audioPath: audioPath,
             audioInputOptions: AudioInputOptions(
@@ -80,6 +87,7 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
                 language: nil,
                 detectLanguage: true,
                 skipSpecialTokens: true,
+                promptTokens: promptTokens?.isEmpty == false ? promptTokens : nil,
                 chunkingStrategy: .vad
             )
         )
@@ -93,7 +101,12 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
         )
         for gap in gaps {
             try Task.checkCancellation()
-            if let repaired = try? await repair(gap, audioPath: audioPath, using: pipeline) {
+            if let repaired = try? await repair(
+                gap,
+                audioPath: audioPath,
+                promptTokens: promptTokens,
+                using: pipeline
+            ) {
                 segments.append(contentsOf: repaired)
             }
         }
@@ -137,6 +150,7 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
     private func repair(
         _ gap: TranscriptGap,
         audioPath: String,
+        promptTokens: [Int]?,
         using pipeline: WhisperKit
     ) async throws -> [WhisperEngineSegment] {
         let padding: TimeInterval = 2
@@ -160,6 +174,7 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
                 language: nil,
                 detectLanguage: true,
                 skipSpecialTokens: true,
+                promptTokens: promptTokens?.isEmpty == false ? promptTokens : nil,
                 chunkingStrategy: .vad
             )
         )
@@ -340,6 +355,7 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
         let fileURL = try validatedURL(for: recording)
         var engineSegments = try await engine.transcribe(
             audioPath: fileURL.path,
+            contextualTerms: request.contextualTerms,
             progressHandler: request.progressHandler
         )
         try Task.checkCancellation()

@@ -190,6 +190,21 @@ final class TranscriptTests: XCTestCase {
         )
     }
 
+    func testContextualVocabularyIsBoundedNormalizedAndDeduplicated() {
+        let raw = [
+            "  Projecte Àgora  ",
+            "projecte agora",
+            "ab",
+            "ACME\nEurope",
+            String(repeating: "x", count: 61)
+        ] + (0..<20).map { "Term \($0)" }
+
+        let terms = ContextualVocabulary.sanitize(raw)
+
+        XCTAssertEqual(terms.prefix(2), ["Projecte Àgora", "ACME Europe"])
+        XCTAssertEqual(terms.count, ContextualVocabulary.maximumTerms)
+    }
+
     func testTranscriptionPolicyPrefersRecommendedAvailableProfile() {
         let policy = TranscriptionPolicy(
             profiles: [

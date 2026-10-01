@@ -85,18 +85,44 @@ struct TranscriptionRequest: Sendable {
     let meetingID: UUID
     let recordings: [AudioRecordingReference]
     let localeIdentifiers: [String]
+    /// Explicit local vocabulary supplied by the user or workspace context.
+    /// Providers may ignore it; they must never silently rewrite evidence.
+    let contextualTerms: [String]
     let progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
 
     init(
         meetingID: UUID,
         recordings: [AudioRecordingReference],
         localeIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers,
+        contextualTerms: [String] = [],
         progressHandler: (@Sendable (TranscriptionProgress) -> Void)? = nil
     ) {
         self.meetingID = meetingID
         self.recordings = recordings
         self.localeIdentifiers = localeIdentifiers
+        self.contextualTerms = ContextualVocabulary.sanitize(contextualTerms)
         self.progressHandler = progressHandler
+    }
+}
+
+enum ContextualVocabulary {
+    static let maximumTerms = 12
+    static let maximumCharactersPerTerm = 60
+
+    static func sanitize(_ candidates: [String]) -> [String] {
+        var seen = Set<String>()
+        return candidates.compactMap { candidate in
+            let term = candidate
+                .components(separatedBy: .controlCharacters)
+                .joined(separator: " ")
+                .split(whereSeparator: \Character.isWhitespace)
+                .joined(separator: " ")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard term.count >= 3, term.count <= maximumCharactersPerTerm else { return nil }
+            let key = term.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
+            guard seen.insert(key).inserted else { return nil }
+            return term
+        }.prefix(maximumTerms).map { $0 }
     }
 }
 
