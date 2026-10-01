@@ -33,12 +33,23 @@ final class AppModelTests: XCTestCase {
         )
         await model.startMeeting(title: "Interrupted", captureSystemAudio: true)
 
+        XCTAssertEqual(model.recordingCaptureStatus, RecordingCaptureStatus(
+            microphone: .recording,
+            systemAudio: .recording
+        ))
+
         systemAudio.simulateInterruption("The capture stream was stopped by macOS.")
-        await Task.yield()
-        await Task.yield()
+        for _ in 0..<20 where model.activeSession?.meeting.audioCaptureIssues.isEmpty == true {
+            await Task.yield()
+        }
 
         XCTAssertTrue(microphone.isRecording)
         XCTAssertNotNil(model.activeSession)
+        XCTAssertEqual(model.activeSession?.meeting.audioCaptureIssues.map(\.kind), [.interrupted])
+        XCTAssertEqual(
+            model.recordingCaptureStatus?.systemAudio,
+            .unavailable("The capture stream was stopped by macOS.")
+        )
         XCTAssertEqual(
             model.errorMessage,
             "System audio recording stopped early. The microphone is still recording. The capture stream was stopped by macOS."
@@ -63,12 +74,19 @@ final class AppModelTests: XCTestCase {
         await model.startMeeting(title: "Fallback", captureSystemAudio: true)
 
         XCTAssertEqual(model.activeSession?.meeting.audioRecordings.map(\.channel), [.microphone])
+        XCTAssertEqual(model.activeSession?.meeting.requestedSystemAudioCapture, true)
+        XCTAssertEqual(model.activeSession?.meeting.audioCaptureIssues.map(\.kind), [.startFailed])
+        XCTAssertEqual(
+            model.recordingCaptureStatus?.systemAudio,
+            .unavailable("System audio permission denied.")
+        )
         XCTAssertNotNil(model.errorMessage)
         XCTAssertTrue(microphone.isRecording)
 
         await model.stopMeeting()
         let storedMeetings = await repository.meetings()
         XCTAssertEqual(storedMeetings.first?.status, .completed)
+        XCTAssertEqual(storedMeetings.first?.audioCaptureIssues.map(\.kind), [.startFailed])
         XCTAssertFalse(microphone.isRecording)
     }
 

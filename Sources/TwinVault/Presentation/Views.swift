@@ -88,6 +88,14 @@ struct RecordingView: View {
                     Text(duration(now.timeIntervalSince(session.meeting.startDate))).monospacedDigit()
                 }
                 Text(session.meeting.title).font(.title2.bold())
+                if let status = model.recordingCaptureStatus {
+                    VStack(alignment: .leading, spacing: 8) {
+                        captureStatusRow("Microphone", status: status.microphone)
+                        captureStatusRow("System Audio", status: status.systemAudio)
+                    }
+                    .padding(12)
+                    .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
+                }
                 TextEditor(text: $noteText)
                     .font(.body).frame(minHeight: 180).border(.quaternary)
                     .onChange(of: noteText) { _, value in model.updateNote(value) }
@@ -103,6 +111,25 @@ struct RecordingView: View {
         .padding(24).frame(minWidth: 580, minHeight: 390)
         .interactiveDismissDisabled()
         .onReceive(timer) { now = $0 }
+    }
+
+    @ViewBuilder
+    private func captureStatusRow(_ channel: String, status: RecordingChannelStatus) -> some View {
+        switch status {
+        case .recording:
+            Label("\(channel): Recording", systemImage: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+        case .notRequested:
+            Label("\(channel): Not requested", systemImage: "minus.circle")
+                .foregroundStyle(.secondary)
+        case let .unavailable(message):
+            VStack(alignment: .leading, spacing: 3) {
+                Label("\(channel): Not recording", systemImage: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                    .fontWeight(.semibold)
+                Text(message).font(.caption).foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
@@ -121,6 +148,25 @@ struct MeetingDetailView: View {
                     value: meeting.transcriptionLocaleIdentifiers.map(languageLabel).joined(separator: " · ")
                 )
                 Text("Audio Channels").font(.title2.bold())
+                if meeting.requestedSystemAudioCapture,
+                   !meeting.audioRecordings.contains(where: { $0.channel == .systemAudio }) {
+                    Label(
+                        "System audio was requested but no system-audio recording was saved.",
+                        systemImage: "exclamationmark.triangle.fill"
+                    )
+                    .foregroundStyle(.orange)
+                }
+                ForEach(meeting.audioCaptureIssues) { issue in
+                    VStack(alignment: .leading, spacing: 3) {
+                        Label(
+                            "\(issue.channel.displayName) capture warning",
+                            systemImage: "exclamationmark.triangle.fill"
+                        )
+                        .fontWeight(.semibold)
+                        Text(issue.message).font(.caption)
+                    }
+                    .foregroundStyle(.orange)
+                }
                 if meeting.audioRecordings.isEmpty {
                     Text("Not available").foregroundStyle(.secondary)
                 }

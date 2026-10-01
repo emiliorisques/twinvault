@@ -65,10 +65,12 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded.audioRecordings.first?.channel, .microphone)
         XCTAssertNil(loaded.audioRecordings.first?.meetingTimelineOffset)
         XCTAssertEqual(loaded.transcriptionLocaleIdentifiers, ["es-ES", "ca-ES", "en-US"])
+        XCTAssertFalse(loaded.requestedSystemAudioCapture)
+        XCTAssertTrue(loaded.audioCaptureIssues.isEmpty)
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 7)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 8)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -108,6 +110,12 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             transcriptReviewIntervals: [reviewInterval],
             crossChannelTranscriptFindings: [finding],
             transcriptionLocaleIdentifiers: ["ca-ES", "en-US"],
+            requestedSystemAudioCapture: true,
+            audioCaptureIssues: [AudioCaptureIssue(
+                channel: .systemAudio,
+                kind: .interrupted,
+                message: "Capture stopped"
+            )],
             status: .completed
         )
 
@@ -119,6 +127,8 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded?.crossChannelTranscriptFindings, [finding])
         XCTAssertEqual(loaded?.audioRecordings.first?.meetingTimelineOffset, 1.25)
         XCTAssertEqual(loaded?.transcriptionLocaleIdentifiers, ["ca-ES", "en-US"])
+        XCTAssertEqual(loaded?.requestedSystemAudioCapture, true)
+        XCTAssertEqual(loaded?.audioCaptureIssues.map(\.kind), [.interrupted])
     }
 }
 

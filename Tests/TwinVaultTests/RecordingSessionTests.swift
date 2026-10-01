@@ -2,6 +2,27 @@ import XCTest
 @testable import TwinVault
 
 final class RecordingSessionTests: XCTestCase {
+    func testRequestedSystemAudioAndCaptureIssueRemainInMeeting() {
+        var session = RecordingSession(
+            title: "Channels",
+            captureSystemAudio: true,
+            now: Date(timeIntervalSince1970: 10)
+        )
+
+        session.recordCaptureIssue(
+            channel: .systemAudio,
+            kind: .startFailed,
+            message: "Permission denied",
+            now: Date(timeIntervalSince1970: 11)
+        )
+
+        XCTAssertTrue(session.meeting.requestedSystemAudioCapture)
+        XCTAssertEqual(session.meeting.audioCaptureIssues.count, 1)
+        XCTAssertEqual(session.meeting.audioCaptureIssues.first?.channel, .systemAudio)
+        XCTAssertEqual(session.meeting.audioCaptureIssues.first?.kind, .startFailed)
+        XCTAssertEqual(session.meeting.audioCaptureIssues.first?.message, "Permission denied")
+    }
+
     func testBlankTitleUsesSafeDefault() {
         let session = RecordingSession(title: "  \n ", now: Date(timeIntervalSince1970: 10))
         XCTAssertEqual(session.meeting.title, "Untitled Meeting")

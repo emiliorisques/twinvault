@@ -3,9 +3,15 @@ import Foundation
 struct RecordingSession: Equatable, Sendable {
     private(set) var meeting: Meeting
 
-    init(title: String, now: Date = .now) {
+    init(title: String, captureSystemAudio: Bool = false, now: Date = .now) {
         let normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        meeting = Meeting(title: normalized.isEmpty ? "Untitled Meeting" : normalized, startDate: now, createdAt: now, updatedAt: now)
+        meeting = Meeting(
+            title: normalized.isEmpty ? "Untitled Meeting" : normalized,
+            startDate: now,
+            requestedSystemAudioCapture: captureSystemAudio,
+            createdAt: now,
+            updatedAt: now
+        )
     }
 
     mutating func updateNote(_ text: String, now: Date = .now) {
@@ -31,6 +37,21 @@ struct RecordingSession: Equatable, Sendable {
         precondition(reference.meetingID == meeting.id)
         meeting.audioRecordings.removeAll { $0.channel == reference.channel }
         meeting.audioRecordings.append(reference)
+        meeting.updatedAt = now
+    }
+
+    mutating func recordCaptureIssue(
+        channel: AudioRecordingReference.Channel,
+        kind: AudioCaptureIssue.Kind,
+        message: String,
+        now: Date = .now
+    ) {
+        meeting.audioCaptureIssues.append(AudioCaptureIssue(
+            channel: channel,
+            kind: kind,
+            message: message,
+            occurredAt: now
+        ))
         meeting.updatedAt = now
     }
 

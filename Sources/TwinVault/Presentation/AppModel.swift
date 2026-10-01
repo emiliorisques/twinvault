@@ -7,6 +7,17 @@ struct TranscriptionActivity: Equatable {
     var progress: TranscriptionProgress
 }
 
+enum RecordingChannelStatus: Equatable {
+    case notRequested
+    case recording
+    case unavailable(String)
+}
+
+struct RecordingCaptureStatus: Equatable {
+    let microphone: RecordingChannelStatus
+    let systemAudio: RecordingChannelStatus
+}
+
 @MainActor
 @Observable
 final class AppModel {
@@ -24,6 +35,23 @@ final class AppModel {
     private(set) var playingRecordingID: UUID?
     private(set) var transcriptionActivity: TranscriptionActivity?
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
+    var recordingCaptureStatus: RecordingCaptureStatus? {
+        guard let meeting = activeSession?.meeting else { return nil }
+        let microphoneStatus: RecordingChannelStatus = audio.isRecording
+            ? .recording
+            : .unavailable("Microphone recording is not active.")
+        let systemStatus: RecordingChannelStatus
+        if !meeting.requestedSystemAudioCapture {
+            systemStatus = .notRequested
+        } else if systemAudio.isCapturing {
+            systemStatus = .recording
+        } else {
+            let message = meeting.audioCaptureIssues.last(where: { $0.channel == .systemAudio })?.message
+                ?? "System audio recording is not active."
+            systemStatus = .unavailable(message)
+        }
+        return RecordingCaptureStatus(microphone: microphoneStatus, systemAudio: systemStatus)
+    }
     let transcriptionProfiles: [TranscriptionProfile]
     var errorMessage: String?
 
@@ -105,7 +133,7 @@ final class AppModel {
             errorMessage = AudioRecordingError.permissionDenied.localizedDescription
             return
         }
-        var session = RecordingSession(title: title)
+        var session = RecordingSession(title: title, captureSystemAudio: captureSystemAudio)
         do {
             let reference = try audio.start(
                 meetingID: session.meeting.id,
@@ -118,9 +146,17 @@ final class AppModel {
                         meetingID: session.meeting.id,
                         meetingStartDate: session.meeting.startDate
                     )
+                    guard systemAudio.isCapturing else {
+                        throw SystemAudioCaptureError.captureDidNotBecomeActive
+                    }
                     session.attachAudio(systemReference)
                     monitorSystemAudioInterruptions()
                 } catch {
+                    session.recordCaptureIssue(
+                        channel: .systemAudio,
+                        kind: .startFailed,
+                        message: error.localizedDescription
+                    )
                     errorMessage = "The meeting started with microphone only. \(error.localizedDescription)"
                 }
             }
@@ -150,6 +186,11 @@ final class AppModel {
         do {
             try await systemAudio.stopSystemAudioCapture()
         } catch {
+            session.recordCaptureIssue(
+                channel: .systemAudio,
+                kind: .finalizationFailed,
+                message: error.localizedDescription
+            )
             errorMessage = error.localizedDescription
         }
         session.stop()
@@ -305,8 +346,26 @@ final class AppModel {
         systemAudioMonitoringTask = Task { [weak self] in
             for await event in events {
                 guard !Task.isCancelled else { return }
-                self?.errorMessage = "System audio recording stopped early. The microphone is still recording. \(event.message)"
+                await self?.handleSystemAudioInterruption(event)
             }
+        }
+    }
+
+    private func handleSystemAudioInterruption(_ event: SystemAudioCaptureInterruption) async {
+        guard var session = activeSession else { return }
+        session.recordCaptureIssue(
+            channel: .systemAudio,
+            kind: .interrupted,
+            message: event.message
+        )
+        activeSession = session
+        errorMessage = "System audio recording stopped early. The microphone is still recording. \(event.message)"
+        do {
+            try await repository.save(session.meeting)
+            await load()
+        } catch {
+            errorMessage = "System audio stopped and its warning could not be saved. \(error.localizedDescription)"
+            return
         }
     }
 

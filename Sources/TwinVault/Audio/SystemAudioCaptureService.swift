@@ -32,6 +32,7 @@ enum SystemAudioCaptureError: LocalizedError {
     case alreadyCapturing
     case noDisplayAvailable
     case couldNotStartWriter
+    case captureDidNotBecomeActive
     case captureInterrupted(String)
     case writerFailed(String)
 
@@ -40,6 +41,7 @@ enum SystemAudioCaptureError: LocalizedError {
         case .alreadyCapturing: "System audio capture is already active."
         case .noDisplayAvailable: "No display is available for system audio capture."
         case .couldNotStartWriter: "The local system audio file could not be started."
+        case .captureDidNotBecomeActive: "System audio did not become active after startup."
         case let .captureInterrupted(message):
             "System audio recording stopped unexpectedly. The microphone recording continued. \(message)"
         case let .writerFailed(message): "System audio could not be saved: \(message)"

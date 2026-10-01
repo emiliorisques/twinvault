@@ -15,6 +15,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Detect language from local acoustic windows without using transcript text or changing the transcription boundaries.
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
+- Show independent live health for microphone and system audio, and retain capture failures with the meeting for later inspection.
 - Mark long transcript intervals without text for human review instead of presenting the transcript as complete.
 - Mark strongly aligned duplicate text across system and microphone channels as possible speaker playback leakage; microphone capture is never treated as proof of the user's identity.
 - Retry acoustically confirmed gaps from the fast ES/EN route with multilingual WhisperKit and retain only gap-covering evidence.
@@ -74,6 +75,8 @@ Phase 2P adds bounded quality recovery to the automatic route. Parakeet now repo
 Phase 2Q hardens the future diarization/identity boundary without installing a diarization model. Every `DiarizationTurn` can retain its exact source recording and replaceable provider while exposing only a session-local speaker label. `SpeakerIdentityMatch` records whether a proposal came from model inference, a future opt-in local “my voice” profile, or explicit user confirmation. `SpeakerIdentityEvidenceGate` never promotes model confidence to confirmed identity and blocks even a high-confidence local-voice match when the turn overlaps possible speaker playback leakage. Third-party identity therefore remains unknown or inferred until a person explicitly confirms it.
 
 Phase 2R introduces the offline acoustic-alignment foundation for two-channel meetings. After recording has stopped, both files can be streamed into compact 100 ms energy fingerprints. Bounded cross-correlation windows estimate how much later system playback reaches the microphone and whether that offset drifts over a long meeting. Low-information or weakly correlated audio produces no reliable estimate. This phase deliberately does not erase duplicate speech, fuse transcripts, identify a speaker, or alter live recording; real two-channel fixtures must validate the estimator before its results are persisted or used automatically.
+
+Phase 2S makes capture health explicit. The recording screen shows microphone and system-audio state independently. When system audio was requested, TwinVault verifies that the service is active after startup and persists structured warnings for startup, interruption, or finalization failure. Meeting detail continues to show those warnings after restart, including the absence of a requested system-audio file. Existing meetings migrate conservatively and are not retroactively labelled as failed when their original capture intent is unknown.
 
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 
