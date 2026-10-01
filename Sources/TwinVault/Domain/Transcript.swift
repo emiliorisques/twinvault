@@ -13,6 +13,35 @@ struct SpeechTurn: Codable, Equatable, Sendable {
     }
 }
 
+/// Language evidence measured directly from an audio interval. It is routing
+/// evidence only and must not be presented as a verified transcript label.
+struct AcousticLanguageObservation: Codable, Equatable, Sendable {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+    let languageCode: String
+    let confidence: Double
+
+    init(
+        startTime: TimeInterval,
+        endTime: TimeInterval,
+        languageCode: String,
+        confidence: Double
+    ) {
+        self.startTime = max(0, startTime)
+        self.endTime = max(max(0, startTime), endTime)
+        self.languageCode = languageCode.lowercased()
+        self.confidence = min(1, max(0, confidence))
+    }
+}
+
+protocol AcousticLanguageIdentifying: Sendable {
+    var identifier: String { get }
+    func identifyLanguages(
+        in recording: AudioRecordingReference,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [AcousticLanguageObservation]
+}
+
 protocol SpeechTurnDetecting: Sendable {
     func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn]
 }
@@ -76,6 +105,7 @@ struct TranscriptionProgress: Equatable, Sendable {
         case preparingModel
         case downloadingModel
         case loadingModel
+        case identifyingLanguage
         case transcribing
     }
 

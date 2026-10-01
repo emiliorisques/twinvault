@@ -256,6 +256,8 @@ private func transcriptionStatus(_ activity: TranscriptionActivity) -> String {
         return "Downloading model…"
     case .loadingModel:
         return "Loading local model…"
+    case .identifyingLanguage:
+        return "Detecting spoken languages locally…"
     case .transcribing:
         return "Transcribing locally…"
     }

@@ -30,6 +30,7 @@
 		A10000000000000000000021 /* LocalTranscriptionBenchmarkTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */; };
 		A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* LocalSpeechTurnDetector.swift */; };
 		A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */; };
+		A10000000000000000000024 /* AcousticLanguageRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* AcousticLanguageRouting.swift */; };
 		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
 		A20000000000000000000002 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
@@ -71,6 +72,7 @@
 		B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalTranscriptionBenchmarkTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* LocalSpeechTurnDetector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalSpeechTurnDetector.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParakeetSpeechToTextProvider.swift; sourceTree = "<group>"; };
+		B10000000000000000000027 /* AcousticLanguageRouting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcousticLanguageRouting.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -164,6 +166,7 @@
 				B10000000000000000000022 /* WhisperKitSpeechToTextProvider.swift */,
 				B10000000000000000000025 /* LocalSpeechTurnDetector.swift */,
 				B10000000000000000000026 /* ParakeetSpeechToTextProvider.swift */,
+				B10000000000000000000027 /* AcousticLanguageRouting.swift */,
 			);
 			path = AI;
 			sourceTree = "<group>";
@@ -321,6 +324,7 @@
 				A10000000000000000000019 /* WhisperKitSpeechToTextProvider.swift in Sources */,
 				A10000000000000000000022 /* LocalSpeechTurnDetector.swift in Sources */,
 				A10000000000000000000023 /* ParakeetSpeechToTextProvider.swift in Sources */,
+				A10000000000000000000024 /* AcousticLanguageRouting.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

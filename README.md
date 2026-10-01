@@ -10,9 +10,9 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Store audio separately from versioned meeting metadata.
 - Browse previous meetings and inspect notes, timestamps, and audio status.
 - Transcribe a completed meeting locally with Spanish, Catalan, and English enabled by default.
-- Choose an explicit transcription profile: multilingual ES/CA/EN (recommended, backed by WhisperKit), experimental fast ES/EN (Parakeet), or Apple Speech as the system-native comparison mode.
+- Choose an explicit transcription profile: automatic ES/CA/EN routing (recommended but still experimental), always-multilingual WhisperKit, fast ES/EN Parakeet, or Apple Speech as the system-native comparison mode.
 - See model preparation, download, loading, and local transcription states; Parakeet reports real download percentage and active work can be cancelled without replacing an existing transcript.
-- Split speech at local acoustic pauses before either engine processes a language hypothesis.
+- Detect language from local acoustic windows without using transcript text or changing the transcription boundaries.
 - Anchor newly recorded microphone and system-audio files to the meeting timeline.
 - Warn immediately if macOS interrupts system-audio capture while keeping the microphone active.
 - Mark long transcript intervals without text for human review instead of presenting the transcript as complete.
@@ -59,11 +59,13 @@ Phase 2K makes long-running transcription work visible and cancellable. FluidAud
 
 Phase 2L restores whole-recording decoding for WhisperKit. Splitting a multilingual recording at every energy-defined speech turn removed useful linguistic context and caused missed English speech in the benchmark. WhisperKit now receives the original recording once, keeps its native incremental loading and VAD chunking, and preserves the engine's global timestamps. The shared energy detector runs afterwards only to identify acoustically active intervals that the transcript did not cover. On the public eight-case suite this reduced directional micro-WER from 31.5% to 24.2%; mixed-language quality still requires explicit routing experiments before production use.
 
+Phase 2M adds conservative recording-level routing. WhisperKit inspects bounded acoustically active windows and returns language observations with time ranges and confidence; transcript text is never used to choose an engine. Any Catalan, unsupported language, missing evidence, or low-confidence result routes the complete recording to WhisperKit. Only consistently confident Spanish/English evidence routes the complete recording to Parakeet. The two engines still transcribe whole recordings, and diarization remains a separate future stage. On the eight-case suite the detector routed all cases as expected and the resulting hybrid selection reduced directional micro-WER to 19.8%. The profile is visible as experimental because the fixture references still require human verification.
+
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, and Parakeet are replaceable implementations of `SpeechToTextProvider`; diarization and speaker identification remain separate unimplemented contracts. Structured memory, twins, external integrations, and generative-AI inference remain absent.
+`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, Parakeet, and the conservative automatic router are replaceable implementations of `SpeechToTextProvider`. Acoustic language identification, diarization, and speaker identification are separate contracts; the latter two remain unimplemented. Structured memory, twins, external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
 Aggregate local evaluation results are recorded in [BENCHMARKS.md](BENCHMARKS.md); private fixtures and raw transcripts are excluded.

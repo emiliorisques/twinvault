@@ -227,6 +227,100 @@ final class ParakeetSpeechToTextProviderTests: XCTestCase {
     }
 }
 
+final class AcousticLanguageRoutingTests: XCTestCase {
+    func testWindowPlannerJoinsNearbySpeechAndBoundsLongRegions() {
+        let windows = LanguageAnalysisWindowPlanner.windows(for: [
+            SpeechTurn(startTime: 0, endTime: 1),
+            SpeechTurn(startTime: 1.5, endTime: 4),
+            SpeechTurn(startTime: 10, endTime: 35)
+        ])
+
+        XCTAssertEqual(windows, [
+            SpeechTurn(startTime: 0, endTime: 4),
+            SpeechTurn(startTime: 10, endTime: 30),
+            SpeechTurn(startTime: 30, endTime: 35)
+        ])
+    }
+
+    func testRouterUsesFastProviderOnlyForConfidentSpanishAndEnglish() {
+        let decision = ConservativeLanguageRouter().decision(for: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 10, languageCode: "es", confidence: 0.94
+            ),
+            AcousticLanguageObservation(
+                startTime: 10, endTime: 20, languageCode: "en-US", confidence: 0.88
+            )
+        ])
+
+        XCTAssertEqual(decision, AutomaticRoutingDecision(
+            target: .fastSpanishEnglish,
+            reason: .confidentSpanishEnglish
+        ))
+    }
+
+    func testRouterUsesMultilingualProviderForCatalanOrUncertainEvidence() {
+        let router = ConservativeLanguageRouter()
+
+        XCTAssertEqual(router.decision(for: [AcousticLanguageObservation(
+            startTime: 0, endTime: 10, languageCode: "ca", confidence: 0.81
+        )]).reason, .catalanDetected)
+        XCTAssertEqual(router.decision(for: [AcousticLanguageObservation(
+            startTime: 0, endTime: 10, languageCode: "es", confidence: 0.62
+        )]).reason, .insufficientEvidence)
+        XCTAssertEqual(router.decision(for: []).reason, .insufficientEvidence)
+    }
+
+    func testAutomaticProviderRemovesCatalanOnlyAfterConfidentFastRoute() async throws {
+        let languageIdentifier = FakeLanguageIdentifier(observations: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 10, languageCode: "es", confidence: 0.95
+            )
+        ])
+        let fast = TrackingSpeechProvider(identifier: "test.fast")
+        let multilingual = TrackingSpeechProvider(identifier: "test.multilingual")
+        let provider = RoutingSpeechToTextProvider(
+            languageIdentifier: languageIdentifier,
+            fastProvider: fast,
+            multilingualProvider: multilingual
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording],
+            localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
+        ))
+
+        XCTAssertEqual(output.segments.first?.providerIdentifier, fast.identifier)
+        let fastLocales = await fast.receivedLocales()
+        let multilingualLocales = await multilingual.receivedLocales()
+        XCTAssertEqual(fastLocales, ["es-ES", "en-US"])
+        XCTAssertNil(multilingualLocales)
+    }
+
+    func testAutomaticProviderFallsBackConservativelyWhenIdentificationFails() async throws {
+        let fast = TrackingSpeechProvider(identifier: "test.fast")
+        let multilingual = TrackingSpeechProvider(identifier: "test.multilingual")
+        let provider = RoutingSpeechToTextProvider(
+            languageIdentifier: FakeLanguageIdentifier(shouldFail: true),
+            fastProvider: fast,
+            multilingualProvider: multilingual
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording]
+        ))
+
+        XCTAssertEqual(output.segments.first?.providerIdentifier, multilingual.identifier)
+        let fastLocales = await fast.receivedLocales()
+        XCTAssertNil(fastLocales)
+    }
+}
+
 private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
     let turns: [SpeechTurn]
 
@@ -271,4 +365,55 @@ private actor FakeParakeetEngine: ParakeetTranscribingEngine {
     }
 
     func receivedURL() -> URL? { url }
+}
+
+private enum TestLanguageError: Error {
+    case failed
+}
+
+private struct FakeLanguageIdentifier: AcousticLanguageIdentifying {
+    let identifier = "test.language-id"
+    let observations: [AcousticLanguageObservation]
+    let shouldFail: Bool
+
+    init(
+        observations: [AcousticLanguageObservation] = [],
+        shouldFail: Bool = false
+    ) {
+        self.observations = observations
+        self.shouldFail = shouldFail
+    }
+
+    func identifyLanguages(
+        in recording: AudioRecordingReference,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [AcousticLanguageObservation] {
+        if shouldFail { throw TestLanguageError.failed }
+        progressHandler?(TranscriptionProgress(stage: .identifyingLanguage))
+        return observations
+    }
+}
+
+private actor TrackingSpeechProvider: SpeechToTextProvider {
+    nonisolated let identifier: String
+    private var locales: [String]?
+
+    init(identifier: String) {
+        self.identifier = identifier
+    }
+
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
+        locales = request.localeIdentifiers
+        let recording = try XCTUnwrap(request.recordings.first)
+        return TranscriptionOutput(segments: [TranscriptSegment(
+            meetingID: request.meetingID,
+            startTime: 0,
+            endTime: 1,
+            text: identifier,
+            sourceRecordingID: recording.id,
+            providerIdentifier: identifier
+        )])
+    }
+
+    func receivedLocales() -> [String]? { locales }
 }

@@ -227,3 +227,37 @@ not yet word-for-word human verified, and AMI overlap makes linear WER conservat
 The next experiment should detect language regions acoustically and route only
 high-confidence Catalan regions away from the fast ES/EN path; transcript text must not
 be used as the sole router.
+
+## 2026-09-29 — acoustic language routing feasibility
+
+WhisperKit language identification was run over bounded energy-active windows from the
+same eight public benchmark files. This stage decodes only a language token; it does not
+transcribe window text and does not alter the later provider's whole-recording input.
+Across 73 windows it predicted 33 Spanish, 25 English, and 15 Catalan regions.
+
+| Case | Expected languages | Detected languages | Routing decision | LID runtime |
+|---|---|---|---|---:|
+| ES clean | ES | ES | Fast ES/EN | 12.5 s |
+| EN clean | EN | EN | Fast ES/EN | 9.2 s |
+| ES/EN | ES+EN | ES+EN | Fast ES/EN | 9.9 s |
+| CA/ES | CA+ES | CA+ES | WhisperKit | 11.4 s |
+| ES/CA/EN | ES+CA+EN | ES+CA+EN | WhisperKit | 14.5 s |
+| multilingual + noise | ES+CA+EN | ES+CA | WhisperKit | 10.3 s |
+| AMI meeting overlap | EN | EN | Fast ES/EN | 14.4 s |
+| stress test | ES+CA+EN | ES+CA+EN | WhisperKit | 11.5 s |
+
+All four Catalan-containing cases took the conservative multilingual route; all four
+cases without Catalan took the fast route. Applying those decisions to the already
+measured ASR outputs gives 468 word edits over 2,363 reference words, or 19.8%
+directional micro-WER. This improves on whole-recording WhisperKit at 24.2% and Parakeet
+at 27.7%. Language identification took 93.7 seconds in total. Combined with the selected
+providers, estimated measured runtime is 185.4 seconds for 1,069 seconds of audio, about
+5.8x real time. A production process can reuse the loaded WhisperKit actor, but cold and
+warm energy measurements are still required.
+
+This is enough to expose the automatic profile for user testing, not to declare it
+production-ready. The references are not yet word-for-word human verified, short
+isolated language switches below the analysis window minimum may be missed, and these
+eight files do not cover all accents or meeting conditions. Routing therefore defaults
+to WhisperKit whenever evidence is absent, weak, Catalan, or unsupported. Diarization
+remains downstream and independent.

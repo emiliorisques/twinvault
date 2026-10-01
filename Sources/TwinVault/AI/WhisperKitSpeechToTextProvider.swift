@@ -41,9 +41,17 @@ protocol WhisperTranscribingEngine: Sendable {
     ) async throws -> [WhisperEngineSegment]
 }
 
+protocol WhisperLanguageIdentifyingEngine: Sendable {
+    func identifyLanguages(
+        audioPath: String,
+        windows: [SpeechTurn],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [AcousticLanguageObservation]
+}
+
 /// Owns the third-party runtime behind an actor so its non-Sendable model
 /// objects never cross a concurrency boundary.
-actor LocalWhisperKitEngine: WhisperTranscribingEngine {
+actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyingEngine {
     static let modelName = "large-v3-v20240930_626MB"
 
     private let modelsDirectory: URL
@@ -90,6 +98,40 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine {
             }
         }
         return segments.sorted { $0.startTime < $1.startTime }
+    }
+
+    func identifyLanguages(
+        audioPath: String,
+        windows: [SpeechTurn],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [AcousticLanguageObservation] {
+        progressHandler?(TranscriptionProgress(stage: .preparingModel))
+        let pipeline = try await loadPipeline()
+        try Task.checkCancellation()
+        progressHandler?(TranscriptionProgress(stage: .identifyingLanguage))
+
+        var observations: [AcousticLanguageObservation] = []
+        for window in windows {
+            try Task.checkCancellation()
+            let buffer = try AudioProcessor.loadAudio(
+                fromPath: audioPath,
+                channelMode: .sumChannels(nil),
+                startTime: window.startTime,
+                endTime: window.endTime
+            )
+            guard let samples = buffer.floatChannelData?[0] else { continue }
+            let audio = Array(UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength)))
+            let result = try await pipeline.detectLangauge(audioArray: audio)
+            let logProbability = result.langProbs[result.language] ?? -.infinity
+            let confidence = logProbability.isFinite ? Double(exp(logProbability)) : 0
+            observations.append(AcousticLanguageObservation(
+                startTime: window.startTime,
+                endTime: window.endTime,
+                languageCode: result.language,
+                confidence: confidence
+            ))
+        }
+        return observations
     }
 
     private func repair(

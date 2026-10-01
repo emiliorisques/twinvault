@@ -11,23 +11,40 @@ struct TwinVaultApplication: App {
             let audio = LocalAudioRecordingService(audioDirectory: paths.audioDirectory)
             let systemAudio = ScreenCaptureSystemAudioService(audioDirectory: paths.audioDirectory)
             let playback = LocalAudioPlaybackService()
+            let whisperEngine = LocalWhisperKitEngine(modelsDirectory: paths.modelsDirectory)
             let whisperKit = WhisperKitSpeechToTextProvider(
                 audioDirectory: paths.audioDirectory,
-                modelsDirectory: paths.modelsDirectory
+                engine: whisperEngine
             )
             let appleSpeech = AppleSpeechTranscriptionProvider(audioDirectory: paths.audioDirectory)
             let parakeet = ParakeetSpeechToTextProvider(
                 audioDirectory: paths.audioDirectory,
                 modelsDirectory: paths.modelsDirectory
             )
+            let languageIdentifier = WhisperKitAcousticLanguageIdentifier(
+                audioDirectory: paths.audioDirectory,
+                engine: whisperEngine
+            )
+            let automatic = RoutingSpeechToTextProvider(
+                languageIdentifier: languageIdentifier,
+                fastProvider: parakeet,
+                multilingualProvider: whisperKit
+            )
             let transcriptionProfiles = [
                 TranscriptionProfile(
-                    id: "multilingual.es-ca-en",
-                    displayName: "Multilingual ES · CA · EN",
-                    detail: "Recommended for meetings that may switch between Spanish, Catalan, and English.",
-                    providerIdentifier: whisperKit.identifier,
+                    id: "automatic.es-ca-en.experimental",
+                    displayName: "Automatic ES · CA · EN (Experimental)",
+                    detail: "Detects spoken languages locally, then uses fast ES/EN or multilingual WhisperKit for the complete recording.",
+                    providerIdentifier: automatic.identifier,
                     localeIdentifiers: ["es-ES", "ca-ES", "en-US"],
                     isRecommended: true
+                ),
+                TranscriptionProfile(
+                    id: "multilingual.es-ca-en",
+                    displayName: "WhisperKit ES · CA · EN",
+                    detail: "Always use the local multilingual engine for the complete recording.",
+                    providerIdentifier: whisperKit.identifier,
+                    localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
                 ),
                 TranscriptionProfile(
                     id: "apple.system.es-ca-en",
@@ -49,7 +66,7 @@ struct TwinVaultApplication: App {
                 audio: audio,
                 systemAudio: systemAudio,
                 playback: playback,
-                speechToTextProviders: [whisperKit, appleSpeech, parakeet],
+                speechToTextProviders: [automatic, whisperKit, appleSpeech, parakeet],
                 transcriptionProfiles: transcriptionProfiles,
                 audioDirectory: paths.audioDirectory
             ))

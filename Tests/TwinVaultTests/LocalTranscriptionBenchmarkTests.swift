@@ -21,6 +21,29 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             relativePath: audioURL.lastPathComponent
         )
         let speechTurns = try LocalEnergySpeechTurnDetector().detectTurns(in: audioURL)
+        if providerName == "language-id" {
+            let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
+                .map { URL(fileURLWithPath: $0) }
+                ?? FileManager.default.temporaryDirectory.appending(path: "TwinVaultBenchmarkModels")
+            try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+            let identifier = WhisperKitAcousticLanguageIdentifier(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                engine: LocalWhisperKitEngine(modelsDirectory: modelsDirectory),
+                turnDetector: FixedBenchmarkSpeechTurnDetector(turns: speechTurns)
+            )
+            let startedAt = ContinuousClock.now
+            let observations = try await identifier.identifyLanguages(
+                in: recording,
+                progressHandler: nil
+            )
+            try write(LanguageIdentificationBenchmarkResult(
+                providerIdentifier: identifier.identifier,
+                elapsedSeconds: startedAt.duration(to: .now).seconds,
+                speechTurns: speechTurns,
+                observations: observations
+            ), to: outputURL)
+            return
+        }
         let provider: any SpeechToTextProvider
         let localeIdentifiers: [String]
         switch providerName {
@@ -84,7 +107,7 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
         }
     }
 
-    private func write(_ result: BenchmarkResult, to url: URL) throws {
+    private func write<Result: Encodable>(_ result: Result, to url: URL) throws {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(result).write(to: url, options: .atomic)
@@ -99,6 +122,19 @@ private struct BenchmarkResult: Codable {
     let reviewIntervals: [TranscriptReviewInterval]
     let segments: [TranscriptSegment]
     let error: String?
+}
+
+private struct LanguageIdentificationBenchmarkResult: Codable {
+    let providerIdentifier: String
+    let elapsedSeconds: Double
+    let speechTurns: [SpeechTurn]
+    let observations: [AcousticLanguageObservation]
+}
+
+private struct FixedBenchmarkSpeechTurnDetector: SpeechTurnDetecting {
+    let turns: [SpeechTurn]
+
+    func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn] { turns }
 }
 
 private extension Duration {
