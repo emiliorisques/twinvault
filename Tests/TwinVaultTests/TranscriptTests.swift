@@ -24,13 +24,104 @@ final class TranscriptTests: XCTestCase {
     }
 
     func testDiarizationTurnContainsNoTranscriptOrIdentity() {
+        let recordingID = UUID()
         let turn = DiarizationTurn(
             meetingID: UUID(), startTime: 5, endTime: 3,
+            sourceRecordingID: recordingID,
+            providerIdentifier: "test.diarizer",
             temporarySpeakerID: "speaker-3"
         )
 
         XCTAssertEqual(turn.endTime, 5)
+        XCTAssertEqual(turn.sourceRecordingID, recordingID)
+        XCTAssertEqual(turn.providerIdentifier, "test.diarizer")
         XCTAssertEqual(turn.temporarySpeakerID, "speaker-3")
+    }
+
+    func testSpeakerIdentityInferenceNeverBecomesConfirmedWithoutUser() {
+        let turn = DiarizationTurn(
+            meetingID: UUID(),
+            startTime: 0,
+            endTime: 2,
+            temporarySpeakerID: "speaker-1"
+        )
+        let inferred = SpeakerIdentityMatch(
+            temporarySpeakerID: turn.temporarySpeakerID,
+            identity: .knownPerson(UUID()),
+            confidence: 1,
+            basis: .modelInference,
+            providerIdentifier: "test.identity"
+        )
+        let confirmed = SpeakerIdentityMatch(
+            temporarySpeakerID: turn.temporarySpeakerID,
+            identity: .me,
+            confidence: 0.2,
+            basis: .explicitUserConfirmation
+        )
+        let gate = SpeakerIdentityEvidenceGate()
+
+        XCTAssertEqual(
+            gate.decision(
+                for: inferred,
+                turn: turn,
+                transcriptSegments: [],
+                findings: []
+            ),
+            .inferredRequiresConfirmation
+        )
+        XCTAssertEqual(
+            gate.decision(
+                for: confirmed,
+                turn: turn,
+                transcriptSegments: [],
+                findings: []
+            ),
+            .confirmedByUser
+        )
+    }
+
+    func testSpeakerIdentityGateBlocksTurnOverPossiblePlaybackLeakage() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 10,
+            endTime: 14,
+            text: "Audio from the speakers",
+            sourceRecordingID: recordingID
+        )
+        let finding = CrossChannelTranscriptFinding(
+            meetingID: meetingID,
+            microphoneSegmentID: segment.id,
+            systemAudioSegmentIDs: [UUID()],
+            textSimilarity: 0.9,
+            timelineOverlap: 0.9
+        )
+        let turn = DiarizationTurn(
+            meetingID: meetingID,
+            startTime: 11,
+            endTime: 13,
+            sourceRecordingID: recordingID,
+            providerIdentifier: "test.diarizer",
+            temporarySpeakerID: "speaker-1"
+        )
+        let match = SpeakerIdentityMatch(
+            temporarySpeakerID: turn.temporarySpeakerID,
+            identity: .me,
+            confidence: 0.99,
+            basis: .localMyVoiceProfile,
+            providerIdentifier: "test.local-voice"
+        )
+
+        XCTAssertEqual(
+            SpeakerIdentityEvidenceGate().decision(
+                for: match,
+                turn: turn,
+                transcriptSegments: [segment],
+                findings: [finding]
+            ),
+            .blockedByPossiblePlaybackLeakage
+        )
     }
 
     func testCrossChannelReconcilerMarksOnlyAlignedMatchingMicrophoneText() {

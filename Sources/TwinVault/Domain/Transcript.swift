@@ -263,17 +263,24 @@ struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {
     let meetingID: UUID
     let startTime: TimeInterval
     let endTime: TimeInterval
+    /// Exact recording used by the diarizer; nil only for legacy/test data.
+    let sourceRecordingID: UUID?
+    /// Replaceable diarization implementation that produced the turn.
+    let providerIdentifier: String?
     /// Session-local label only; never a biometric identity.
     let temporarySpeakerID: String
 
     init(
         id: UUID = UUID(), meetingID: UUID, startTime: TimeInterval,
-        endTime: TimeInterval, temporarySpeakerID: String
+        endTime: TimeInterval, sourceRecordingID: UUID? = nil,
+        providerIdentifier: String? = nil, temporarySpeakerID: String
     ) {
         self.id = id
         self.meetingID = meetingID
         self.startTime = max(0, startTime)
         self.endTime = max(max(0, startTime), endTime)
+        self.sourceRecordingID = sourceRecordingID
+        self.providerIdentifier = providerIdentifier
         self.temporarySpeakerID = temporarySpeakerID
     }
 }
@@ -290,9 +297,64 @@ struct SpeakerIdentityMatch: Equatable, Sendable {
         case unknown
     }
 
+    enum Basis: Equatable, Sendable {
+        /// A session-local model proposal. It is always an inference.
+        case modelInference
+        /// Future opt-in profile containing only the local user's own voice.
+        case localMyVoiceProfile
+        /// A human explicitly confirmed this match.
+        case explicitUserConfirmation
+    }
+
     let temporarySpeakerID: String
     let identity: Identity
     let confidence: Double
+    let basis: Basis
+    let providerIdentifier: String?
+
+    init(
+        temporarySpeakerID: String,
+        identity: Identity,
+        confidence: Double,
+        basis: Basis,
+        providerIdentifier: String? = nil
+    ) {
+        self.temporarySpeakerID = temporarySpeakerID
+        self.identity = identity
+        self.confidence = min(1, max(0, confidence))
+        self.basis = basis
+        self.providerIdentifier = providerIdentifier
+    }
+}
+
+enum SpeakerIdentityEvidenceDecision: Equatable, Sendable {
+    case blockedByPossiblePlaybackLeakage
+    case remainUnknown
+    case inferredRequiresConfirmation
+    case confirmedByUser
+}
+
+/// Final safety boundary between temporary diarization labels and stable people.
+/// Model confidence never upgrades an identity to confirmed.
+struct SpeakerIdentityEvidenceGate: Sendable {
+    func decision(
+        for match: SpeakerIdentityMatch,
+        turn: DiarizationTurn,
+        transcriptSegments: [TranscriptSegment],
+        findings: [CrossChannelTranscriptFinding]
+    ) -> SpeakerIdentityEvidenceDecision {
+        let leakedSegmentIDs = Set(findings.map(\.microphoneSegmentID))
+        let overlapsPossibleLeakage = transcriptSegments.contains { segment in
+            leakedSegmentIDs.contains(segment.id)
+                && segment.sourceRecordingID == turn.sourceRecordingID
+                && segment.endTime > turn.startTime
+                && segment.startTime < turn.endTime
+        }
+        if overlapsPossibleLeakage { return .blockedByPossiblePlaybackLeakage }
+        if case .unknown = match.identity { return .remainUnknown }
+        if match.basis == .explicitUserConfirmation { return .confirmedByUser }
+        return .inferredRequiresConfirmation
+    }
 }
 
 protocol SpeakerIdentificationProvider: Sendable {
