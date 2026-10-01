@@ -72,6 +72,28 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
                 modelsDirectory: modelsDirectory
             )
             localeIdentifiers = ["es-ES", "en-US"]
+        case "nemotron-auto", "nemotron-es", "nemotron-en":
+            let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
+                .map { URL(fileURLWithPath: $0) }
+                ?? FileManager.default.temporaryDirectory.appending(path: "TwinVaultBenchmarkModels")
+            try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+            let languageMode: NemotronLanguageMode
+            switch providerName {
+            case "nemotron-es":
+                languageMode = .spanish
+                localeIdentifiers = ["es-ES"]
+            case "nemotron-en":
+                languageMode = .english
+                localeIdentifiers = ["en-US"]
+            default:
+                languageMode = .automatic
+                localeIdentifiers = ["es-ES", "en-US"]
+            }
+            provider = NemotronSpeechToTextProvider(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                modelsDirectory: modelsDirectory,
+                languageMode: languageMode
+            )
         default:
             XCTFail("Unknown benchmark provider: \(providerName)")
             return

@@ -44,10 +44,16 @@ def main() -> int:
     parser.add_argument("--benchmark", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--results", type=Path, required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--providers",
+        nargs="+",
+        default=("parakeet", "whisperkit"),
+        help="Result filename prefixes to compare (default: parakeet whisperkit).",
+    )
     args = parser.parse_args()
     output = args.output or args.results
     output.mkdir(parents=True, exist_ok=True)
-    providers = ("parakeet", "whisperkit")
+    providers = tuple(args.providers)
     rows = []
     for reference_path in sorted((args.benchmark / "reference").glob("*.json")):
         reference = json.loads(reference_path.read_text(encoding="utf-8"))
@@ -94,17 +100,20 @@ def main() -> int:
         "Directional WER: references are dataset-provided and still require human review.",
         "AMI contains overlapping speech, so its linear WER is especially conservative.",
         "",
-        "| Case | Languages | Parakeet WER / time | WhisperKit WER / time |",
-        "|---|---|---:|---:|",
+        "| Case | Languages | " + " | ".join(
+            f"{provider} WER / time" for provider in providers
+        ) + " |",
+        "|---|---|" + "---:|" * len(providers),
     ]
     for case in sorted({row["case"] for row in rows}):
         by_provider = {row["provider"]: row for row in rows if row["case"] == case}
-        parakeet, whisper = by_provider["parakeet"], by_provider["whisperkit"]
-        report.append(
-            f"| {case} | {parakeet['languages']} | {parakeet['wer_percent']:.1f}% / "
-            f"{parakeet['elapsed_seconds']:.2f}s | {whisper['wer_percent']:.1f}% / "
-            f"{whisper['elapsed_seconds']:.2f}s |"
+        first = by_provider[providers[0]]
+        values = " | ".join(
+            f"{by_provider[provider]['wer_percent']:.1f}% / "
+            f"{by_provider[provider]['elapsed_seconds']:.2f}s"
+            for provider in providers
         )
+        report.append(f"| {case} | {first['languages']} | {values} |")
     report.extend(["", "## Aggregate", ""])
     for provider in providers:
         selected = [row for row in rows if row["provider"] == provider]

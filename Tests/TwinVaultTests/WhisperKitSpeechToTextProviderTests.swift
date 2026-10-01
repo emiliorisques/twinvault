@@ -227,6 +227,122 @@ final class ParakeetSpeechToTextProviderTests: XCTestCase {
     }
 }
 
+final class NemotronSpeechToTextProviderTests: XCTestCase {
+    func testProviderMapsDetectedLanguageAndProvenance() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "meeting.caf")
+        try makeSilentAudio(at: fileURL, duration: 4)
+        let engine = FakeNemotronEngine(result: NemotronEngineResult(
+            segments: [ParakeetEngineSegment(
+                startTime: 1,
+                endTime: 2,
+                text: "El presupuesto está listo"
+            )],
+            detectedLanguage: "es-ES"
+        ))
+        let provider = NemotronSpeechToTextProvider(
+            audioDirectory: directory,
+            languageMode: .automatic,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: fileURL.lastPathComponent
+        )
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording],
+            localeIdentifiers: ["es-ES", "en-US"]
+        ))
+
+        XCTAssertEqual(output.segments.count, 1)
+        XCTAssertEqual(output.segments[0].text, "El presupuesto está listo")
+        XCTAssertEqual(output.segments[0].sourceRecordingID, recording.id)
+        XCTAssertEqual(output.segments[0].providerIdentifier, provider.identifier)
+        XCTAssertEqual(output.segments[0].localeIdentifier, "es-ES")
+        let receivedURL = await engine.receivedURL()
+        XCTAssertEqual(receivedURL, fileURL)
+    }
+
+    func testProviderRejectsCatalanBeforeCallingEngine() async {
+        let engine = FakeNemotronEngine(result: NemotronEngineResult(
+            segments: [],
+            detectedLanguage: nil
+        ))
+        let provider = NemotronSpeechToTextProvider(
+            audioDirectory: FileManager.default.temporaryDirectory,
+            languageMode: .automatic,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "meeting.m4a"
+        )
+
+        do {
+            _ = try await provider.transcribe(TranscriptionRequest(
+                meetingID: meetingID,
+                recordings: [recording],
+                localeIdentifiers: ["es-ES", "ca-ES", "en-US"]
+            ))
+            XCTFail("Catalan must not be routed to Nemotron.")
+        } catch NemotronTranscriptionError.unsupportedLocales(let locales) {
+            XCTAssertEqual(locales, ["ca-ES"])
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        let receivedURL = await engine.receivedURL()
+        XCTAssertNil(receivedURL)
+    }
+
+    func testProviderRejectsPathTraversalBeforeCallingEngine() async {
+        let engine = FakeNemotronEngine(result: NemotronEngineResult(
+            segments: [],
+            detectedLanguage: nil
+        ))
+        let provider = NemotronSpeechToTextProvider(
+            audioDirectory: FileManager.default.temporaryDirectory,
+            languageMode: .spanish,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "../outside.m4a"
+        )
+
+        do {
+            _ = try await provider.transcribe(TranscriptionRequest(
+                meetingID: meetingID,
+                recordings: [recording],
+                localeIdentifiers: ["es-ES"]
+            ))
+            XCTFail("Expected an invalid recording reference error.")
+        } catch NemotronTranscriptionError.invalidRecordingReference {
+            // Expected.
+        } catch {
+            XCTFail("Unexpected error: \(error)")
+        }
+        let receivedURL = await engine.receivedURL()
+        XCTAssertNil(receivedURL)
+    }
+
+    private func makeSilentAudio(at url: URL, duration: TimeInterval) throws {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        let frameCount = AVAudioFrameCount(duration * format.sampleRate)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
+        memset(buffer.floatChannelData![0], 0, Int(frameCount) * MemoryLayout<Float>.size)
+        try file.write(from: buffer)
+    }
+}
+
 final class AcousticLanguageRoutingTests: XCTestCase {
     func testWindowPlannerJoinsNearbySpeechAndBoundsLongRegions() {
         let windows = LanguageAnalysisWindowPlanner.windows(for: [
@@ -362,6 +478,26 @@ private actor FakeParakeetEngine: ParakeetTranscribingEngine {
         url = fileURL
         progressHandler?(TranscriptionProgress(stage: .transcribing))
         return segments
+    }
+
+    func receivedURL() -> URL? { url }
+}
+
+private actor FakeNemotronEngine: NemotronTranscribingEngine {
+    private let result: NemotronEngineResult
+    private var url: URL?
+
+    init(result: NemotronEngineResult) {
+        self.result = result
+    }
+
+    func transcribe(
+        fileURL: URL,
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) -> NemotronEngineResult {
+        url = fileURL
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
+        return result
     }
 
     func receivedURL() -> URL? { url }

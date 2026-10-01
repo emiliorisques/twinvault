@@ -261,3 +261,35 @@ isolated language switches below the analysis window minimum may be missed, and 
 eight files do not cover all accents or meeting conditions. Routing therefore defaults
 to WhisperKit whenever evidence is absent, weak, Catalan, or unsupported. Diarization
 remains downstream and independent.
+
+## 2026-10-01 — Nemotron 3.5 multilingual evaluation
+
+FluidAudio 0.17.4's streaming Nemotron 3.5 0.6B Core ML adapter was run locally in
+automatic-language mode over the same eight complete WAV files. The first private run
+downloaded and prepared 641 MB of model assets; meeting audio was never uploaded. The
+four channels from the two latest private meetings were also processed as a qualitative
+comparison. Those private recordings have no human-corrected references, so their
+pairwise model disagreement is not reported as accuracy.
+
+| Case | Languages | Parakeet WER / time | WhisperKit WER / time | Nemotron WER / time |
+|---|---|---:|---:|---:|
+| ES clean | ES | 5.8% / 1.10 s | 5.4% / 84.38 s | 11.2% / 2.67 s |
+| EN clean | EN | 6.9% / 1.10 s | 11.4% / 13.93 s | 8.2% / 2.34 s |
+| ES/EN | ES+EN | 6.5% / 1.31 s | 25.4% / 20.01 s | 15.9% / 3.31 s |
+| CA/ES | CA+ES | 54.9% / 2.78 s | 21.1% / 20.85 s | 44.0% / 2.77 s |
+| ES/CA/EN | ES+CA+EN | 34.4% / 1.41 s | 33.1% / 24.21 s | 35.6% / 4.14 s |
+| multilingual + noise | ES+CA+EN | 45.4% / 3.67 s | 26.7% / 21.39 s | 44.6% / 3.60 s |
+| AMI meeting overlap | EN | 22.4% / 1.92 s | 31.1% / 26.19 s | 26.3% / 3.97 s |
+| stress test | ES+CA+EN | 45.5% / 3.02 s | 29.2% / 19.74 s | 49.6% / 2.68 s |
+
+Across ES/EN cases 01–03, Parakeet scored 6.4%, Nemotron 12.0%, and WhisperKit
+14.6%. On the four Catalan-containing cases, WhisperKit scored 27.8%, Nemotron 43.0%,
+and Parakeet 44.5%. Aggregate micro-WER was 24.2% for WhisperKit, 27.7% for Parakeet,
+and 29.6% for Nemotron. Nemotron completed the suite in 25.5 seconds after model
+availability, but speed does not compensate for the accuracy loss. Automatic Nemotron
+also omitted a detected-language value on several successful private recordings.
+
+Decision: do not register Nemotron as a product profile and do not use it for language
+identification. Keep the adapter as a reproducible evaluation boundary. The current
+automatic policy remains independent acoustic LID, Parakeet for confident ES/EN, and
+whole-recording WhisperKit for Catalan or uncertainty.
