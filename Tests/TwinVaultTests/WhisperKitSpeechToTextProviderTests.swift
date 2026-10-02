@@ -102,6 +102,46 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
         XCTAssertEqual(receivedTerms, ["Projecte Àgora"])
     }
 
+    func testRegionalTranscriptionKeepsWideContextButReturnsOnlySelection() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "meeting.caf")
+        try makeSilentAudio(at: fileURL, duration: 120)
+        let engine = FakeWhisperEngine(segments: [
+            WhisperEngineSegment(startTime: 45, endTime: 48, text: "Context", languageCode: nil),
+            WhisperEngineSegment(startTime: 52, endTime: 56, text: "Bon dia", languageCode: nil),
+            WhisperEngineSegment(startTime: 65, endTime: 68, text: "Context", languageCode: nil)
+        ])
+        let provider = WhisperKitSpeechToTextProvider(
+            audioDirectory: directory,
+            engine: engine
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: fileURL.lastPathComponent
+        )
+        let region = TranscriptionRegion(
+            startTime: 50,
+            endTime: 60,
+            contextStartTime: 40,
+            contextEndTime: 70,
+            languageCode: "ca"
+        )
+
+        let output = try await provider.transcribe(
+            TranscriptionRequest(meetingID: meetingID, recordings: [recording]),
+            regions: [region]
+        )
+
+        XCTAssertEqual(output.segments.map(\.text), ["Bon dia"])
+        XCTAssertEqual(output.segments.first?.localeIdentifier, "ca")
+        XCTAssertEqual(output.segments.first?.providerIdentifier, provider.identifier)
+        let receivedRegions = await engine.receivedRegions()
+        XCTAssertEqual(receivedRegions, [region])
+    }
+
     func testRejectsPathTraversalBeforeCallingEngine() async {
         let engine = FakeWhisperEngine(segments: [])
         let provider = WhisperKitSpeechToTextProvider(
@@ -420,6 +460,80 @@ final class AcousticLanguageRoutingTests: XCTestCase {
         XCTAssertEqual(router.decision(for: []).reason, .insufficientEvidence)
     }
 
+    func testRouterUsesHybridOnlyWhenCatalanIsMinority() {
+        let router = ConservativeLanguageRouter()
+        let minority = router.decision(for: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 90, languageCode: "es", confidence: 0.99
+            ),
+            AcousticLanguageObservation(
+                startTime: 90, endTime: 100, languageCode: "ca", confidence: 0.95
+            ),
+            AcousticLanguageObservation(
+                startTime: 100, endTime: 105, languageCode: "en", confidence: 0.4
+            )
+        ])
+        let dominant = router.decision(for: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 40, languageCode: "es", confidence: 0.99
+            ),
+            AcousticLanguageObservation(
+                startTime: 40, endTime: 100, languageCode: "ca", confidence: 0.95
+            )
+        ])
+
+        XCTAssertEqual(minority, AutomaticRoutingDecision(
+            target: .hybridCatalanRegions,
+            reason: .minorityCatalanDetected
+        ))
+        XCTAssertEqual(dominant, AutomaticRoutingDecision(
+            target: .multilingual,
+            reason: .catalanDetected
+        ))
+    }
+
+    func testRouterFallsBackWhenMostAcousticEvidenceIsUncertain() {
+        let decision = ConservativeLanguageRouter().decision(for: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 10, languageCode: "es", confidence: 0.98
+            ),
+            AcousticLanguageObservation(
+                startTime: 10, endTime: 40, languageCode: "en", confidence: 0.45
+            )
+        ])
+
+        XCTAssertEqual(decision, AutomaticRoutingDecision(
+            target: .multilingual,
+            reason: .insufficientEvidence
+        ))
+    }
+
+    func testCatalanRegionPlannerMergesNearbyEvidenceAndAddsWideContext() {
+        let regions = CatalanTranscriptionRegionPlanner.regions(from: [
+            AcousticLanguageObservation(
+                startTime: 50, endTime: 54, languageCode: "ca", confidence: 0.95
+            ),
+            AcousticLanguageObservation(
+                startTime: 58, endTime: 63, languageCode: "ca-ES", confidence: 0.91
+            ),
+            AcousticLanguageObservation(
+                startTime: 80, endTime: 83, languageCode: "ca", confidence: 0.6
+            )
+        ])
+
+        XCTAssertEqual(regions, [TranscriptionRegion(
+            startTime: 50,
+            endTime: 63,
+            contextStartTime: 40,
+            contextEndTime: 73,
+            languageCode: "ca"
+        )])
+        XCTAssertGreaterThanOrEqual(
+            regions[0].contextEndTime - regions[0].contextStartTime,
+            20
+        )
+    }
+
     func testAutomaticProviderRemovesCatalanOnlyAfterConfidentFastRoute() async throws {
         let languageIdentifier = FakeLanguageIdentifier(observations: [
             AcousticLanguageObservation(
@@ -506,6 +620,89 @@ final class AcousticLanguageRoutingTests: XCTestCase {
         XCTAssertEqual(fastTerms, ["ACME Europe"])
         XCTAssertEqual(multilingualTerms, ["ACME Europe"])
     }
+
+    func testAutomaticProviderReplacesOnlySuccessfulMinorityCatalanRegion() async throws {
+        let languageIdentifier = FakeLanguageIdentifier(observations: [
+            AcousticLanguageObservation(
+                startTime: 0, endTime: 80, languageCode: "es", confidence: 0.98
+            ),
+            AcousticLanguageObservation(
+                startTime: 80, endTime: 90, languageCode: "ca", confidence: 0.96
+            )
+        ])
+        let fast = TrackingSpeechProvider(
+            identifier: "test.fast",
+            segments: [
+                10...20,
+                82...86,
+                92...96
+            ]
+        )
+        let multilingual = TrackingRegionalSpeechProvider(
+            identifier: "test.multilingual",
+            segmentRange: 81...89
+        )
+        let provider = RoutingSpeechToTextProvider(
+            languageIdentifier: languageIdentifier,
+            fastProvider: fast,
+            multilingualProvider: multilingual
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording]
+        ))
+
+        XCTAssertEqual(output.segments.map(\.providerIdentifier), [
+            fast.identifier,
+            multilingual.identifier,
+            fast.identifier
+        ])
+        XCTAssertEqual(output.segments.map(\.startTime), [10, 81, 92])
+        let receivedRegions = await multilingual.receivedRegions()
+        XCTAssertEqual(receivedRegions, [TranscriptionRegion(
+            startTime: 80,
+            endTime: 90,
+            contextStartTime: 70,
+            contextEndTime: 100,
+            languageCode: "ca"
+        )])
+    }
+
+    func testAutomaticProviderPreservesFastTextAndReportsFailedRegionOnce() async throws {
+        let provider = RoutingSpeechToTextProvider(
+            languageIdentifier: FakeLanguageIdentifier(observations: [
+                AcousticLanguageObservation(
+                    startTime: 0, endTime: 80, languageCode: "es", confidence: 0.98
+                ),
+                AcousticLanguageObservation(
+                    startTime: 80, endTime: 90, languageCode: "ca", confidence: 0.96
+                )
+            ]),
+            fastProvider: TrackingSpeechProvider(
+                identifier: "test.fast",
+                segmentRange: 82...86
+            ),
+            multilingualProvider: TrackingRegionalSpeechProvider(
+                identifier: "test.multilingual",
+                segmentRange: nil
+            )
+        )
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+
+        let output = try await provider.transcribe(TranscriptionRequest(
+            meetingID: meetingID,
+            recordings: [recording]
+        ))
+
+        XCTAssertEqual(output.segments.map(\.providerIdentifier), ["test.fast"])
+        XCTAssertEqual(output.reviewIntervals.count, 1)
+        XCTAssertEqual(output.reviewIntervals.first?.startTime, 80)
+        XCTAssertEqual(output.reviewIntervals.first?.endTime, 90)
+    }
 }
 
 private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
@@ -518,6 +715,7 @@ private actor FakeWhisperEngine: WhisperTranscribingEngine {
     private let segments: [WhisperEngineSegment]
     private var path: String?
     private var contextualTerms: [String] = []
+    private var regions: [TranscriptionRegion]?
 
     init(segments: [WhisperEngineSegment]) {
         self.segments = segments
@@ -534,8 +732,33 @@ private actor FakeWhisperEngine: WhisperTranscribingEngine {
         return segments
     }
 
+    func transcribe(
+        audioPath: String,
+        regions: [TranscriptionRegion],
+        contextualTerms: [String],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) -> [WhisperEngineSegment] {
+        path = audioPath
+        self.regions = regions
+        self.contextualTerms = contextualTerms
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
+        return segments.compactMap { segment in
+            let midpoint = (segment.startTime + segment.endTime) / 2
+            guard let region = regions.first(where: {
+                midpoint >= $0.startTime && midpoint <= $0.endTime
+            }) else { return nil }
+            return WhisperEngineSegment(
+                startTime: segment.startTime,
+                endTime: segment.endTime,
+                text: segment.text,
+                languageCode: region.languageCode
+            )
+        }
+    }
+
     func receivedPath() -> String? { path }
     func receivedContextualTerms() -> [String] { contextualTerms }
+    func receivedRegions() -> [TranscriptionRegion]? { regions }
 }
 
 private actor FakeParakeetEngine: ParakeetTranscribingEngine {
@@ -609,7 +832,7 @@ private actor TrackingSpeechProvider: SpeechToTextProvider {
     nonisolated let identifier: String
     private var locales: [String]?
     private var contextualTerms: [String]?
-    private let segmentRange: ClosedRange<TimeInterval>
+    private let segmentRanges: [ClosedRange<TimeInterval>]
     private let reviewRange: ClosedRange<TimeInterval>?
 
     init(
@@ -618,7 +841,17 @@ private actor TrackingSpeechProvider: SpeechToTextProvider {
         reviewRange: ClosedRange<TimeInterval>? = nil
     ) {
         self.identifier = identifier
-        self.segmentRange = segmentRange
+        self.segmentRanges = [segmentRange]
+        self.reviewRange = reviewRange
+    }
+
+    init(
+        identifier: String,
+        segments: [ClosedRange<TimeInterval>],
+        reviewRange: ClosedRange<TimeInterval>? = nil
+    ) {
+        self.identifier = identifier
+        self.segmentRanges = segments
         self.reviewRange = reviewRange
     }
 
@@ -634,16 +867,63 @@ private actor TrackingSpeechProvider: SpeechToTextProvider {
                 endTime: range.upperBound
             )]
         } ?? []
-        return TranscriptionOutput(segments: [TranscriptSegment(
-            meetingID: request.meetingID,
-            startTime: segmentRange.lowerBound,
-            endTime: segmentRange.upperBound,
-            text: identifier,
-            sourceRecordingID: recording.id,
-            providerIdentifier: identifier
-        )], reviewIntervals: reviewIntervals)
+        return TranscriptionOutput(segments: segmentRanges.map { range in
+            TranscriptSegment(
+                meetingID: request.meetingID,
+                startTime: range.lowerBound,
+                endTime: range.upperBound,
+                text: identifier,
+                sourceRecordingID: recording.id,
+                providerIdentifier: identifier
+            )
+        }, reviewIntervals: reviewIntervals)
     }
 
     func receivedLocales() -> [String]? { locales }
     func receivedContextualTerms() -> [String]? { contextualTerms }
+}
+
+private actor TrackingRegionalSpeechProvider: RegionalSpeechToTextProvider {
+    nonisolated let identifier: String
+    private let segmentRange: ClosedRange<TimeInterval>?
+    private var regions: [TranscriptionRegion]?
+
+    init(identifier: String, segmentRange: ClosedRange<TimeInterval>?) {
+        self.identifier = identifier
+        self.segmentRange = segmentRange
+    }
+
+    func transcribe(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
+        TranscriptionOutput(segments: [])
+    }
+
+    func transcribe(
+        _ request: TranscriptionRequest,
+        regions: [TranscriptionRegion]
+    ) async throws -> TranscriptionOutput {
+        self.regions = regions
+        let recording = try XCTUnwrap(request.recordings.first)
+        let segments = segmentRange.map { range in
+            [TranscriptSegment(
+                meetingID: request.meetingID,
+                startTime: range.lowerBound,
+                endTime: range.upperBound,
+                text: identifier,
+                sourceRecordingID: recording.id,
+                providerIdentifier: identifier,
+                localeIdentifier: "ca"
+            )]
+        } ?? []
+        let reviews = segmentRange == nil ? regions.map {
+            TranscriptReviewInterval(
+                meetingID: request.meetingID,
+                sourceRecordingID: recording.id,
+                startTime: $0.startTime,
+                endTime: $0.endTime
+            )
+        } : []
+        return TranscriptionOutput(segments: segments, reviewIntervals: reviews)
+    }
+
+    func receivedRegions() -> [TranscriptionRegion]? { regions }
 }

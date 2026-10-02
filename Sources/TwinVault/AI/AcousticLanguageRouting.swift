@@ -45,12 +45,14 @@ enum LanguageAnalysisWindowPlanner {
 
 enum AutomaticTranscriptionTarget: Equatable, Sendable {
     case fastSpanishEnglish
+    case hybridCatalanRegions
     case multilingual
 }
 
 enum AutomaticRoutingReason: Equatable, Sendable {
     case confidentSpanishEnglish
     case catalanDetected
+    case minorityCatalanDetected
     case unsupportedLanguageDetected
     case insufficientEvidence
 }
@@ -65,13 +67,19 @@ struct AutomaticRoutingDecision: Equatable, Sendable {
 struct ConservativeLanguageRouter: Sendable {
     let minimumFastConfidence: Double
     let multilingualTriggerConfidence: Double
+    let catalanDominanceThreshold: Double
+    let minimumTrustedDurationShare: Double
 
     init(
         minimumFastConfidence: Double = 0.8,
-        multilingualTriggerConfidence: Double = 0.5
+        multilingualTriggerConfidence: Double = 0.5,
+        catalanDominanceThreshold: Double = 0.5,
+        minimumTrustedDurationShare: Double = 0.6
     ) {
         self.minimumFastConfidence = min(1, max(0, minimumFastConfidence))
         self.multilingualTriggerConfidence = min(1, max(0, multilingualTriggerConfidence))
+        self.catalanDominanceThreshold = min(1, max(0, catalanDominanceThreshold))
+        self.minimumTrustedDurationShare = min(1, max(0, minimumTrustedDurationShare))
     }
 
     func decision(for observations: [AcousticLanguageObservation]) -> AutomaticRoutingDecision {
@@ -79,23 +87,101 @@ struct ConservativeLanguageRouter: Sendable {
             return AutomaticRoutingDecision(target: .multilingual, reason: .insufficientEvidence)
         }
         if observations.contains(where: {
-            Self.code($0.languageCode) == "ca" && $0.confidence >= multilingualTriggerConfidence
-        }) {
-            return AutomaticRoutingDecision(target: .multilingual, reason: .catalanDetected)
-        }
-        if observations.contains(where: {
-            !["es", "en"].contains(Self.code($0.languageCode))
+            !["es", "en", "ca"].contains(Self.code($0.languageCode))
                 && $0.confidence >= multilingualTriggerConfidence
         }) {
             return AutomaticRoutingDecision(target: .multilingual, reason: .unsupportedLanguageDetected)
         }
-        guard observations.allSatisfy({
-            ["es", "en"].contains(Self.code($0.languageCode))
-                && $0.confidence >= minimumFastConfidence
-        }) else {
+        let trusted = observations.filter { $0.confidence >= minimumFastConfidence }
+        guard !trusted.isEmpty else {
+            return AutomaticRoutingDecision(target: .multilingual, reason: .insufficientEvidence)
+        }
+        let catalanDuration = trusted
+            .filter { Self.code($0.languageCode) == "ca" }
+            .reduce(0) { $0 + max(0, $1.endTime - $1.startTime) }
+        let supportedDuration = trusted
+            .filter { ["es", "en", "ca"].contains(Self.code($0.languageCode)) }
+            .reduce(0) { $0 + max(0, $1.endTime - $1.startTime) }
+        let observedDuration = observations.reduce(0) {
+            $0 + max(0, $1.endTime - $1.startTime)
+        }
+        guard observedDuration > 0,
+              supportedDuration / observedDuration >= minimumTrustedDurationShare else {
+            return AutomaticRoutingDecision(target: .multilingual, reason: .insufficientEvidence)
+        }
+        if catalanDuration > 0 {
+            let share = supportedDuration > 0 ? catalanDuration / supportedDuration : 1
+            if share >= catalanDominanceThreshold {
+                return AutomaticRoutingDecision(target: .multilingual, reason: .catalanDetected)
+            }
+            return AutomaticRoutingDecision(
+                target: .hybridCatalanRegions,
+                reason: .minorityCatalanDetected
+            )
+        }
+        guard trusted.contains(where: { ["es", "en"].contains(Self.code($0.languageCode)) }) else {
             return AutomaticRoutingDecision(target: .multilingual, reason: .insufficientEvidence)
         }
         return AutomaticRoutingDecision(target: .fastSpanishEnglish, reason: .confidentSpanishEnglish)
+    }
+
+    private static func code(_ identifier: String) -> String {
+        identifier.split(whereSeparator: { $0 == "-" || $0 == "_" })
+            .first.map { String($0).lowercased() } ?? identifier.lowercased()
+    }
+}
+
+enum CatalanTranscriptionRegionPlanner {
+    static func regions(
+        from observations: [AcousticLanguageObservation],
+        minimumConfidence: Double = 0.8,
+        maximumJoiningGap: TimeInterval = 8,
+        contextPadding: TimeInterval = 10,
+        minimumContextDuration: TimeInterval = 20
+    ) -> [TranscriptionRegion] {
+        let catalan = observations
+            .filter {
+                code($0.languageCode) == "ca" && $0.confidence >= minimumConfidence
+            }
+            .sorted { $0.startTime < $1.startTime }
+        guard !catalan.isEmpty else { return [] }
+
+        var selections: [SpeechTurn] = []
+        for observation in catalan {
+            guard let previous = selections.last else {
+                selections.append(SpeechTurn(
+                    startTime: observation.startTime,
+                    endTime: observation.endTime
+                ))
+                continue
+            }
+            if observation.startTime - previous.endTime <= maximumJoiningGap {
+                selections[selections.count - 1] = SpeechTurn(
+                    startTime: previous.startTime,
+                    endTime: max(previous.endTime, observation.endTime)
+                )
+            } else {
+                selections.append(SpeechTurn(
+                    startTime: observation.startTime,
+                    endTime: observation.endTime
+                ))
+            }
+        }
+
+        return selections.map { selection in
+            let contextStart = max(0, selection.startTime - contextPadding)
+            var contextEnd = selection.endTime + contextPadding
+            if contextEnd - contextStart < minimumContextDuration {
+                contextEnd = contextStart + minimumContextDuration
+            }
+            return TranscriptionRegion(
+                startTime: selection.startTime,
+                endTime: selection.endTime,
+                contextStartTime: contextStart,
+                contextEndTime: contextEnd,
+                languageCode: "ca"
+            )
+        }
     }
 
     private static func code(_ identifier: String) -> String {
@@ -212,22 +298,115 @@ actor RoutingSpeechToTextProvider: SpeechToTextProvider {
         case .multilingual:
             return try await multilingualProvider.transcribe(request)
         case .fastSpanishEnglish:
-            let fastOutput = try await fastProvider.transcribe(TranscriptionRequest(
-                meetingID: request.meetingID,
-                recordings: request.recordings,
-                localeIdentifiers: request.localeIdentifiers.filter {
-                    let code = $0.split(whereSeparator: { $0 == "-" || $0 == "_" }).first
-                    return code == "es" || code == "en"
-                },
-                contextualTerms: request.contextualTerms,
-                progressHandler: request.progressHandler
-            ))
+            let fastOutput = try await transcribeFast(request)
             guard !fastOutput.reviewIntervals.isEmpty else { return fastOutput }
             return try await repairFastCoverage(
                 fastOutput,
                 request: request,
                 recording: recording
             )
+        case .hybridCatalanRegions:
+            guard let regionalProvider = multilingualProvider as? any RegionalSpeechToTextProvider else {
+                return try await multilingualProvider.transcribe(request)
+            }
+            let regions = CatalanTranscriptionRegionPlanner.regions(from: observations)
+            guard !regions.isEmpty else {
+                return try await multilingualProvider.transcribe(request)
+            }
+            let fastOutput = try await transcribeFast(request)
+            return try await transcribeHybrid(
+                fastOutput: fastOutput,
+                request: request,
+                recording: recording,
+                regions: regions,
+                regionalProvider: regionalProvider
+            )
+        }
+    }
+
+    private func transcribeFast(_ request: TranscriptionRequest) async throws -> TranscriptionOutput {
+        try await fastProvider.transcribe(TranscriptionRequest(
+            meetingID: request.meetingID,
+            recordings: request.recordings,
+            localeIdentifiers: request.localeIdentifiers.filter {
+                let code = $0.split(whereSeparator: { $0 == "-" || $0 == "_" }).first
+                return code == "es" || code == "en"
+            },
+            contextualTerms: request.contextualTerms,
+            progressHandler: request.progressHandler
+        ))
+    }
+
+    private func transcribeHybrid(
+        fastOutput: TranscriptionOutput,
+        request: TranscriptionRequest,
+        recording: AudioRecordingReference,
+        regions: [TranscriptionRegion],
+        regionalProvider: any RegionalSpeechToTextProvider
+    ) async throws -> TranscriptionOutput {
+        let regionalOutput: TranscriptionOutput
+        do {
+            regionalOutput = try await regionalProvider.transcribe(request, regions: regions)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            try Task.checkCancellation()
+            return TranscriptionOutput(
+                segments: fastOutput.segments,
+                reviewIntervals: fastOutput.reviewIntervals + regions.map {
+                    TranscriptReviewInterval(
+                        meetingID: request.meetingID,
+                        sourceRecordingID: recording.id,
+                        startTime: $0.startTime,
+                        endTime: $0.endTime
+                    )
+                },
+                unavailableLocaleIdentifiers: fastOutput.unavailableLocaleIdentifiers
+            )
+        }
+
+        let successfulRegions = regions.filter { region in
+            regionalOutput.segments.contains { region.containsMidpoint(of: $0) }
+        }
+        let retainedFast = fastOutput.segments.filter { segment in
+            !successfulRegions.contains { $0.containsMidpoint(of: segment) }
+        }
+        let failedRegionReviews = regions
+            .filter { !successfulRegions.contains($0) }
+            .map {
+                TranscriptReviewInterval(
+                    meetingID: request.meetingID,
+                    sourceRecordingID: recording.id,
+                    startTime: $0.startTime,
+                    endTime: $0.endTime
+                )
+            }
+        let reviewIntervals = deduplicatedReviewIntervals(
+            fastOutput.reviewIntervals
+                + regionalOutput.reviewIntervals
+                + failedRegionReviews
+        )
+        return TranscriptionOutput(
+            segments: (retainedFast + regionalOutput.segments).sorted { $0.startTime < $1.startTime },
+            reviewIntervals: reviewIntervals.sorted { $0.startTime < $1.startTime },
+            unavailableLocaleIdentifiers: Array(Set(
+                fastOutput.unavailableLocaleIdentifiers
+                    + regionalOutput.unavailableLocaleIdentifiers
+            )).sorted()
+        )
+    }
+
+    private func deduplicatedReviewIntervals(
+        _ intervals: [TranscriptReviewInterval]
+    ) -> [TranscriptReviewInterval] {
+        intervals.reduce(into: []) { result, interval in
+            let alreadyPresent = result.contains {
+                $0.sourceRecordingID == interval.sourceRecordingID
+                    && $0.reason == interval.reason
+                    && abs($0.startTime - interval.startTime) < 0.001
+                    && abs($0.endTime - interval.endTime) < 0.001
+            }
+            if !alreadyPresent { result.append(interval) }
         }
     }
 

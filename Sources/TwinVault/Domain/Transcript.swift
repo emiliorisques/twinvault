@@ -202,6 +202,47 @@ extension SpeechToTextProvider {
     var displayName: String { identifier }
 }
 
+/// A bounded decode request that keeps a wider acoustic context than the
+/// interval whose transcript will be retained. This prevents short language
+/// switches from being decoded as isolated micro-fragments.
+struct TranscriptionRegion: Equatable, Sendable {
+    let startTime: TimeInterval
+    let endTime: TimeInterval
+    let contextStartTime: TimeInterval
+    let contextEndTime: TimeInterval
+    let languageCode: String
+
+    init(
+        startTime: TimeInterval,
+        endTime: TimeInterval,
+        contextStartTime: TimeInterval,
+        contextEndTime: TimeInterval,
+        languageCode: String
+    ) {
+        let start = max(0, startTime)
+        let end = max(start, endTime)
+        self.startTime = start
+        self.endTime = end
+        self.contextStartTime = min(start, max(0, contextStartTime))
+        self.contextEndTime = max(end, contextEndTime)
+        self.languageCode = languageCode.lowercased()
+    }
+
+    func containsMidpoint(of segment: TranscriptSegment) -> Bool {
+        let midpoint = (segment.startTime + segment.endTime) / 2
+        return midpoint >= startTime && midpoint <= endTime
+    }
+}
+
+/// Optional provider capability used by the automatic router. The ordinary
+/// provider protocol remains whole-recording based and replaceable.
+protocol RegionalSpeechToTextProvider: SpeechToTextProvider {
+    func transcribe(
+        _ request: TranscriptionRequest,
+        regions: [TranscriptionRegion]
+    ) async throws -> TranscriptionOutput
+}
+
 /// A user-visible transcription intent. Profiles select a provider and its
 /// supported languages before audio is processed; transcript text never
 /// silently changes this routing decision.

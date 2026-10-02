@@ -340,16 +340,16 @@ final class AppModelTests: XCTestCase {
         await model.load()
 
         model.startTranscription(meetingID: meetingID, recordingID: recording.id)
-        for _ in 0..<20 where model.transcriptionActivity?.progress.fractionCompleted != 0.5 {
-            await Task.yield()
+        for _ in 0..<100 where model.transcriptionActivity?.progress.fractionCompleted != 0.5 {
+            try? await Task.sleep(for: .milliseconds(5))
         }
         XCTAssertEqual(model.transcriptionActivity?.recordingID, recording.id)
         XCTAssertEqual(model.transcriptionActivity?.progress.stage, .downloadingModel)
         XCTAssertEqual(model.transcriptionActivity?.progress.fractionCompleted, 0.5)
 
         model.cancelTranscription()
-        for _ in 0..<20 where model.transcriptionActivity != nil {
-            await Task.yield()
+        for _ in 0..<100 where model.transcriptionActivity != nil {
+            try? await Task.sleep(for: .milliseconds(5))
         }
 
         let stored = await repository.meeting(id: meetingID)

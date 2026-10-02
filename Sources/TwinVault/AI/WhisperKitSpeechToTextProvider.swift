@@ -42,6 +42,32 @@ protocol WhisperTranscribingEngine: Sendable {
         contextualTerms: [String],
         progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
     ) async throws -> [WhisperEngineSegment]
+
+    func transcribe(
+        audioPath: String,
+        regions: [TranscriptionRegion],
+        contextualTerms: [String],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [WhisperEngineSegment]
+}
+
+extension WhisperTranscribingEngine {
+    func transcribe(
+        audioPath: String,
+        regions: [TranscriptionRegion],
+        contextualTerms: [String],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [WhisperEngineSegment] {
+        let segments = try await transcribe(
+            audioPath: audioPath,
+            contextualTerms: contextualTerms,
+            progressHandler: progressHandler
+        )
+        return segments.filter { segment in
+            let midpoint = (segment.startTime + segment.endTime) / 2
+            return regions.contains { midpoint >= $0.startTime && midpoint <= $0.endTime }
+        }
+    }
 }
 
 protocol WhisperLanguageIdentifyingEngine: Sendable {
@@ -145,6 +171,56 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
             ))
         }
         return observations
+    }
+
+    func transcribe(
+        audioPath: String,
+        regions: [TranscriptionRegion],
+        contextualTerms: [String],
+        progressHandler: (@Sendable (TranscriptionProgress) -> Void)?
+    ) async throws -> [WhisperEngineSegment] {
+        progressHandler?(TranscriptionProgress(stage: .preparingModel))
+        let pipeline = try await loadPipeline()
+        try Task.checkCancellation()
+        progressHandler?(TranscriptionProgress(stage: .transcribing))
+        let promptTokens = pipeline.tokenizer?.encode(
+            text: contextualTerms.joined(separator: ", ")
+        )
+
+        var retained: [WhisperEngineSegment] = []
+        for region in regions {
+            try Task.checkCancellation()
+            let buffer = try AudioProcessor.loadAudio(
+                fromPath: audioPath,
+                channelMode: .sumChannels(nil),
+                startTime: region.contextStartTime,
+                endTime: region.contextEndTime
+            )
+            guard let samples = buffer.floatChannelData?[0] else { continue }
+            let audio = Array(UnsafeBufferPointer(start: samples, count: Int(buffer.frameLength)))
+            let results = try await pipeline.transcribe(
+                audioArray: audio,
+                decodeOptions: DecodingOptions(
+                    task: .transcribe,
+                    language: nil,
+                    detectLanguage: true,
+                    skipSpecialTokens: true,
+                    promptTokens: promptTokens?.isEmpty == false ? promptTokens : nil,
+                    chunkingStrategy: .vad
+                )
+            )
+            retained.append(contentsOf: map(results, offset: region.contextStartTime).compactMap {
+                let midpoint = ($0.startTime + $0.endTime) / 2
+                guard midpoint >= region.startTime, midpoint <= region.endTime else { return nil }
+                return WhisperEngineSegment(
+                    startTime: $0.startTime,
+                    endTime: $0.endTime,
+                    text: $0.text,
+                    languageCode: region.languageCode
+                )
+            })
+        }
+        return retained.sorted { $0.startTime < $1.startTime }
     }
 
     private func repair(
@@ -315,7 +391,7 @@ enum WhisperTranscriptSanitizer {
 
 /// Local multilingual transcription adapter. The first use may download the
 /// pinned Core ML model; recordings are always read from the local vault.
-actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
+actor WhisperKitSpeechToTextProvider: RegionalSpeechToTextProvider {
     nonisolated let identifier = "whisperkit.large-v3-turbo-626mb"
     nonisolated let displayName = "WhisperKit (multilingual)"
 
@@ -396,6 +472,65 @@ actor WhisperKitSpeechToTextProvider: SpeechToTextProvider {
         return TranscriptionOutput(
             segments: segments,
             reviewIntervals: reviewIntervals
+        )
+    }
+
+    func transcribe(
+        _ request: TranscriptionRequest,
+        regions: [TranscriptionRegion]
+    ) async throws -> TranscriptionOutput {
+        guard let recording = request.recordings.first else {
+            throw WhisperKitTranscriptionError.noRecording
+        }
+        let fileURL = try validatedURL(for: recording)
+        let audioFile = try AVAudioFile(forReading: fileURL)
+        let duration = TimeInterval(audioFile.length) / audioFile.fileFormat.sampleRate
+        let boundedRegions = regions.compactMap { region -> TranscriptionRegion? in
+            let start = min(duration, region.startTime)
+            let end = min(duration, region.endTime)
+            guard end > start else { return nil }
+            return TranscriptionRegion(
+                startTime: start,
+                endTime: end,
+                contextStartTime: min(duration, region.contextStartTime),
+                contextEndTime: min(duration, region.contextEndTime),
+                languageCode: region.languageCode
+            )
+        }
+        guard !boundedRegions.isEmpty else {
+            return TranscriptionOutput(segments: [])
+        }
+        let engineSegments = try await engine.transcribe(
+            audioPath: fileURL.path,
+            regions: boundedRegions,
+            contextualTerms: request.contextualTerms,
+            progressHandler: request.progressHandler
+        )
+        try Task.checkCancellation()
+        let segments = engineSegments.map { segment in
+            TranscriptSegment(
+                meetingID: request.meetingID,
+                startTime: segment.startTime,
+                endTime: segment.endTime,
+                text: segment.text,
+                sourceRecordingID: recording.id,
+                providerIdentifier: identifier,
+                localeIdentifier: segment.languageCode
+            )
+        }
+        let missingRegions = boundedRegions.filter { region in
+            !segments.contains { region.containsMidpoint(of: $0) }
+        }
+        return TranscriptionOutput(
+            segments: segments.sorted { $0.startTime < $1.startTime },
+            reviewIntervals: missingRegions.map {
+                TranscriptReviewInterval(
+                    meetingID: request.meetingID,
+                    sourceRecordingID: recording.id,
+                    startTime: $0.startTime,
+                    endTime: $0.endTime
+                )
+            }
         )
     }
 

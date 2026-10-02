@@ -34,7 +34,7 @@ struct TwinVaultApplication: App {
                 TranscriptionProfile(
                     id: "automatic.es-ca-en.experimental",
                     displayName: "Automatic ES · CA · EN (Experimental)",
-                    detail: "Detects spoken languages locally, then uses fast ES/EN or multilingual WhisperKit for the complete recording.",
+                    detail: "Uses fast ES/EN, contextual WhisperKit regions for occasional Catalan, or full WhisperKit when Catalan dominates.",
                     providerIdentifier: automatic.identifier,
                     localeIdentifiers: ["es-ES", "ca-ES", "en-US"],
                     isRecommended: true

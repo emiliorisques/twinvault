@@ -2,6 +2,42 @@
 
 Private fixtures and raw provider outputs are never committed. This document stores only aggregate measurements and engineering conclusions.
 
+## 2026-10-02 — NEO minority-Catalan regional routing
+
+The 65-minute local microphone fixture `NEO` was used to validate the Phase 2T
+decision path after its original nearly four-hour capture was safely shortened.
+It has no word-for-word human reference, so this is a routing, latency, and
+coverage diagnostic rather than a WER result. Raw hypotheses remain private and
+outside the repository.
+
+Acoustic identification found 165 Spanish windows with 99.1% mean confidence,
+seven short Catalan candidates, four low-confidence English candidates, and one
+low-confidence Portuguese candidate. The previous all-or-nothing policy sent the
+entire recording to WhisperKit. The new policy treated Catalan as minority
+evidence, retained a whole-recording Parakeet baseline, and invoked WhisperKit
+only on contextual Catalan regions.
+
+| Strategy | Runtime | Output segments | Output words |
+|---|---:|---:|---:|
+| Parakeet only | 61.7 s | 323 | 6,874 |
+| WhisperKit whole recording | 424.5 s | 855 | 7,052 |
+| Phase 2T automatic hybrid | 214.7 s | 328 | 6,882 |
+
+The hybrid output contained 321 Parakeet segments and seven WhisperKit segments
+labelled Catalan, preserving each provider as provenance. Two high-confidence
+Catalan windows produced no regional transcript and remained explicit review
+intervals; the Parakeet text was not deleted in those intervals. The hybrid was
+roughly twice as fast as whole-recording WhisperKit on this run. Human review of
+one closing Catalan passage found the regional Whisper output more plausible than
+Parakeet's Spanish-like substitutions, but this is qualitative and does not meet
+an accuracy release gate.
+
+The fixture contains only microphone audio, including weak loudspeaker pickup of
+remote participants. A Granola transcript captured a remote response that all
+local engines largely missed. This demonstrates a capture limitation, not a
+routing failure: the next representative benchmark must include TwinVault's
+separate system-audio channel.
+
 ## 2026-09-27 — mixed Catalan/Spanish/English broadcast
 
 Input was a 1,299.7-second microphone recording on Apple Silicon. Both providers received the exact same local M4A. The available reference transcript was truncated to its turn ending at 21:22, normalized to lowercase words with punctuation removed, and compared with Levenshtein word distance. Its text was not fully human-verified, so WER is directional rather than a release-quality accuracy claim.

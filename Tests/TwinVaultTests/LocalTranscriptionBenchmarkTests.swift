@@ -72,6 +72,31 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
                 modelsDirectory: modelsDirectory
             )
             localeIdentifiers = ["es-ES", "en-US"]
+        case "automatic":
+            let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
+                .map { URL(fileURLWithPath: $0) }
+                ?? FileManager.default.temporaryDirectory.appending(path: "TwinVaultBenchmarkModels")
+            try FileManager.default.createDirectory(at: modelsDirectory, withIntermediateDirectories: true)
+            let whisperEngine = LocalWhisperKitEngine(modelsDirectory: modelsDirectory)
+            let multilingual = WhisperKitSpeechToTextProvider(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                engine: whisperEngine
+            )
+            let identifier = WhisperKitAcousticLanguageIdentifier(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                engine: whisperEngine,
+                turnDetector: FixedBenchmarkSpeechTurnDetector(turns: speechTurns)
+            )
+            let fast = ParakeetSpeechToTextProvider(
+                audioDirectory: audioURL.deletingLastPathComponent(),
+                modelsDirectory: modelsDirectory
+            )
+            provider = RoutingSpeechToTextProvider(
+                languageIdentifier: identifier,
+                fastProvider: fast,
+                multilingualProvider: multilingual
+            )
+            localeIdentifiers = Meeting.defaultTranscriptionLocaleIdentifiers
         case "nemotron-auto", "nemotron-es", "nemotron-en":
             let modelsDirectory = environment["TWINVAULT_BENCHMARK_MODELS"]
                 .map { URL(fileURLWithPath: $0) }
