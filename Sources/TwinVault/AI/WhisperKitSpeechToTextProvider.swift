@@ -202,8 +202,8 @@ actor LocalWhisperKitEngine: WhisperTranscribingEngine, WhisperLanguageIdentifyi
                 audioArray: audio,
                 decodeOptions: DecodingOptions(
                     task: .transcribe,
-                    language: nil,
-                    detectLanguage: true,
+                    language: region.languageCode,
+                    detectLanguage: false,
                     skipSpecialTokens: true,
                     promptTokens: promptTokens?.isEmpty == false ? promptTokens : nil,
                     chunkingStrategy: .vad

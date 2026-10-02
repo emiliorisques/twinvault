@@ -21,25 +21,69 @@ enum LanguageAnalysisWindowPlanner {
             }
         }
 
+        // Language switches often happen at natural pauses. Preserve complete
+        // speech turns as separate evidence instead of joining every nearby
+        // turn into one dominant-language window. Only combine turns that are
+        // individually too short for dependable language identification.
         var joined: [SpeechTurn] = []
-        for candidate in candidates {
-            guard let previous = joined.last else {
-                joined.append(candidate)
-                continue
-            }
-            let silence = candidate.startTime - previous.endTime
-            let combinedDuration = candidate.endTime - previous.startTime
-            if silence <= maximumJoiningSilence, combinedDuration <= maximumDuration {
-                joined[joined.count - 1] = SpeechTurn(
-                    startTime: previous.startTime,
-                    endTime: candidate.endTime
-                )
-            } else {
-                joined.append(candidate)
-            }
+        var pendingShort: SpeechTurn?
+
+        func appendExpanded(_ turn: SpeechTurn) {
+            let missingDuration = max(0, minimumDuration - (turn.endTime - turn.startTime))
+            let expandedStart = max(0, turn.startTime - missingDuration / 2)
+            let remaining = max(0, minimumDuration - (turn.endTime - expandedStart))
+            joined.append(SpeechTurn(
+                startTime: expandedStart,
+                endTime: turn.endTime + remaining
+            ))
         }
 
-        return joined.filter { $0.endTime - $0.startTime >= minimumDuration }
+        for candidate in candidates {
+            if candidate.endTime - candidate.startTime >= minimumDuration {
+                if let pending = pendingShort {
+                    let silence = candidate.startTime - pending.endTime
+                    let combinedDuration = candidate.endTime - pending.startTime
+                    if silence <= maximumJoiningSilence, combinedDuration <= maximumDuration {
+                        joined.append(SpeechTurn(
+                            startTime: pending.startTime,
+                            endTime: candidate.endTime
+                        ))
+                    } else {
+                        appendExpanded(pending)
+                        joined.append(candidate)
+                    }
+                    pendingShort = nil
+                } else {
+                    joined.append(candidate)
+                }
+                continue
+            }
+
+            guard let pending = pendingShort else {
+                pendingShort = candidate
+                continue
+            }
+            let silence = candidate.startTime - pending.endTime
+            let combinedDuration = candidate.endTime - pending.startTime
+            if silence <= maximumJoiningSilence, combinedDuration <= maximumDuration {
+                let combined = SpeechTurn(
+                    startTime: pending.startTime,
+                    endTime: candidate.endTime
+                )
+                if combined.endTime - combined.startTime >= minimumDuration {
+                    joined.append(combined)
+                    pendingShort = nil
+                } else {
+                    pendingShort = combined
+                }
+            } else {
+                appendExpanded(pending)
+                pendingShort = candidate
+            }
+        }
+        if let pendingShort { appendExpanded(pendingShort) }
+
+        return joined
     }
 }
 

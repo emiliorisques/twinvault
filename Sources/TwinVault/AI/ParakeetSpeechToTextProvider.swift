@@ -49,7 +49,10 @@ enum ParakeetSegmenter {
         words: [ParakeetTimedWord],
         fallbackText: String,
         audioDuration: TimeInterval,
-        maximumDuration: TimeInterval = 12,
+        // Segmentation happens after whole-file recognition. Short evidence
+        // chunks make regional language replacement precise without feeding
+        // small, context-poor audio fragments into either ASR model.
+        maximumDuration: TimeInterval = 3,
         pauseBoundary: TimeInterval = 0.8,
         maximumWords: Int = 32
     ) -> [ParakeetEngineSegment] {

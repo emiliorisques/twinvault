@@ -181,6 +181,26 @@ final class WhisperKitSpeechToTextProviderTests: XCTestCase {
 }
 
 final class ParakeetSpeechToTextProviderTests: XCTestCase {
+    func testDefaultSegmenterBoundsContinuousEvidenceChunks() {
+        let words = (0..<8).map { index in
+            ParakeetTimedWord(
+                text: "w\(index)",
+                startTime: Double(index) * 0.5,
+                endTime: Double(index) * 0.5 + 0.4
+            )
+        }
+
+        let segments = ParakeetSegmenter.segments(
+            words: words,
+            fallbackText: "",
+            audioDuration: 4
+        )
+
+        XCTAssertEqual(segments.count, 2)
+        XCTAssertLessThanOrEqual(segments[0].endTime - segments[0].startTime, 3)
+        XCTAssertLessThanOrEqual(segments[1].endTime - segments[1].startTime, 3)
+    }
+
     func testSegmenterCreatesTimestampedEvidenceChunks() {
         let segments = ParakeetSegmenter.segments(
             words: [
@@ -418,6 +438,33 @@ final class NemotronSpeechToTextProviderTests: XCTestCase {
 }
 
 final class AcousticLanguageRoutingTests: XCTestCase {
+    func testEnergyDetectorKeepsQuietSpeechBelowPreviousAbsoluteFloor() throws {
+        let url = FileManager.default.temporaryDirectory
+            .appending(path: "quiet-speech-\(UUID().uuidString).caf")
+        defer { try? FileManager.default.removeItem(at: url) }
+
+        let sampleRate = 16_000.0
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
+        let frameCount = AVAudioFrameCount(sampleRate * 3)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount)!
+        buffer.frameLength = frameCount
+        let samples = buffer.floatChannelData![0]
+        for frame in 0..<Int(frameCount) {
+            let time = Double(frame) / sampleRate
+            samples[frame] = time >= 1 && time < 2
+                ? Float(0.004 * sin(2 * Double.pi * 220 * time))
+                : 0
+        }
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        try file.write(from: buffer)
+
+        let turns = try LocalEnergySpeechTurnDetector().detectTurns(in: url)
+
+        XCTAssertEqual(turns.count, 1)
+        XCTAssertLessThanOrEqual(turns[0].startTime, 1)
+        XCTAssertGreaterThanOrEqual(turns[0].endTime, 2)
+    }
+
     func testWindowPlannerJoinsNearbySpeechAndBoundsLongRegions() {
         let windows = LanguageAnalysisWindowPlanner.windows(for: [
             SpeechTurn(startTime: 0, endTime: 1),

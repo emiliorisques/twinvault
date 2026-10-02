@@ -6,7 +6,10 @@ struct SpeechTurnDetectionConfiguration: Equatable, Sendable {
     var minimumSpeechDuration: TimeInterval = 0.20
     var maximumInternalSilence: TimeInterval = 0.50
     var padding: TimeInterval = 0.15
-    var minimumThresholdDB: Double = -48
+    // Quiet laptop microphones can place valid speech below -48 dBFS. Keep the
+    // adaptive noise-floor margin, but do not clamp it high enough to erase
+    // low-level speech before language identification.
+    var minimumThresholdDB: Double = -60
     var maximumThresholdDB: Double = -25
     var noiseMarginDB: Double = 10
 }

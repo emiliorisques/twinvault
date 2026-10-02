@@ -329,3 +329,20 @@ Decision: do not register Nemotron as a product profile and do not use it for la
 identification. Keep the adapter as a reproducible evaluation boundary. The current
 automatic policy remains independent acoustic LID, Parakeet for confident ES/EN, and
 whole-recording WhisperKit for Catalan or uncertainty.
+
+## 2026-10-02 — Quiet brief Catalan switch regression
+
+The private `test 2 oct` microphone fixture contains about twenty seconds of speech:
+Spanish, one brief Catalan turn, then Spanish. The first automatic run analyzed only
+the louder first half, classified the recording as Spanish, and used Parakeet alone.
+The omitted Catalan turn measured roughly -53 dBFS mean level. A temporary +20 dB
+diagnostic copy identified the isolated turn as Catalan with 90.2% confidence, proving
+that the language model could classify it and that the energy gate was the failure.
+
+After lowering the adaptive detector floor, preserving complete language turns, and
+forcing Catalan only for the regional decode, the original unmodified audio identified
+`00:14.35–00:16.50` as Catalan with 97.7% confidence. The final automatic run completed
+in 14.5 seconds with no review intervals: Parakeet retained the Spanish evidence and
+WhisperKit produced `Por ejemplo, ahora parlo un trozo en catalán.` with `ca` provenance.
+The system-audio channel contained no detected speech. This is a targeted regression
+result, not a WER claim; the fixture still needs a word-for-word human reference.
