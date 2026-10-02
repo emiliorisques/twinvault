@@ -166,6 +166,7 @@ struct TranscriptionOutput: Equatable, Sendable {
 struct TranscriptReviewInterval: Identifiable, Codable, Equatable, Sendable {
     enum Reason: String, Codable, Sendable {
         case longUntranscribedInterval
+        case regionalLanguageVerificationFailed
     }
 
     let id: UUID

@@ -749,6 +749,10 @@ final class AcousticLanguageRoutingTests: XCTestCase {
         XCTAssertEqual(output.reviewIntervals.count, 1)
         XCTAssertEqual(output.reviewIntervals.first?.startTime, 80)
         XCTAssertEqual(output.reviewIntervals.first?.endTime, 90)
+        XCTAssertEqual(
+            output.reviewIntervals.first?.reason,
+            .regionalLanguageVerificationFailed
+        )
     }
 }
 

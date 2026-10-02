@@ -239,11 +239,17 @@ struct MeetingDetailView: View {
                 } else {
                     if !meeting.transcriptReviewIntervals.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
-                            Label("Review transcript coverage", systemImage: "exclamationmark.triangle.fill")
+                            Label("Review transcript", systemImage: "exclamationmark.triangle.fill")
                                 .fontWeight(.semibold)
                             ForEach(meeting.transcriptReviewIntervals) { interval in
-                                Text("No transcript from \(duration(interval.startTime)) to \(duration(interval.endTime)); this may be silence or missed speech.")
-                                    .font(.caption)
+                                switch interval.reason {
+                                case .longUntranscribedInterval:
+                                    Text("No transcript from \(duration(interval.startTime)) to \(duration(interval.endTime)); this may be silence or missed speech.")
+                                        .font(.caption)
+                                case .regionalLanguageVerificationFailed:
+                                    Text("Catalan was detected from \(duration(interval.startTime)) to \(duration(interval.endTime)), but the Catalan verification pass returned no replacement. The fast transcript was retained.")
+                                        .font(.caption)
+                                }
                             }
                         }
                         .foregroundStyle(.orange)

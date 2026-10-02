@@ -402,7 +402,8 @@ actor RoutingSpeechToTextProvider: SpeechToTextProvider {
                         meetingID: request.meetingID,
                         sourceRecordingID: recording.id,
                         startTime: $0.startTime,
-                        endTime: $0.endTime
+                        endTime: $0.endTime,
+                        reason: .regionalLanguageVerificationFailed
                     )
                 },
                 unavailableLocaleIdentifiers: fastOutput.unavailableLocaleIdentifiers
@@ -415,19 +416,33 @@ actor RoutingSpeechToTextProvider: SpeechToTextProvider {
         let retainedFast = fastOutput.segments.filter { segment in
             !successfulRegions.contains { $0.containsMidpoint(of: segment) }
         }
-        let failedRegionReviews = regions
-            .filter { !successfulRegions.contains($0) }
+        let failedRegions = regions.filter { !successfulRegions.contains($0) }
+        let normalizedRegionalReviews = regionalOutput.reviewIntervals.map { interval in
+            guard failedRegions.contains(where: {
+                interval.startTime < $0.endTime && interval.endTime > $0.startTime
+            }) else { return interval }
+            return TranscriptReviewInterval(
+                id: interval.id,
+                meetingID: interval.meetingID,
+                sourceRecordingID: interval.sourceRecordingID,
+                startTime: interval.startTime,
+                endTime: interval.endTime,
+                reason: .regionalLanguageVerificationFailed
+            )
+        }
+        let failedRegionReviews = failedRegions
             .map {
                 TranscriptReviewInterval(
                     meetingID: request.meetingID,
                     sourceRecordingID: recording.id,
                     startTime: $0.startTime,
-                    endTime: $0.endTime
+                    endTime: $0.endTime,
+                    reason: .regionalLanguageVerificationFailed
                 )
             }
         let reviewIntervals = deduplicatedReviewIntervals(
             fastOutput.reviewIntervals
-                + regionalOutput.reviewIntervals
+                + normalizedRegionalReviews
                 + failedRegionReviews
         )
         return TranscriptionOutput(
