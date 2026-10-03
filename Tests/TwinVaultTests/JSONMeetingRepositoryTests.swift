@@ -70,7 +70,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 9)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 10)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -101,6 +101,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             microphoneSegmentID: segment.id,
             systemAudioSegmentIDs: [UUID()],
             textSimilarity: 0.91,
+            acousticSimilarity: 0.86,
             timelineOverlap: 0.88
         )
         let alignment = ChannelAlignmentEstimate(

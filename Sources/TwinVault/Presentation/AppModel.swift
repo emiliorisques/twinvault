@@ -30,6 +30,7 @@ final class AppModel {
     private let audioDirectory: URL
     private let speechTurnDetector: any SpeechTurnDetecting
     private let channelAlignmentAnalyzer: any AudioChannelAlignmentAnalyzing
+    private let acousticLeakageAnalyzer: any AcousticPlaybackLeakageAnalyzing
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
     private(set) var meetings: [Meeting] = []
@@ -66,7 +67,8 @@ final class AppModel {
         speechToText: any SpeechToTextProvider,
         audioDirectory: URL,
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
-        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil
+        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
+        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil
     ) {
         self.repository = repository
         self.audio = audio
@@ -90,6 +92,8 @@ final class AppModel {
         self.speechTurnDetector = speechTurnDetector
         self.channelAlignmentAnalyzer = channelAlignmentAnalyzer
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
+        self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
+            ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
     }
 
     init(
@@ -101,7 +105,8 @@ final class AppModel {
         transcriptionProfiles: [TranscriptionProfile]? = nil,
         audioDirectory: URL,
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
-        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil
+        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
+        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
         self.repository = repository
@@ -133,6 +138,8 @@ final class AppModel {
         self.speechTurnDetector = speechTurnDetector
         self.channelAlignmentAnalyzer = channelAlignmentAnalyzer
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
+        self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
+            ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
     }
 
     func load() async {
@@ -303,6 +310,12 @@ final class AppModel {
             meeting.updatedAt = .now
             try await repository.save(meeting)
             await load()
+            var crossChannelAnalysisError: String?
+            do {
+                try await updateAlignmentAndFindings(meetingID: meetingID)
+            } catch {
+                crossChannelAnalysisError = "The transcript was saved, but cross-channel analysis could not finish. \(error.localizedDescription)"
+            }
             if !output.unavailableLocaleIdentifiers.isEmpty {
                 let labels = output.unavailableLocaleIdentifiers.map(Self.languageLabel).joined(separator: ", ")
                 errorMessage = "Transcription completed, but these language models were unavailable: \(labels). You can try again later."
@@ -312,6 +325,8 @@ final class AppModel {
                 errorMessage = "Transcription completed. Catalan was detected, but its verification pass returned no replacement; the fast transcript was retained and marked for review."
             } else if !output.reviewIntervals.isEmpty {
                 errorMessage = "Transcription completed, but some long audio intervals contain no transcript. They are marked for review and must not be treated as complete evidence."
+            } else if let crossChannelAnalysisError {
+                errorMessage = crossChannelAnalysisError
             }
         } catch is CancellationError {
             // Cancellation is a user action, not an application error. Existing
@@ -374,16 +389,8 @@ final class AppModel {
             }
         }
 
-        do {
-            try Task.checkCancellation()
-            try await updateAlignmentAndFindings(meetingID: meetingID)
-            if !skippedChannels.isEmpty, errorMessage == nil {
-                errorMessage = "No speech was detected in \(skippedChannels.joined(separator: ", ")); that channel was safely skipped."
-            }
-        } catch is CancellationError {
-            return
-        } catch {
-            errorMessage = error.localizedDescription
+        if !skippedChannels.isEmpty, errorMessage == nil {
+            errorMessage = "No speech was detected in \(skippedChannels.joined(separator: ", ")); that channel was safely skipped."
         }
     }
 
@@ -394,6 +401,27 @@ final class AppModel {
         transcriptionTask = Task { @MainActor [weak self] in
             defer { self?.transcriptionTask = nil }
             await self?.transcribeMeeting(meetingID: meetingID, profileID: profileID)
+        }
+    }
+
+    func startChannelAnalysis(meetingID: UUID) {
+        guard transcriptionTask == nil, transcriptionActivity == nil,
+              transcribingMeetingID == nil else { return }
+        errorMessage = nil
+        transcriptionTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.transcribingMeetingID = meetingID
+            defer {
+                self.transcribingMeetingID = nil
+                self.transcriptionTask = nil
+            }
+            do {
+                try await self.updateAlignmentAndFindings(meetingID: meetingID)
+            } catch is CancellationError {
+                return
+            } catch {
+                self.errorMessage = error.localizedDescription
+            }
         }
     }
 
@@ -442,11 +470,24 @@ final class AppModel {
         } else {
             meeting.channelAlignmentEstimate = nil
         }
+        var acousticSimilarities: [UUID: Double] = [:]
+        if let microphone, let systemAudio,
+           let alignment = meeting.channelAlignmentEstimate {
+            acousticSimilarities = (try? await acousticLeakageAnalyzer.similarities(
+                microphone: microphone,
+                systemAudio: systemAudio,
+                microphoneSegments: meeting.transcriptSegments.filter {
+                    $0.sourceRecordingID == microphone.id
+                },
+                alignment: alignment
+            )) ?? [:]
+        }
         meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
             meetingID: meeting.id,
             recordings: meeting.audioRecordings,
             segments: meeting.transcriptSegments,
-            alignment: meeting.channelAlignmentEstimate
+            alignment: meeting.channelAlignmentEstimate,
+            acousticSimilarities: acousticSimilarities
         )
         meeting.updatedAt = .now
         try await repository.save(meeting)

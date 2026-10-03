@@ -252,7 +252,8 @@ final class AppModelTests: XCTestCase {
             ),
             audioDirectory: directory,
             speechTurnDetector: FixedSpeechTurnDetector(hasSpeech: true),
-            channelAlignmentAnalyzer: FixedChannelAlignmentAnalyzer(estimate: alignment)
+            channelAlignmentAnalyzer: FixedChannelAlignmentAnalyzer(estimate: alignment),
+            acousticLeakageAnalyzer: FixedAcousticLeakageAnalyzer(similarity: 0.91)
         )
         await model.load()
 
@@ -262,7 +263,64 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments.count, 2)
         XCTAssertEqual(stored?.channelAlignmentEstimate, alignment)
         XCTAssertEqual(stored?.crossChannelTranscriptFindings.count, 1)
+        XCTAssertEqual(stored?.crossChannelTranscriptFindings.first?.acousticSimilarity, 0.91)
         XCTAssertNil(model.transcribingMeetingID)
+    }
+
+    func testSeparateChannelTranscriptionsRefreshAlignmentAutomatically() async throws {
+        let directory = testAudioDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        try Data([0]).write(to: directory.appending(path: microphone.relativePath))
+        try Data([0]).write(to: directory.appending(path: system.relativePath))
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Separate transcription",
+            audioRecordings: [microphone, system],
+            status: .completed
+        ))
+        let alignment = ChannelAlignmentEstimate(
+            microphoneDelayAtStart: 0.1,
+            driftSecondsPerHour: 0,
+            confidence: 0.9,
+            anchors: [ChannelAlignmentAnchor(
+                meetingTime: 1,
+                microphoneDelay: 0.1,
+                correlation: 0.9
+            )]
+        )
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(
+                transcript: "This sentence came from the speakers"
+            ),
+            audioDirectory: directory,
+            channelAlignmentAnalyzer: FixedChannelAlignmentAnalyzer(estimate: alignment),
+            acousticLeakageAnalyzer: FixedAcousticLeakageAnalyzer(similarity: 0.88)
+        )
+        await model.load()
+
+        await model.transcribe(meetingID: meetingID, recordingID: microphone.id)
+        await model.transcribe(meetingID: meetingID, recordingID: system.id)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.channelAlignmentEstimate, alignment)
+        XCTAssertEqual(stored?.crossChannelTranscriptFindings.first?.acousticSimilarity, 0.88)
     }
 
     func testTranscribeMeetingSkipsSilentChannel() async throws {
@@ -644,6 +702,19 @@ private struct FixedChannelAlignmentAnalyzer: AudioChannelAlignmentAnalyzing {
         systemAudio: AudioRecordingReference
     ) async throws -> ChannelAlignmentEstimate? {
         estimate
+    }
+}
+
+private struct FixedAcousticLeakageAnalyzer: AcousticPlaybackLeakageAnalyzing {
+    let similarity: Double
+
+    func similarities(
+        microphone: AudioRecordingReference,
+        systemAudio: AudioRecordingReference,
+        microphoneSegments: [TranscriptSegment],
+        alignment: ChannelAlignmentEstimate
+    ) async throws -> [UUID: Double] {
+        Dictionary(uniqueKeysWithValues: microphoneSegments.map { ($0.id, similarity) })
     }
 }
 

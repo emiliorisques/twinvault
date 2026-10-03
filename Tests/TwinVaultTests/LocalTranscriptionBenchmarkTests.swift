@@ -19,13 +19,16 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             XCTFail("Both private fixture channels must be in the same directory.")
             return
         }
-        let meetingID = UUID()
-        let microphone = AudioRecordingReference(
+        let fixtureMeeting = try loadMeetingIfConfigured(environment: environment)
+        let meetingID = fixtureMeeting?.id ?? UUID()
+        let microphone = fixtureMeeting?.audioRecordings.first(where: { $0.channel == .microphone })
+            ?? AudioRecordingReference(
             meetingID: meetingID,
             relativePath: microphoneURL.lastPathComponent,
             meetingTimelineOffset: 0
         )
-        let systemAudio = AudioRecordingReference(
+        let systemAudio = fixtureMeeting?.audioRecordings.first(where: { $0.channel == .systemAudio })
+            ?? AudioRecordingReference(
             meetingID: meetingID,
             relativePath: systemAudioURL.lastPathComponent,
             channel: .systemAudio,
@@ -39,9 +42,33 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
             microphone: microphone,
             systemAudio: systemAudio
         )
+        var acousticSimilarities: [UUID: Double] = [:]
+        var findings: [CrossChannelTranscriptFinding] = []
+        if let estimate,
+           let fixtureMeeting {
+            acousticSimilarities = try await LocalAcousticPlaybackLeakageAnalyzer(
+                audioDirectory: microphoneURL.deletingLastPathComponent()
+            ).similarities(
+                microphone: microphone,
+                systemAudio: systemAudio,
+                microphoneSegments: fixtureMeeting.transcriptSegments.filter {
+                    $0.sourceRecordingID == microphone.id
+                },
+                alignment: estimate
+            )
+            findings = CrossChannelTranscriptReconciler().findings(
+                meetingID: fixtureMeeting.id,
+                recordings: fixtureMeeting.audioRecordings,
+                segments: fixtureMeeting.transcriptSegments,
+                alignment: estimate,
+                acousticSimilarities: acousticSimilarities
+            )
+        }
         try write(ChannelAlignmentBenchmarkResult(
             elapsedSeconds: startedAt.duration(to: .now).seconds,
-            estimate: estimate
+            estimate: estimate,
+            acousticSimilarities: acousticSimilarities,
+            findings: findings
         ), to: URL(fileURLWithPath: outputPath).standardizedFileURL)
     }
 
@@ -199,6 +226,19 @@ final class LocalTranscriptionBenchmarkTests: XCTestCase {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(result).write(to: url, options: .atomic)
     }
+
+    private func loadMeetingIfConfigured(environment: [String: String]) throws -> Meeting? {
+        guard let storePath = environment["TWINVAULT_ALIGNMENT_MEETING_STORE"],
+              let meetingIDValue = environment["TWINVAULT_ALIGNMENT_MEETING_ID"],
+              let meetingID = UUID(uuidString: meetingIDValue) else { return nil }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let store = try decoder.decode(
+            PrivateMeetingStore.self,
+            from: Data(contentsOf: URL(fileURLWithPath: storePath))
+        )
+        return store.meetings.first { $0.id == meetingID }
+    }
 }
 
 private struct BenchmarkResult: Codable {
@@ -221,6 +261,12 @@ private struct LanguageIdentificationBenchmarkResult: Codable {
 private struct ChannelAlignmentBenchmarkResult: Codable {
     let elapsedSeconds: Double
     let estimate: ChannelAlignmentEstimate?
+    let acousticSimilarities: [UUID: Double]
+    let findings: [CrossChannelTranscriptFinding]
+}
+
+private struct PrivateMeetingStore: Decodable {
+    let meetings: [Meeting]
 }
 
 private struct FixedBenchmarkSpeechTurnDetector: SpeechTurnDetecting {

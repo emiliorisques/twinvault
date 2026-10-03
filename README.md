@@ -85,6 +85,8 @@ Phase 2U hardens that hybrid against quiet microphones and brief language change
 
 Phase 2V adds one post-meeting `Transcribe Meeting` action. It checks each saved channel for speech, safely skips silent channels, transcribes useful microphone and system-audio files sequentially with the selected local profile, and then calculates acoustic alignment. Only reliable alignment estimates are persisted and used to improve the existing possible-playback warning. Both transcripts remain separate evidence; no text is deleted, fused, or attributed to the user merely because it came from the microphone.
 
+Phase 2W makes that protection independent of ASR wording. Reliable channel alignment accounts for each recorder's actual meeting start offset, then compares aligned 100 ms acoustic envelopes for every microphone transcript segment. Strong text or acoustic agreement can create an inspectable playback-leakage finding; weak evidence fails closed. Meeting detail defaults to a derived `Conversation` view that hides only flagged microphone duplicates and offers `Raw Channels` to inspect every original segment. No evidence is deleted or copied, and unflagged microphone speech still does not imply the user's identity.
+
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
 
 ## Current boundaries

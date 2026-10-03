@@ -13,6 +13,7 @@ struct CrossChannelTranscriptFinding: Identifiable, Codable, Equatable, Sendable
     let microphoneSegmentID: UUID
     let systemAudioSegmentIDs: [UUID]
     let textSimilarity: Double
+    let acousticSimilarity: Double?
     let timelineOverlap: Double
 
     init(
@@ -22,6 +23,7 @@ struct CrossChannelTranscriptFinding: Identifiable, Codable, Equatable, Sendable
         microphoneSegmentID: UUID,
         systemAudioSegmentIDs: [UUID],
         textSimilarity: Double,
+        acousticSimilarity: Double? = nil,
         timelineOverlap: Double
     ) {
         self.id = id
@@ -30,6 +32,7 @@ struct CrossChannelTranscriptFinding: Identifiable, Codable, Equatable, Sendable
         self.microphoneSegmentID = microphoneSegmentID
         self.systemAudioSegmentIDs = systemAudioSegmentIDs
         self.textSimilarity = min(1, max(0, textSimilarity))
+        self.acousticSimilarity = acousticSimilarity.map { min(1, max(0, $0)) }
         self.timelineOverlap = min(1, max(0, timelineOverlap))
     }
 }
@@ -59,17 +62,20 @@ struct SpeakerAttributionPolicy: Sendable {
 struct CrossChannelTranscriptReconciler: Sendable {
     private let minimumWordCount: Int
     private let minimumTextSimilarity: Double
+    private let minimumAcousticSimilarity: Double
     private let minimumTimelineOverlap: Double
     private let timingTolerance: TimeInterval
 
     init(
         minimumWordCount: Int = 4,
         minimumTextSimilarity: Double = 0.78,
+        minimumAcousticSimilarity: Double = 0.75,
         minimumTimelineOverlap: Double = 0.55,
         timingTolerance: TimeInterval = 0.75
     ) {
         self.minimumWordCount = max(1, minimumWordCount)
         self.minimumTextSimilarity = min(1, max(0, minimumTextSimilarity))
+        self.minimumAcousticSimilarity = min(1, max(0, minimumAcousticSimilarity))
         self.minimumTimelineOverlap = min(1, max(0, minimumTimelineOverlap))
         self.timingTolerance = max(0, timingTolerance)
     }
@@ -78,7 +84,8 @@ struct CrossChannelTranscriptReconciler: Sendable {
         meetingID: UUID,
         recordings: [AudioRecordingReference],
         segments: [TranscriptSegment],
-        alignment: ChannelAlignmentEstimate? = nil
+        alignment: ChannelAlignmentEstimate? = nil,
+        acousticSimilarities: [UUID: Double] = [:]
     ) -> [CrossChannelTranscriptFinding] {
         let recordingsByID = Dictionary(
             recordings.map { ($0.id, $0) },
@@ -113,13 +120,18 @@ struct CrossChannelTranscriptReconciler: Sendable {
 
             let microphoneWords = Self.words(in: microphoneSegment.text)
             let systemWords = Self.words(in: candidates.map(\.text).joined(separator: " "))
-            guard microphoneWords.count >= minimumWordCount,
-                  systemWords.count >= minimumWordCount else { return nil }
-            let similarity = Self.containedSequenceSimilarity(
-                microphoneWords,
-                systemWords
-            )
-            guard similarity >= minimumTextSimilarity else { return nil }
+            let textSimilarity: Double
+            if microphoneWords.count >= minimumWordCount,
+               systemWords.count >= minimumWordCount {
+                textSimilarity = Self.containedSequenceSimilarity(microphoneWords, systemWords)
+            } else {
+                textSimilarity = 0
+            }
+            let acousticSimilarity = acousticSimilarities[microphoneSegment.id]
+            guard textSimilarity >= minimumTextSimilarity
+                    || acousticSimilarity.map({ $0 >= minimumAcousticSimilarity }) == true else {
+                return nil
+            }
             let timelineScore = candidates.compactMap {
                 timelineInterval(for: $0, recordingsByID: recordingsByID, alignment: alignment)
             }.map {
@@ -130,7 +142,8 @@ struct CrossChannelTranscriptReconciler: Sendable {
                 meetingID: meetingID,
                 microphoneSegmentID: microphoneSegment.id,
                 systemAudioSegmentIDs: candidates.map(\.id),
-                textSimilarity: similarity,
+                textSimilarity: textSimilarity,
+                acousticSimilarity: acousticSimilarity,
                 timelineOverlap: timelineScore
             )
         }
@@ -202,5 +215,37 @@ struct CrossChannelTranscriptReconciler: Sendable {
             previous = current
         }
         return Double(previous.last ?? 0) / Double(max(1, min(left.count, right.count)))
+    }
+}
+
+/// A read-only contextual view over the original transcript evidence. Possible
+/// microphone playback duplicates are hidden, never deleted or copied.
+struct MeetingConversationTranscript: Sendable {
+    func segments(
+        recordings: [AudioRecordingReference],
+        segments: [TranscriptSegment],
+        findings: [CrossChannelTranscriptFinding]
+    ) -> [TranscriptSegment] {
+        let hiddenMicrophoneIDs = Set(findings.map(\.microphoneSegmentID))
+        let recordingsByID = Dictionary(
+            recordings.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        return segments.filter { !hiddenMicrophoneIDs.contains($0.id) }.sorted {
+            timelineStart($0, recordingsByID: recordingsByID)
+                < timelineStart($1, recordingsByID: recordingsByID)
+        }
+    }
+
+    private func timelineStart(
+        _ segment: TranscriptSegment,
+        recordingsByID: [UUID: AudioRecordingReference]
+    ) -> TimeInterval {
+        guard let recordingID = segment.sourceRecordingID,
+              let recording = recordingsByID[recordingID] else {
+            return segment.startTime
+        }
+        return recording.meetingTimelineTime(forRecordingTime: segment.startTime)
+            ?? segment.startTime
     }
 }

@@ -27,6 +27,26 @@ struct ChannelAlignmentEstimate: Codable, Equatable, Sendable {
     func microphoneDelay(at meetingTime: TimeInterval) -> TimeInterval {
         microphoneDelayAtStart + (driftSecondsPerHour * meetingTime / 3_600)
     }
+
+    func adjustedForTimelineOffsets(
+        microphone: TimeInterval?,
+        systemAudio: TimeInterval?
+    ) -> ChannelAlignmentEstimate {
+        guard let microphone, let systemAudio else { return self }
+        let correction = microphone - systemAudio
+        return ChannelAlignmentEstimate(
+            microphoneDelayAtStart: microphoneDelayAtStart + correction,
+            driftSecondsPerHour: driftSecondsPerHour,
+            confidence: confidence,
+            anchors: anchors.map {
+                ChannelAlignmentAnchor(
+                    meetingTime: $0.meetingTime + systemAudio,
+                    microphoneDelay: $0.microphoneDelay + correction,
+                    correlation: $0.correlation
+                )
+            }
+        )
+    }
 }
 
 struct ChannelAlignmentEstimator: Sendable {
@@ -254,7 +274,161 @@ struct LocalAudioChannelAlignmentAnalyzer: AudioChannelAlignmentAnalyzing, Senda
         return try await Task.detached(priority: .utility) {
             let systemFingerprint = try extractor.extract(from: systemAudioURL)
             let microphoneFingerprint = try extractor.extract(from: microphoneURL)
-            return estimator.estimate(systemAudio: systemFingerprint, microphone: microphoneFingerprint)
+            guard let fileEstimate = estimator.estimate(
+                systemAudio: systemFingerprint,
+                microphone: microphoneFingerprint
+            ) else { return nil }
+            return fileEstimate.adjustedForTimelineOffsets(
+                microphone: microphone.meetingTimelineOffset,
+                systemAudio: systemAudio.meetingTimelineOffset
+            )
+        }.value
+    }
+
+    private func localURL(for recording: AudioRecordingReference) throws -> URL {
+        guard recording.relativePath == URL(fileURLWithPath: recording.relativePath).lastPathComponent else {
+            throw AudioChannelAlignmentError.invalidRecordingReference
+        }
+        let root = audioDirectory.standardizedFileURL
+        let url = root.appending(path: recording.relativePath).standardizedFileURL
+        guard url.deletingLastPathComponent() == root else {
+            throw AudioChannelAlignmentError.invalidRecordingReference
+        }
+        return url
+    }
+}
+
+protocol AcousticPlaybackLeakageAnalyzing: Sendable {
+    func similarities(
+        microphone: AudioRecordingReference,
+        systemAudio: AudioRecordingReference,
+        microphoneSegments: [TranscriptSegment],
+        alignment: ChannelAlignmentEstimate
+    ) async throws -> [UUID: Double]
+}
+
+struct AlignedAcousticSimilarityEstimator: Sendable {
+    var minimumComparedFrames = 15
+    var searchTolerance: TimeInterval = 0.2
+
+    func similarities(
+        microphone: AudioEnergyFingerprint,
+        systemAudio: AudioEnergyFingerprint,
+        microphoneSegments: [TranscriptSegment],
+        microphoneTimelineOffset: TimeInterval,
+        systemTimelineOffset: TimeInterval,
+        alignment: ChannelAlignmentEstimate
+    ) -> [UUID: Double] {
+        guard microphone.frameDuration > 0,
+              abs(microphone.frameDuration - systemAudio.frameDuration) < 0.000_001 else {
+            return [:]
+        }
+        let frameDuration = microphone.frameDuration
+        let toleranceFrames = max(0, Int((searchTolerance / frameDuration).rounded()))
+        var result: [UUID: Double] = [:]
+
+        for segment in microphoneSegments {
+            let microphoneStartFrame = max(0, Int((segment.startTime / frameDuration).rounded(.down)))
+            let microphoneEndFrame = min(
+                microphone.values.count,
+                Int((segment.endTime / frameDuration).rounded(.up))
+            )
+            guard microphoneEndFrame - microphoneStartFrame >= minimumComparedFrames else { continue }
+
+            let observedMeetingTime = microphoneTimelineOffset + segment.startTime
+            let sourceMeetingTime = observedMeetingTime - alignment.microphoneDelay(at: observedMeetingTime)
+            let expectedSystemStart = sourceMeetingTime - systemTimelineOffset
+            let expectedSystemStartFrame = Int((expectedSystemStart / frameDuration).rounded())
+            var best: Double?
+            for adjustment in (-toleranceFrames)...toleranceFrames {
+                let systemStartFrame = expectedSystemStartFrame + adjustment
+                guard let similarity = correlation(
+                    microphone: microphone.values,
+                    systemAudio: systemAudio.values,
+                    microphoneRange: microphoneStartFrame..<microphoneEndFrame,
+                    systemStartFrame: systemStartFrame
+                ) else { continue }
+                best = max(best ?? -1, similarity)
+            }
+            if let best { result[segment.id] = min(1, max(0, best)) }
+        }
+        return result
+    }
+
+    private func correlation(
+        microphone: [Float],
+        systemAudio: [Float],
+        microphoneRange: Range<Int>,
+        systemStartFrame: Int
+    ) -> Double? {
+        let microphoneLower = max(microphoneRange.lowerBound, microphoneRange.lowerBound - systemStartFrame)
+        let microphoneUpper = min(
+            microphoneRange.upperBound,
+            microphoneRange.lowerBound + systemAudio.count - systemStartFrame
+        )
+        let count = microphoneUpper - microphoneLower
+        guard count >= minimumComparedFrames else { return nil }
+        let systemLower = systemStartFrame + microphoneLower - microphoneRange.lowerBound
+
+        var microphoneSum = 0.0
+        var systemSum = 0.0
+        for offset in 0..<count {
+            microphoneSum += Double(microphone[microphoneLower + offset])
+            systemSum += Double(systemAudio[systemLower + offset])
+        }
+        let microphoneMean = microphoneSum / Double(count)
+        let systemMean = systemSum / Double(count)
+        var covariance = 0.0
+        var microphoneVariance = 0.0
+        var systemVariance = 0.0
+        for offset in 0..<count {
+            let microphoneValue = Double(microphone[microphoneLower + offset]) - microphoneMean
+            let systemValue = Double(systemAudio[systemLower + offset]) - systemMean
+            covariance += microphoneValue * systemValue
+            microphoneVariance += microphoneValue * microphoneValue
+            systemVariance += systemValue * systemValue
+        }
+        let denominator = sqrt(microphoneVariance * systemVariance)
+        guard denominator > 0.000_000_1 else { return nil }
+        return covariance / denominator
+    }
+}
+
+struct LocalAcousticPlaybackLeakageAnalyzer: AcousticPlaybackLeakageAnalyzing, Sendable {
+    let audioDirectory: URL
+    var extractor = LocalAudioEnergyFingerprintExtractor()
+    var estimator = AlignedAcousticSimilarityEstimator()
+
+    func similarities(
+        microphone: AudioRecordingReference,
+        systemAudio: AudioRecordingReference,
+        microphoneSegments: [TranscriptSegment],
+        alignment: ChannelAlignmentEstimate
+    ) async throws -> [UUID: Double] {
+        guard microphone.meetingID == systemAudio.meetingID else {
+            throw AudioChannelAlignmentError.recordingsDoNotBelongTogether
+        }
+        guard microphone.channel == .microphone, systemAudio.channel == .systemAudio else {
+            throw AudioChannelAlignmentError.requiredChannelsMissing
+        }
+        guard let microphoneOffset = microphone.meetingTimelineOffset,
+              let systemOffset = systemAudio.meetingTimelineOffset else { return [:] }
+        let microphoneURL = try localURL(for: microphone)
+        let systemAudioURL = try localURL(for: systemAudio)
+        let extractor = self.extractor
+        let estimator = self.estimator
+
+        return try await Task.detached(priority: .utility) {
+            let microphoneFingerprint = try extractor.extract(from: microphoneURL)
+            let systemFingerprint = try extractor.extract(from: systemAudioURL)
+            return estimator.similarities(
+                microphone: microphoneFingerprint,
+                systemAudio: systemFingerprint,
+                microphoneSegments: microphoneSegments,
+                microphoneTimelineOffset: microphoneOffset,
+                systemTimelineOffset: systemOffset,
+                alignment: alignment
+            )
         }.value
     }
 

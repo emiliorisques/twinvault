@@ -352,8 +352,8 @@ result, not a WER claim; the fixture still needs a word-for-word human reference
 The private 25-second meeting `nuevo test` was captured simultaneously through the
 microphone and ScreenCaptureKit system-audio paths. Raw audio and hypotheses remain
 outside the repository. The offline energy-envelope analyzer found a 0.30-second
-microphone delay with 0.926 confidence from one full-recording anchor and completed in
-0.40 seconds. This exceeds the 0.70 persistence threshold and is the first real fixture
+file-relative microphone lag with 0.926 confidence from one full-recording anchor and completed in
+0.40 seconds. This exceeds the 0.70 persistence threshold and was the first real fixture
 to validate using acoustic alignment in the playback-leakage safety gate.
 
 Both channels were also processed independently by the automatic ES/CA/EN route. The
@@ -365,3 +365,14 @@ especially at the end. This supports keeping system audio as the primary evidenc
 remote playback while retaining microphone evidence separately. It is not a WER result:
 the fixture has no human-corrected reference, is short, and provides only one alignment
 anchor, so a longer two-channel meeting is still required for drift validation.
+
+Phase 2W corrected that result for the recorders' independently measured meeting offsets:
+the meeting-timeline playback delay is 0.076 seconds, while confidence remains 0.926.
+Segment-level aligned envelope comparison produced six usable scores across seven short
+microphone segments (one was below the 1.5-second evidence minimum). Scores ranged from
+0.266 to 0.892; two exceeded the deliberately conservative 0.75 acoustic threshold, and
+one of those was independently corroborated by transcript agreement. This confirms that
+acoustics recover duplicates even when two ASR outputs use different words, but also that
+energy envelopes alone must fail closed rather than hide every overlapping microphone
+segment. The conversation view therefore suppresses only strong findings and keeps all
+other evidence visible and unassigned.

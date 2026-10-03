@@ -288,6 +288,90 @@ final class TranscriptTests: XCTestCase {
         ).count, 1)
     }
 
+    func testCrossChannelReconcilerAcceptsStrongAcousticMatchWhenASRTextDiffers() {
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "mic.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let microphoneSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 4,
+            text: "innovation process method statistics",
+            sourceRecordingID: microphone.id
+        )
+        let systemSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 4,
+            text: "la innovación tiene métricas diferentes",
+            sourceRecordingID: system.id
+        )
+
+        let findings = CrossChannelTranscriptReconciler().findings(
+            meetingID: meetingID,
+            recordings: [microphone, system],
+            segments: [microphoneSegment, systemSegment],
+            acousticSimilarities: [microphoneSegment.id: 0.91]
+        )
+
+        XCTAssertEqual(findings.count, 1)
+        XCTAssertEqual(findings.first?.acousticSimilarity, 0.91)
+        XCTAssertLessThan(findings.first?.textSimilarity ?? 1, 0.78)
+    }
+
+    func testConversationTranscriptHidesPlaybackButPreservesUniqueMicrophoneSpeech() {
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "mic.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let duplicate = TranscriptSegment(
+            meetingID: meetingID, startTime: 1, endTime: 2, text: "duplicate",
+            sourceRecordingID: microphone.id
+        )
+        let remote = TranscriptSegment(
+            meetingID: meetingID, startTime: 1, endTime: 2, text: "remote",
+            sourceRecordingID: system.id
+        )
+        let local = TranscriptSegment(
+            meetingID: meetingID, startTime: 3, endTime: 4, text: "local",
+            sourceRecordingID: microphone.id
+        )
+        let finding = CrossChannelTranscriptFinding(
+            meetingID: meetingID,
+            microphoneSegmentID: duplicate.id,
+            systemAudioSegmentIDs: [remote.id],
+            textSimilarity: 0.2,
+            acousticSimilarity: 0.9,
+            timelineOverlap: 1
+        )
+
+        let conversation = MeetingConversationTranscript().segments(
+            recordings: [microphone, system],
+            segments: [duplicate, local, remote],
+            findings: [finding]
+        )
+
+        XCTAssertEqual(conversation.map(\.id), [remote.id, local.id])
+        XCTAssertEqual([duplicate, local, remote].count, 3, "The source evidence remains untouched.")
+    }
+
     func testSegmentRetainsAudioAndProviderProvenance() {
         let recordingID = UUID()
         let segment = TranscriptSegment(
@@ -474,6 +558,63 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(estimate.microphoneDelayAtStart, 0.4, accuracy: 0.02)
         XCTAssertGreaterThan(estimate.confidence, 0.9)
         XCTAssertTrue(estimate.isReliable)
+    }
+
+    func testChannelAlignmentAccountsForIndependentCaptureStartOffsets() throws {
+        let fileAlignment = ChannelAlignmentEstimate(
+            microphoneDelayAtStart: 0.3,
+            driftSecondsPerHour: 0,
+            confidence: 0.92,
+            anchors: [ChannelAlignmentAnchor(
+                meetingTime: 12.6,
+                microphoneDelay: 0.3,
+                correlation: 0.92
+            )]
+        )
+
+        let meetingAlignment = fileAlignment.adjustedForTimelineOffsets(
+            microphone: 0.247,
+            systemAudio: 0.471
+        )
+
+        XCTAssertEqual(meetingAlignment.microphoneDelayAtStart, 0.076, accuracy: 0.001)
+        XCTAssertEqual(meetingAlignment.anchors.first?.meetingTime ?? 0, 13.071, accuracy: 0.001)
+        XCTAssertEqual(meetingAlignment.anchors.first?.microphoneDelay ?? 0, 0.076, accuracy: 0.001)
+    }
+
+    func testAlignedAcousticSimilarityFindsPlaybackWithDifferentFileTimelines() throws {
+        let systemValues = (0..<100).map { index -> Float in
+            Float(sin(Double(index) * 0.37) + cos(Double(index) * 0.11) * 0.4)
+        }
+        let microphoneValues = Array(repeating: Float(-0.5), count: 3) + systemValues
+        let segment = TranscriptSegment(
+            meetingID: UUID(),
+            startTime: 0.3,
+            endTime: 5.3,
+            text: "different recognizer output",
+            sourceRecordingID: UUID()
+        )
+        let alignment = ChannelAlignmentEstimate(
+            microphoneDelayAtStart: 0.3,
+            driftSecondsPerHour: 0,
+            confidence: 0.95,
+            anchors: [ChannelAlignmentAnchor(
+                meetingTime: 2,
+                microphoneDelay: 0.3,
+                correlation: 0.95
+            )]
+        )
+
+        let similarities = AlignedAcousticSimilarityEstimator().similarities(
+            microphone: AudioEnergyFingerprint(frameDuration: 0.1, values: microphoneValues),
+            systemAudio: AudioEnergyFingerprint(frameDuration: 0.1, values: systemValues),
+            microphoneSegments: [segment],
+            microphoneTimelineOffset: 0,
+            systemTimelineOffset: 0,
+            alignment: alignment
+        )
+
+        XCTAssertGreaterThan(try XCTUnwrap(similarities[segment.id]), 0.99)
     }
 
     func testAcousticChannelAlignmentRejectsFlatUninformativeAudio() {

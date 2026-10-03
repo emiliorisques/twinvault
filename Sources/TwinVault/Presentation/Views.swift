@@ -134,8 +134,45 @@ struct RecordingView: View {
 }
 
 struct MeetingDetailView: View {
+    private enum TranscriptDisplayMode: String, CaseIterable, Identifiable {
+        case conversation = "Conversation"
+        case rawChannels = "Raw Channels"
+
+        var id: Self { self }
+    }
+
     @Environment(AppModel.self) private var model
     let meeting: Meeting
+    @State private var transcriptDisplayMode = TranscriptDisplayMode.conversation
+
+    private var conversationSegments: [TranscriptSegment] {
+        MeetingConversationTranscript().segments(
+            recordings: meeting.audioRecordings,
+            segments: meeting.transcriptSegments,
+            findings: meeting.crossChannelTranscriptFindings
+        )
+    }
+
+    private var displayedSegments: [TranscriptSegment] {
+        switch transcriptDisplayMode {
+        case .conversation: conversationSegments
+        case .rawChannels: meeting.transcriptSegments
+        }
+    }
+
+    private var hiddenPlaybackCount: Int {
+        meeting.transcriptSegments.count - conversationSegments.count
+    }
+
+    private var hasBothChannelTranscripts: Bool {
+        let channelsWithTranscript = Set(meeting.audioRecordings.compactMap { recording in
+            meeting.transcriptSegments.contains { $0.sourceRecordingID == recording.id }
+                ? recording.channel
+                : nil
+        })
+        return channelsWithTranscript.contains(.microphone)
+            && channelsWithTranscript.contains(.systemAudio)
+    }
 
     var body: some View {
         ScrollView {
@@ -204,6 +241,12 @@ struct MeetingDetailView: View {
                         Label("Transcribe Meeting", systemImage: "waveform.badge.magnifyingglass")
                     }
                     .help("Detect speech, transcribe every useful channel locally, align both timelines, and flag probable speaker playback captured by the microphone.")
+                    if hasBothChannelTranscripts {
+                        Button("Refresh Channel Analysis", systemImage: "arrow.triangle.2.circlepath") {
+                            model.startChannelAnalysis(meetingID: meeting.id)
+                        }
+                        .help("Recalculate alignment and playback leakage without transcribing the audio again.")
+                    }
                 }
                 if let alignment = meeting.channelAlignmentEstimate, alignment.isReliable {
                     LabeledContent(
@@ -281,6 +324,20 @@ struct MeetingDetailView: View {
                 if meeting.transcriptSegments.isEmpty {
                     Text("Not transcribed").foregroundStyle(.secondary)
                 } else {
+                    Picker("Transcript view", selection: $transcriptDisplayMode) {
+                        ForEach(TranscriptDisplayMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    if transcriptDisplayMode == .conversation, hiddenPlaybackCount > 0 {
+                        Label(
+                            "\(hiddenPlaybackCount) microphone playback duplicate\(hiddenPlaybackCount == 1 ? "" : "s") hidden. Original channel evidence is preserved.",
+                            systemImage: "checkmark.shield"
+                        )
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    }
                     if !meeting.transcriptReviewIntervals.isEmpty {
                         VStack(alignment: .leading, spacing: 6) {
                             Label("Review transcript", systemImage: "exclamationmark.triangle.fill")
@@ -298,7 +355,8 @@ struct MeetingDetailView: View {
                         }
                         .foregroundStyle(.orange)
                     }
-                    if !meeting.crossChannelTranscriptFindings.isEmpty {
+                    if transcriptDisplayMode == .rawChannels,
+                       !meeting.crossChannelTranscriptFindings.isEmpty {
                         Label(
                             "Possible speaker playback was also captured by the microphone. It remains unassigned and will not be treated as your voice.",
                             systemImage: "speaker.wave.2.trianglebadge.exclamationmark"
@@ -306,7 +364,7 @@ struct MeetingDetailView: View {
                         .font(.callout)
                         .foregroundStyle(.orange)
                     }
-                    ForEach(meeting.transcriptSegments) { segment in
+                    ForEach(displayedSegments) { segment in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {
                                 Text(duration(segment.startTime)).monospacedDigit()
