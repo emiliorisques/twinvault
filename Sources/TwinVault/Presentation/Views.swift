@@ -169,6 +169,47 @@ struct MeetingDetailView: View {
                 }
                 if meeting.audioRecordings.isEmpty {
                     Text("Not available").foregroundStyle(.secondary)
+                } else if model.transcribingMeetingID == meeting.id {
+                    HStack {
+                        if let activity = model.transcriptionActivity {
+                            ProgressView().controlSize(.small)
+                            Text("Transcribing meeting · \(transcriptionStatus(activity))")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ProgressView().controlSize(.small)
+                            Text("Analyzing meeting channels…")
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Button("Cancel", role: .cancel) { model.cancelTranscription() }
+                    }
+                } else {
+                    Menu {
+                        ForEach(model.transcriptionProfiles) { profile in
+                            Button {
+                                model.startMeetingTranscription(
+                                    meetingID: meeting.id,
+                                    profileID: profile.id
+                                )
+                            } label: {
+                                Label(
+                                    profile.isRecommended
+                                        ? "\(profile.displayName) — Recommended"
+                                        : profile.displayName,
+                                    systemImage: profile.isRecommended ? "checkmark.seal" : "waveform"
+                                )
+                            }
+                        }
+                    } label: {
+                        Label("Transcribe Meeting", systemImage: "waveform.badge.magnifyingglass")
+                    }
+                    .help("Detect speech, transcribe every useful channel locally, align both timelines, and flag probable speaker playback captured by the microphone.")
+                }
+                if let alignment = meeting.channelAlignmentEstimate, alignment.isReliable {
+                    LabeledContent(
+                        "Channel alignment",
+                        value: "Microphone delay \(duration(alignment.microphoneDelayAtStart)) · \(Int((alignment.confidence * 100).rounded()))% confidence"
+                    )
                 }
                 ForEach(meeting.audioRecordings) { recording in
                     HStack {
@@ -227,7 +268,10 @@ struct MeetingDetailView: View {
                                     systemImage: "text.bubble"
                                 )
                             }
-                            .disabled(model.transcribingRecordingID != nil)
+                            .disabled(
+                                model.transcriptionActivity != nil
+                                    || model.transcribingMeetingID != nil
+                            )
                             .help("Choose a local transcription profile. The recommended profile supports mixed Spanish, Catalan, and English.")
                         }
                     }

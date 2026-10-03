@@ -28,12 +28,15 @@ final class AppModel {
     private let speechToTextProviders: [String: any SpeechToTextProvider]
     private let transcriptionPolicy: TranscriptionPolicy
     private let audioDirectory: URL
+    private let speechTurnDetector: any SpeechTurnDetecting
+    private let channelAlignmentAnalyzer: any AudioChannelAlignmentAnalyzing
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
     private(set) var transcriptionActivity: TranscriptionActivity?
+    private(set) var transcribingMeetingID: UUID?
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
     var recordingCaptureStatus: RecordingCaptureStatus? {
         guard let meeting = activeSession?.meeting else { return nil }
@@ -61,7 +64,9 @@ final class AppModel {
         systemAudio: any SystemAudioCaptureService,
         playback: any AudioPlaybackService,
         speechToText: any SpeechToTextProvider,
-        audioDirectory: URL
+        audioDirectory: URL,
+        speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
+        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil
     ) {
         self.repository = repository
         self.audio = audio
@@ -82,6 +87,9 @@ final class AppModel {
         )
         self.transcriptionProfiles = [profile]
         self.audioDirectory = audioDirectory
+        self.speechTurnDetector = speechTurnDetector
+        self.channelAlignmentAnalyzer = channelAlignmentAnalyzer
+            ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
     }
 
     init(
@@ -91,7 +99,9 @@ final class AppModel {
         playback: any AudioPlaybackService,
         speechToTextProviders: [any SpeechToTextProvider],
         transcriptionProfiles: [TranscriptionProfile]? = nil,
-        audioDirectory: URL
+        audioDirectory: URL,
+        speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
+        channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
         self.repository = repository
@@ -120,6 +130,9 @@ final class AppModel {
         self.transcriptionPolicy = policy
         self.transcriptionProfiles = policy.availableProfiles
         self.audioDirectory = audioDirectory
+        self.speechTurnDetector = speechTurnDetector
+        self.channelAlignmentAnalyzer = channelAlignmentAnalyzer
+            ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
     }
 
     func load() async {
@@ -255,7 +268,6 @@ final class AppModel {
             if transcriptionActivity?.id == activityID {
                 transcriptionActivity = nil
             }
-            transcriptionTask = nil
         }
         do {
             let output = try await speechToText.transcribe(TranscriptionRequest(
@@ -284,7 +296,8 @@ final class AppModel {
             meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
                 meetingID: meeting.id,
                 recordings: meeting.audioRecordings,
-                segments: meeting.transcriptSegments
+                segments: meeting.transcriptSegments,
+                alignment: meeting.channelAlignmentEstimate
             )
             meeting.transcriptionLocaleIdentifiers = profile.localeIdentifiers
             meeting.updatedAt = .now
@@ -293,6 +306,10 @@ final class AppModel {
             if !output.unavailableLocaleIdentifiers.isEmpty {
                 let labels = output.unavailableLocaleIdentifiers.map(Self.languageLabel).joined(separator: ", ")
                 errorMessage = "Transcription completed, but these language models were unavailable: \(labels). You can try again later."
+            } else if output.reviewIntervals.contains(where: {
+                $0.reason == .regionalLanguageVerificationFailed
+            }) {
+                errorMessage = "Transcription completed. Catalan was detected, but its verification pass returned no replacement; the fast transcript was retained and marked for review."
             } else if !output.reviewIntervals.isEmpty {
                 errorMessage = "Transcription completed, but some long audio intervals contain no transcript. They are marked for review and must not be treated as complete evidence."
             }
@@ -311,7 +328,8 @@ final class AppModel {
         profileID: String? = nil
     ) {
         guard transcriptionTask == nil, transcriptionActivity == nil else { return }
-        transcriptionTask = Task { [weak self] in
+        transcriptionTask = Task { @MainActor [weak self] in
+            defer { self?.transcriptionTask = nil }
             await self?.transcribe(
                 meetingID: meetingID,
                 recordingID: recordingID,
@@ -320,8 +338,119 @@ final class AppModel {
         }
     }
 
+    func transcribeMeeting(meetingID: UUID, profileID: String? = nil) async {
+        guard transcriptionActivity == nil, transcribingMeetingID == nil,
+              let meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        guard transcriptionPolicy.profile(id: profileID) != nil else {
+            errorMessage = "The selected transcription profile is unavailable."
+            return
+        }
+
+        transcribingMeetingID = meetingID
+        defer { transcribingMeetingID = nil }
+        var skippedChannels: [String] = []
+        let recordings = meeting.audioRecordings.sorted {
+            if $0.channel == $1.channel { return $0.createdAt < $1.createdAt }
+            return $0.channel == .microphone
+        }
+
+        for recording in recordings {
+            do {
+                try Task.checkCancellation()
+                guard try await containsSpeech(recording) else {
+                    try await clearTranscript(for: recording, meetingID: meetingID)
+                    skippedChannels.append(recording.channel.displayName)
+                    continue
+                }
+                await transcribe(
+                    meetingID: meetingID,
+                    recordingID: recording.id,
+                    profileID: profileID
+                )
+            } catch is CancellationError {
+                return
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+
+        do {
+            try Task.checkCancellation()
+            try await updateAlignmentAndFindings(meetingID: meetingID)
+            if !skippedChannels.isEmpty, errorMessage == nil {
+                errorMessage = "No speech was detected in \(skippedChannels.joined(separator: ", ")); that channel was safely skipped."
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func startMeetingTranscription(meetingID: UUID, profileID: String? = nil) {
+        guard transcriptionTask == nil, transcriptionActivity == nil,
+              transcribingMeetingID == nil else { return }
+        errorMessage = nil
+        transcriptionTask = Task { @MainActor [weak self] in
+            defer { self?.transcriptionTask = nil }
+            await self?.transcribeMeeting(meetingID: meetingID, profileID: profileID)
+        }
+    }
+
     func cancelTranscription() {
         transcriptionTask?.cancel()
+    }
+
+    private func containsSpeech(_ recording: AudioRecordingReference) async throws -> Bool {
+        let fileURL = try validatedAudioURL(for: recording)
+        let detector = speechTurnDetector
+        return try await Task.detached(priority: .utility) {
+            try !detector.detectTurns(in: fileURL).isEmpty
+        }.value
+    }
+
+    private func clearTranscript(
+        for recording: AudioRecordingReference,
+        meetingID: UUID
+    ) async throws {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recording.id }
+        meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recording.id }
+        meeting.channelAlignmentEstimate = nil
+        meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
+            meetingID: meeting.id,
+            recordings: meeting.audioRecordings,
+            segments: meeting.transcriptSegments
+        )
+        meeting.updatedAt = .now
+        try await repository.save(meeting)
+        await load()
+    }
+
+    private func updateAlignmentAndFindings(meetingID: UUID) async throws {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let microphone = meeting.audioRecordings.first { $0.channel == .microphone }
+        let systemAudio = meeting.audioRecordings.first { $0.channel == .systemAudio }
+        if let microphone, let systemAudio,
+           meeting.transcriptSegments.contains(where: { $0.sourceRecordingID == microphone.id }),
+           meeting.transcriptSegments.contains(where: { $0.sourceRecordingID == systemAudio.id }) {
+            let estimate = try await channelAlignmentAnalyzer.analyze(
+                microphone: microphone,
+                systemAudio: systemAudio
+            )
+            meeting.channelAlignmentEstimate = estimate?.isReliable == true ? estimate : nil
+        } else {
+            meeting.channelAlignmentEstimate = nil
+        }
+        meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
+            meetingID: meeting.id,
+            recordings: meeting.audioRecordings,
+            segments: meeting.transcriptSegments,
+            alignment: meeting.channelAlignmentEstimate
+        )
+        meeting.updatedAt = .now
+        try await repository.save(meeting)
+        await load()
     }
 
     private func validatedAudioURL(for recording: AudioRecordingReference) throws -> URL {

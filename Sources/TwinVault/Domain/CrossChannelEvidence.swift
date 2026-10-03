@@ -77,7 +77,8 @@ struct CrossChannelTranscriptReconciler: Sendable {
     func findings(
         meetingID: UUID,
         recordings: [AudioRecordingReference],
-        segments: [TranscriptSegment]
+        segments: [TranscriptSegment],
+        alignment: ChannelAlignmentEstimate? = nil
     ) -> [CrossChannelTranscriptFinding] {
         let recordingsByID = Dictionary(
             recordings.map { ($0.id, $0) },
@@ -93,12 +94,14 @@ struct CrossChannelTranscriptReconciler: Sendable {
         return microphone.compactMap { microphoneSegment in
             guard let microphoneInterval = timelineInterval(
                 for: microphoneSegment,
-                recordingsByID: recordingsByID
+                recordingsByID: recordingsByID,
+                alignment: alignment
             ) else { return nil }
             let candidates = system.filter { systemSegment in
                 guard let systemInterval = timelineInterval(
                     for: systemSegment,
-                    recordingsByID: recordingsByID
+                    recordingsByID: recordingsByID,
+                    alignment: alignment
                 ) else { return false }
                 return overlapRatio(
                     microphoneInterval,
@@ -118,7 +121,7 @@ struct CrossChannelTranscriptReconciler: Sendable {
             )
             guard similarity >= minimumTextSimilarity else { return nil }
             let timelineScore = candidates.compactMap {
-                timelineInterval(for: $0, recordingsByID: recordingsByID)
+                timelineInterval(for: $0, recordingsByID: recordingsByID, alignment: alignment)
             }.map {
                 overlapRatio(microphoneInterval, $0, tolerance: timingTolerance)
             }.max() ?? 0
@@ -143,7 +146,8 @@ struct CrossChannelTranscriptReconciler: Sendable {
 
     private func timelineInterval(
         for segment: TranscriptSegment,
-        recordingsByID: [UUID: AudioRecordingReference]
+        recordingsByID: [UUID: AudioRecordingReference],
+        alignment: ChannelAlignmentEstimate?
     ) -> ClosedRange<TimeInterval>? {
         guard let recordingID = segment.sourceRecordingID,
               let recording = recordingsByID[recordingID],
@@ -151,7 +155,14 @@ struct CrossChannelTranscriptReconciler: Sendable {
               let end = recording.meetingTimelineTime(forRecordingTime: segment.endTime) else {
             return nil
         }
-        return start...max(start, end)
+        guard recording.channel == .microphone,
+              let alignment,
+              alignment.isReliable else {
+            return start...max(start, end)
+        }
+        let adjustedStart = start - alignment.microphoneDelay(at: start)
+        let adjustedEnd = end - alignment.microphoneDelay(at: end)
+        return adjustedStart...max(adjustedStart, adjustedEnd)
     }
 
     private func overlapRatio(

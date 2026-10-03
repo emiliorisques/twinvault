@@ -236,6 +236,58 @@ final class TranscriptTests: XCTestCase {
         )
     }
 
+    func testCrossChannelReconcilerUsesReliableAcousticAlignment() {
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "mic.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let microphoneSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 3,
+            text: "the same four spoken words",
+            sourceRecordingID: microphone.id
+        )
+        let systemSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 0,
+            endTime: 2,
+            text: "the same four spoken words",
+            sourceRecordingID: system.id
+        )
+        let reconciler = CrossChannelTranscriptReconciler(timingTolerance: 0)
+        let alignment = ChannelAlignmentEstimate(
+            microphoneDelayAtStart: 1,
+            driftSecondsPerHour: 0,
+            confidence: 0.95,
+            anchors: [ChannelAlignmentAnchor(
+                meetingTime: 1,
+                microphoneDelay: 1,
+                correlation: 0.95
+            )]
+        )
+
+        XCTAssertTrue(reconciler.findings(
+            meetingID: meetingID,
+            recordings: [microphone, system],
+            segments: [microphoneSegment, systemSegment]
+        ).isEmpty)
+        XCTAssertEqual(reconciler.findings(
+            meetingID: meetingID,
+            recordings: [microphone, system],
+            segments: [microphoneSegment, systemSegment],
+            alignment: alignment
+        ).count, 1)
+    }
+
     func testSegmentRetainsAudioAndProviderProvenance() {
         let recordingID = UUID()
         let segment = TranscriptSegment(

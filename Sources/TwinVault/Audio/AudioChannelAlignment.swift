@@ -8,7 +8,7 @@ struct AudioEnergyFingerprint: Equatable, Sendable {
     var duration: TimeInterval { Double(values.count) * frameDuration }
 }
 
-struct ChannelAlignmentAnchor: Equatable, Sendable {
+struct ChannelAlignmentAnchor: Codable, Equatable, Sendable {
     let meetingTime: TimeInterval
     let microphoneDelay: TimeInterval
     let correlation: Double
@@ -16,7 +16,7 @@ struct ChannelAlignmentAnchor: Equatable, Sendable {
 
 /// Acoustic timing between the two locally recorded channels. A positive delay
 /// means a system-audio event reaches the microphone file later.
-struct ChannelAlignmentEstimate: Equatable, Sendable {
+struct ChannelAlignmentEstimate: Codable, Equatable, Sendable {
     let microphoneDelayAtStart: TimeInterval
     let driftSecondsPerHour: Double
     let confidence: Double

@@ -199,9 +199,118 @@ final class AppModelTests: XCTestCase {
         await model.transcribe(meetingID: meetingID, recordingID: system.id)
 
         let stored = await repository.meeting(id: meetingID)
-        XCTAssertEqual(stored?.transcriptSegments.count, 2)
+        XCTAssertEqual(
+            stored?.transcriptSegments.count,
+            2,
+            model.errorMessage ?? "No AppModel error was reported."
+        )
         XCTAssertEqual(stored?.crossChannelTranscriptFindings.count, 1)
         XCTAssertNil(stored?.transcriptSegments.first?.temporarySpeakerID)
+    }
+
+    func testTranscribeMeetingProcessesSpeechChannelsAndPersistsAlignment() async throws {
+        let directory = testAudioDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        try Data([0]).write(to: directory.appending(path: microphone.relativePath))
+        try Data([0]).write(to: directory.appending(path: system.relativePath))
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Automatic dual-channel transcription",
+            audioRecordings: [microphone, system],
+            status: .completed
+        ))
+        let alignment = ChannelAlignmentEstimate(
+            microphoneDelayAtStart: 0,
+            driftSecondsPerHour: 0,
+            confidence: 0.95,
+            anchors: [ChannelAlignmentAnchor(
+                meetingTime: 1,
+                microphoneDelay: 0,
+                correlation: 0.95
+            )]
+        )
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(
+                transcript: "This sentence came from the speakers"
+            ),
+            audioDirectory: directory,
+            speechTurnDetector: FixedSpeechTurnDetector(hasSpeech: true),
+            channelAlignmentAnalyzer: FixedChannelAlignmentAnalyzer(estimate: alignment)
+        )
+        await model.load()
+
+        await model.transcribeMeeting(meetingID: meetingID)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments.count, 2)
+        XCTAssertEqual(stored?.channelAlignmentEstimate, alignment)
+        XCTAssertEqual(stored?.crossChannelTranscriptFindings.count, 1)
+        XCTAssertNil(model.transcribingMeetingID)
+    }
+
+    func testTranscribeMeetingSkipsSilentChannel() async throws {
+        let directory = testAudioDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "silent-system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        try Data([0]).write(to: directory.appending(path: microphone.relativePath))
+        try Data([0]).write(to: directory.appending(path: system.relativePath))
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Silent system channel",
+            audioRecordings: [microphone, system],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: directory,
+            speechTurnDetector: FilenameSpeechTurnDetector(silentFilename: system.relativePath),
+            channelAlignmentAnalyzer: FixedChannelAlignmentAnalyzer(estimate: nil)
+        )
+        await model.load()
+
+        await model.transcribeMeeting(meetingID: meetingID)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(
+            stored?.transcriptSegments.map(\.sourceRecordingID),
+            [microphone.id],
+            model.errorMessage ?? "No AppModel error was reported."
+        )
+        XCTAssertNil(stored?.channelAlignmentEstimate)
+        XCTAssertTrue(model.errorMessage?.contains("System Audio") == true)
     }
 
     func testPartialMultilingualTranscriptionIsSavedAndWarnsUser() async {
@@ -507,4 +616,40 @@ private struct CancellableSpeechToTextProvider: SpeechToTextProvider {
         try await Task.sleep(for: .seconds(30))
         return TranscriptionOutput(segments: [])
     }
+}
+
+private struct FixedSpeechTurnDetector: SpeechTurnDetecting {
+    let hasSpeech: Bool
+
+    func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn] {
+        hasSpeech ? [SpeechTurn(startTime: 0, endTime: 1)] : []
+    }
+}
+
+private struct FilenameSpeechTurnDetector: SpeechTurnDetecting {
+    let silentFilename: String
+
+    func detectTurns(in audioFileURL: URL) throws -> [SpeechTurn] {
+        audioFileURL.lastPathComponent == silentFilename
+            ? []
+            : [SpeechTurn(startTime: 0, endTime: 1)]
+    }
+}
+
+private struct FixedChannelAlignmentAnalyzer: AudioChannelAlignmentAnalyzing {
+    let estimate: ChannelAlignmentEstimate?
+
+    func analyze(
+        microphone: AudioRecordingReference,
+        systemAudio: AudioRecordingReference
+    ) async throws -> ChannelAlignmentEstimate? {
+        estimate
+    }
+}
+
+private func testAudioDirectory() -> URL {
+    let directory = FileManager.default.temporaryDirectory
+        .appending(path: "TwinVaultAppModelTests-\(UUID().uuidString)")
+    try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
 }

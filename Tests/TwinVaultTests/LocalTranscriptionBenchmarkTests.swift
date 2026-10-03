@@ -5,6 +5,46 @@ import XCTest
 /// Opt-in local benchmark. Normal test runs skip it, never access private audio,
 /// and never download model assets.
 final class LocalTranscriptionBenchmarkTests: XCTestCase {
+    func testPrivateChannelAlignmentFixture() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let microphonePath = environment["TWINVAULT_ALIGNMENT_MICROPHONE"],
+              let systemAudioPath = environment["TWINVAULT_ALIGNMENT_SYSTEM"],
+              let outputPath = environment["TWINVAULT_ALIGNMENT_OUTPUT"] else {
+            throw XCTSkip("Set the TWINVAULT_ALIGNMENT_* environment variables to run this private fixture.")
+        }
+
+        let microphoneURL = URL(fileURLWithPath: microphonePath).standardizedFileURL
+        let systemAudioURL = URL(fileURLWithPath: systemAudioPath).standardizedFileURL
+        guard microphoneURL.deletingLastPathComponent() == systemAudioURL.deletingLastPathComponent() else {
+            XCTFail("Both private fixture channels must be in the same directory.")
+            return
+        }
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: microphoneURL.lastPathComponent,
+            meetingTimelineOffset: 0
+        )
+        let systemAudio = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: systemAudioURL.lastPathComponent,
+            channel: .systemAudio,
+            meetingTimelineOffset: 0
+        )
+        let analyzer = LocalAudioChannelAlignmentAnalyzer(
+            audioDirectory: microphoneURL.deletingLastPathComponent()
+        )
+        let startedAt = ContinuousClock.now
+        let estimate = try await analyzer.analyze(
+            microphone: microphone,
+            systemAudio: systemAudio
+        )
+        try write(ChannelAlignmentBenchmarkResult(
+            elapsedSeconds: startedAt.duration(to: .now).seconds,
+            estimate: estimate
+        ), to: URL(fileURLWithPath: outputPath).standardizedFileURL)
+    }
+
     func testPrivateAudioFixture() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let audioPath = environment["TWINVAULT_BENCHMARK_AUDIO"],
@@ -176,6 +216,11 @@ private struct LanguageIdentificationBenchmarkResult: Codable {
     let elapsedSeconds: Double
     let speechTurns: [SpeechTurn]
     let observations: [AcousticLanguageObservation]
+}
+
+private struct ChannelAlignmentBenchmarkResult: Codable {
+    let elapsedSeconds: Double
+    let estimate: ChannelAlignmentEstimate?
 }
 
 private struct FixedBenchmarkSpeechTurnDetector: SpeechTurnDetecting {

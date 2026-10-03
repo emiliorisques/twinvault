@@ -346,3 +346,22 @@ in 14.5 seconds with no review intervals: Parakeet retained the Spanish evidence
 WhisperKit produced `Por ejemplo, ahora parlo un trozo en catalán.` with `ca` provenance.
 The system-audio channel contained no detected speech. This is a targeted regression
 result, not a WER claim; the fixture still needs a word-for-word human reference.
+
+## 2026-10-03 — Real two-channel alignment and automatic route
+
+The private 25-second meeting `nuevo test` was captured simultaneously through the
+microphone and ScreenCaptureKit system-audio paths. Raw audio and hypotheses remain
+outside the repository. The offline energy-envelope analyzer found a 0.30-second
+microphone delay with 0.926 confidence from one full-recording anchor and completed in
+0.40 seconds. This exceeds the 0.70 persistence threshold and is the first real fixture
+to validate using acoustic alignment in the playback-leakage safety gate.
+
+Both channels were also processed independently by the automatic ES/CA/EN route. The
+system channel completed warm in 7.3 seconds and returned 61 words in eight segments;
+the microphone channel's cold run took 82.2 seconds and returned 46 words in seven
+segments. Both routed to Parakeet, produced no review interval, and preserved mixed
+Spanish/English speech. The system transcript was visibly more complete and coherent,
+especially at the end. This supports keeping system audio as the primary evidence for
+remote playback while retaining microphone evidence separately. It is not a WER result:
+the fixture has no human-corrected reference, is short, and provides only one alignment
+anchor, so a longer two-channel meeting is still required for drift validation.
