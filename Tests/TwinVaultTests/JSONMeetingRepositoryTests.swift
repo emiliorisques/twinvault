@@ -67,10 +67,11 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded.transcriptionLocaleIdentifiers, ["es-ES", "ca-ES", "en-US"])
         XCTAssertFalse(loaded.requestedSystemAudioCapture)
         XCTAssertTrue(loaded.audioCaptureIssues.isEmpty)
+        XCTAssertTrue(loaded.speakerLabels.isEmpty)
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 12)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 13)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -133,6 +134,13 @@ final class JSONMeetingRepositoryTests: XCTestCase {
                 canonicalTemporarySpeakerID: "speaker-1",
                 confirmedAt: Date(timeIntervalSince1970: 123)
             )],
+            speakerLabels: [MeetingSpeakerLabel(
+                meetingID: meetingID,
+                sourceRecordingID: recordingID,
+                canonicalTemporarySpeakerID: "speaker-1",
+                displayName: "Laura",
+                confirmedAt: Date(timeIntervalSince1970: 124)
+            )],
             transcriptReviewIntervals: [reviewInterval],
             crossChannelTranscriptFindings: [finding],
             channelAlignmentEstimate: alignment,
@@ -152,6 +160,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
         XCTAssertEqual(loaded?.diarizationTurns, meeting.diarizationTurns)
         XCTAssertEqual(loaded?.speakerClusterCorrections, meeting.speakerClusterCorrections)
+        XCTAssertEqual(loaded?.speakerLabels, meeting.speakerLabels)
         XCTAssertEqual(loaded?.transcriptReviewIntervals, [reviewInterval])
         XCTAssertEqual(loaded?.crossChannelTranscriptFindings, [finding])
         XCTAssertEqual(loaded?.channelAlignmentEstimate, alignment)

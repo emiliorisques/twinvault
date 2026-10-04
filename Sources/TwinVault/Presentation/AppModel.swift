@@ -489,6 +489,9 @@ final class AppModel {
             meeting.speakerClusterCorrections.removeAll {
                 $0.sourceRecordingID == recording.id
             }
+            meeting.speakerLabels.removeAll {
+                $0.sourceRecordingID == recording.id
+            }
             meeting.diarizationTurns.sort {
                 if $0.startTime == $1.startTime { return $0.endTime < $1.endTime }
                 return $0.startTime < $1.startTime
@@ -536,6 +539,32 @@ final class AppModel {
             return
         }
 
+        let resolver = SpeakerClusterResolver()
+        let resolvedSource = resolver.canonicalTemporarySpeakerID(
+            for: sourceTemporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        let resolvedExistingTarget = resolver.canonicalTemporarySpeakerID(
+            for: canonicalTemporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        let sourceLabel = meeting.speakerLabels.first {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == resolvedSource
+        }
+        let targetLabel = meeting.speakerLabels.first {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == resolvedExistingTarget
+        }
+        if let sourceLabel, sourceLabel.displayName != targetLabel?.displayName {
+            errorMessage = "Remove the name from \(sourceLabel.displayName) before merging these speakers."
+            return
+        }
+
         var corrections = meeting.speakerClusterCorrections
         corrections.removeAll {
             $0.sourceRecordingID == sourceRecordingID
@@ -559,6 +588,12 @@ final class AppModel {
             canonicalTemporarySpeakerID: resolvedTarget
         ))
         meeting.speakerClusterCorrections = corrections
+        if resolvedSource != resolvedTarget {
+            meeting.speakerLabels.removeAll {
+                $0.sourceRecordingID == sourceRecordingID
+                    && $0.canonicalTemporarySpeakerID == resolvedSource
+            }
+        }
         meeting.updatedAt = .now
         do {
             try await repository.save(meeting)
@@ -575,6 +610,90 @@ final class AppModel {
             $0.sourceRecordingID == sourceRecordingID
         }
         guard meeting.speakerClusterCorrections.count != previousCount else { return }
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func assignTemporarySpeakerName(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String,
+        displayName: String
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let normalizedName = displayName
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        guard !normalizedName.isEmpty, normalizedName.count <= 80 else {
+            errorMessage = "Enter a speaker name between 1 and 80 characters."
+            return
+        }
+
+        let rawIdentifiers = Set(meeting.diarizationTurns.compactMap { turn in
+            turn.sourceRecordingID == sourceRecordingID ? turn.temporarySpeakerID : nil
+        })
+        let resolver = SpeakerClusterResolver()
+        let canonicalIdentifiers = Set(rawIdentifiers.map {
+            resolver.canonicalTemporarySpeakerID(
+                for: $0,
+                meetingID: meetingID,
+                sourceRecordingID: sourceRecordingID,
+                corrections: meeting.speakerClusterCorrections
+            )
+        })
+        let canonicalIdentifier = resolver.canonicalTemporarySpeakerID(
+            for: temporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        guard canonicalIdentifiers.contains(canonicalIdentifier) else {
+            errorMessage = "That temporary speaker no longer exists in this recording."
+            return
+        }
+
+        meeting.speakerLabels.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == canonicalIdentifier
+        }
+        meeting.speakerLabels.append(MeetingSpeakerLabel(
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            canonicalTemporarySpeakerID: canonicalIdentifier,
+            displayName: normalizedName
+        ))
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func removeTemporarySpeakerName(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let canonicalIdentifier = SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: temporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        let previousCount = meeting.speakerLabels.count
+        meeting.speakerLabels.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == canonicalIdentifier
+        }
+        guard meeting.speakerLabels.count != previousCount else { return }
         meeting.updatedAt = .now
         do {
             try await repository.save(meeting)

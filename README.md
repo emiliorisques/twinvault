@@ -92,6 +92,8 @@ Phase 2X adds explicit post-meeting speaker diarization for system audio. **Dete
 
 Phase 2Y adds human review for meeting-local speaker clusters. Beside every temporary speaker, **Merge with…** records an explicit user-confirmed mapping and immediately applies it to transcript presentation. Raw diarization turns are never overwritten, **Reset Speaker Corrections** is reversible, and running diarization again discards mappings for the replaced clustering result. These corrections state only that two temporary labels represent the same voice in one meeting; they do not name a person or create biometric identity.
 
+Phase 2Z lets the user add, edit, or remove a participant name for each reviewed speaker. The transcript shows the confirmed name together with its technical label, such as `Laura · Speaker 1`. The name is scoped to that meeting and stored separately from raw diarization evidence; it is not reused across meetings, treated as a biometric match, or promoted into a `Person` entity. Re-running diarization clears labels tied to the replaced clusters, and conflicting named clusters must be reviewed before merging.
+
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, and speaker identification are not enabled. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for experimental Parakeet transcription and offline diarization. FluidAudio currently exposes a broad package product, so it increases build size beyond the code TwinVault uses; model-asset licensing and that packaging cost must be reviewed before distribution.
 
 ## Current boundaries

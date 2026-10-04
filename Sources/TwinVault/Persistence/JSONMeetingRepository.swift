@@ -10,7 +10,7 @@ actor JSONMeetingRepository: MeetingRepository {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
-    private static let currentSchemaVersion = 12
+    private static let currentSchemaVersion = 13
 
     init(paths: VaultPaths, fileManager: FileManager = .default) throws {
         self.paths = paths

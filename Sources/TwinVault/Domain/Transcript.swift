@@ -363,6 +363,40 @@ struct SpeakerClusterCorrection: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// A user-confirmed display label for one canonical, meeting-local speaker
+/// cluster. This is not a stable person identity or biometric match.
+struct MeetingSpeakerLabel: Identifiable, Codable, Equatable, Sendable {
+    enum Basis: String, Codable, Sendable {
+        case userConfirmed
+    }
+
+    let id: UUID
+    let meetingID: UUID
+    let sourceRecordingID: UUID
+    let canonicalTemporarySpeakerID: String
+    let displayName: String
+    let basis: Basis
+    let confirmedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        canonicalTemporarySpeakerID: String,
+        displayName: String,
+        basis: Basis = .userConfirmed,
+        confirmedAt: Date = .now
+    ) {
+        self.id = id
+        self.meetingID = meetingID
+        self.sourceRecordingID = sourceRecordingID
+        self.canonicalTemporarySpeakerID = canonicalTemporarySpeakerID
+        self.displayName = displayName
+        self.basis = basis
+        self.confirmedAt = confirmedAt
+    }
+}
+
 struct SpeakerClusterResolver: Sendable {
     func canonicalTemporarySpeakerID(
         for identifier: String,

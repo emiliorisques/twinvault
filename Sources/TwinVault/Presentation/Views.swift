@@ -141,9 +141,17 @@ struct MeetingDetailView: View {
         var id: Self { self }
     }
 
+    private struct SpeakerNamingTarget: Identifiable {
+        let recordingID: UUID
+        let identifier: String
+        let currentName: String
+        var id: String { "\(recordingID.uuidString)-\(identifier)" }
+    }
+
     @Environment(AppModel.self) private var model
     let meeting: Meeting
     @State private var transcriptDisplayMode = TranscriptDisplayMode.conversation
+    @State private var speakerNamingTarget: SpeakerNamingTarget?
 
     private var conversationSegments: [TranscriptSegment] {
         MeetingConversationTranscript().segments(
@@ -197,6 +205,13 @@ struct MeetingDetailView: View {
         return meeting.speakerClusterCorrections.contains { $0.sourceRecordingID == recordingID }
     }
 
+    private var canonicalTemporarySpeakerIDs: [String] {
+        guard let recordingID = systemAudioRecording?.id else { return [] }
+        return Set(rawTemporarySpeakerIDs.map {
+            resolvedTemporarySpeakerID($0, recordingID: recordingID)
+        }).sorted()
+    }
+
     private func resolvedTemporarySpeakerID(_ identifier: String, recordingID: UUID) -> String {
         SpeakerClusterResolver().canonicalTemporarySpeakerID(
             for: identifier,
@@ -214,13 +229,29 @@ struct MeetingDetailView: View {
         return identifier
     }
 
+    private func confirmedSpeakerName(_ identifier: String, recordingID: UUID) -> String? {
+        meeting.speakerLabels.first {
+            $0.sourceRecordingID == recordingID
+                && $0.canonicalTemporarySpeakerID == identifier
+                && $0.basis == .userConfirmed
+        }?.displayName
+    }
+
+    private func reviewedSpeakerLabel(_ identifier: String, recordingID: UUID) -> String {
+        guard let name = confirmedSpeakerName(identifier, recordingID: recordingID) else {
+            return speakerLabel(identifier)
+        }
+        return "\(name) · \(speakerLabel(identifier))"
+    }
+
     private func temporarySpeakerLabel(for segment: TranscriptSegment) -> String? {
         guard let identifier = TranscriptSpeakerAttribution().temporarySpeakerID(
             for: segment,
             turns: meeting.diarizationTurns,
             corrections: meeting.speakerClusterCorrections
         ) else { return nil }
-        return speakerLabel(identifier)
+        guard let recordingID = segment.sourceRecordingID else { return speakerLabel(identifier) }
+        return reviewedSpeakerLabel(identifier, recordingID: recordingID)
     }
 
     var body: some View {
@@ -405,6 +436,49 @@ struct MeetingDetailView: View {
                             }
                         }
                         if let recordingID = systemAudioRecording?.id {
+                            ForEach(canonicalTemporarySpeakerIDs, id: \.self) { identifier in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(reviewedSpeakerLabel(identifier, recordingID: recordingID))
+                                            .fontWeight(.medium)
+                                        if confirmedSpeakerName(identifier, recordingID: recordingID) != nil {
+                                            Text("Name confirmed by user for this meeting")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    Button(
+                                        confirmedSpeakerName(identifier, recordingID: recordingID) == nil
+                                            ? "Add Name" : "Edit Name"
+                                    ) {
+                                        speakerNamingTarget = SpeakerNamingTarget(
+                                            recordingID: recordingID,
+                                            identifier: identifier,
+                                            currentName: confirmedSpeakerName(
+                                                identifier,
+                                                recordingID: recordingID
+                                            ) ?? ""
+                                        )
+                                    }
+                                    if confirmedSpeakerName(identifier, recordingID: recordingID) != nil {
+                                        Button("Remove Name", role: .destructive) {
+                                            Task {
+                                                await model.removeTemporarySpeakerName(
+                                                    meetingID: meeting.id,
+                                                    sourceRecordingID: recordingID,
+                                                    temporarySpeakerID: identifier
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if rawTemporarySpeakerIDs.count > 1 {
+                                Text("Cluster corrections")
+                                    .font(.headline)
+                                    .padding(.top, 4)
+                            }
                             ForEach(rawTemporarySpeakerIDs, id: \.self) { identifier in
                                 let resolved = resolvedTemporarySpeakerID(
                                     identifier,
@@ -456,7 +530,7 @@ struct MeetingDetailView: View {
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         if !rawTemporarySpeakerIDs.isEmpty {
-                            Text("Merges are explicit user-confirmed corrections. Original model turns are preserved and you can reset the corrections at any time.")
+                            Text("Names and merges are explicit user-confirmed labels for this meeting. Original model turns are preserved, and no biometric identity is created.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -548,7 +622,62 @@ struct MeetingDetailView: View {
                     Label(duration(moment.elapsedTime), systemImage: "bookmark.fill")
                 }
             }.padding(28).frame(maxWidth: 760, alignment: .leading)
-        }.navigationTitle(meeting.title)
+        }
+        .navigationTitle(meeting.title)
+        .sheet(item: $speakerNamingTarget) { target in
+            SpeakerNameEditor(
+                speakerLabel: speakerLabel(target.identifier),
+                initialName: target.currentName
+            ) { name in
+                Task {
+                    await model.assignTemporarySpeakerName(
+                        meetingID: meeting.id,
+                        sourceRecordingID: target.recordingID,
+                        temporarySpeakerID: target.identifier,
+                        displayName: name
+                    )
+                }
+            }
+        }
+    }
+}
+
+private struct SpeakerNameEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let speakerLabel: String
+    let onSave: (String) -> Void
+    @State private var name: String
+
+    init(speakerLabel: String, initialName: String, onSave: @escaping (String) -> Void) {
+        self.speakerLabel = speakerLabel
+        self.onSave = onSave
+        _name = State(initialValue: initialName)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Name \(speakerLabel)").font(.title2.bold())
+            Text("This label applies only to this meeting and is confirmed by you.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            TextField("Participant name", text: $name)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(save)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Save", action: save)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 400)
+    }
+
+    private func save() {
+        onSave(name)
+        dismiss()
     }
 }
 
