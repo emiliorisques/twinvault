@@ -760,6 +760,58 @@ final class TranscriptTests: XCTestCase {
         }
     }
 
+    func testDiarizationStabilityReconcilerMergesOnlyTinyUnstableFragment() {
+        let turns = [
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-A", startTime: 3.58, endTime: 24.58,
+                stabilitySpeakerID: "stable-A"
+            ),
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-B", startTime: 25.52, endTime: 27.88,
+                stabilitySpeakerID: "stable-A"
+            )
+        ]
+
+        let reconciled = DiarizationStabilityReconciler().reconcile(turns)
+
+        XCTAssertEqual(Set(reconciled.map(\.speakerID)), ["primary-A"])
+        XCTAssertEqual(reconciled.map(\.startTime), [3.58, 25.52])
+    }
+
+    func testDiarizationStabilityReconcilerKeepsBriefDistinctSpeaker() {
+        let turns = [
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-A", startTime: 0, endTime: 21,
+                stabilitySpeakerID: "stable-A"
+            ),
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-B", startTime: 22, endTime: 24.3,
+                stabilitySpeakerID: "stable-B"
+            )
+        ]
+
+        let reconciled = DiarizationStabilityReconciler().reconcile(turns)
+
+        XCTAssertEqual(Set(reconciled.map(\.speakerID)), ["primary-A", "primary-B"])
+    }
+
+    func testDiarizationStabilityReconcilerKeepsOverlappingSpeaker() {
+        let turns = [
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-A", startTime: 0, endTime: 21,
+                stabilitySpeakerID: "stable-A"
+            ),
+            LocalDiarizationEngineTurn(
+                speakerID: "primary-B", startTime: 19, endTime: 21,
+                stabilitySpeakerID: "stable-A"
+            )
+        ]
+
+        let reconciled = DiarizationStabilityReconciler().reconcile(turns)
+
+        XCTAssertEqual(Set(reconciled.map(\.speakerID)), ["primary-A", "primary-B"])
+    }
+
     private func writeSilentAudio(to url: URL) throws {
         let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
         let file = try AVAudioFile(forWriting: url, settings: format.settings)

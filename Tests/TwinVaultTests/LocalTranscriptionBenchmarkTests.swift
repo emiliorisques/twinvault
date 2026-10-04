@@ -5,6 +5,43 @@ import XCTest
 /// Opt-in local benchmark. Normal test runs skip it, never access private audio,
 /// and never download model assets.
 final class LocalTranscriptionBenchmarkTests: XCTestCase {
+    func testPrivateDiarizationFixture() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let audioPath = environment["TWINVAULT_DIARIZATION_AUDIO"],
+              let modelsPath = environment["TWINVAULT_DIARIZATION_MODELS"],
+              let outputPath = environment["TWINVAULT_DIARIZATION_OUTPUT"] else {
+            throw XCTSkip("Set the TWINVAULT_DIARIZATION_* environment variables to run this private fixture.")
+        }
+
+        let audioURL = URL(fileURLWithPath: audioPath).standardizedFileURL
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: audioURL.lastPathComponent,
+            channel: .systemAudio
+        )
+        let provider = FluidAudioDiarizationProvider(
+            audioDirectory: audioURL.deletingLastPathComponent(),
+            modelsDirectory: URL(fileURLWithPath: modelsPath).standardizedFileURL,
+            engine: FluidAudioOfflineDiarizationEngine(
+                modelsDirectory: URL(fileURLWithPath: modelsPath).standardizedFileURL,
+                stabilityClusteringThreshold: environment["TWINVAULT_DIARIZATION_STABILITY_THRESHOLD"]
+                    .flatMap(Double.init) ?? 1.30
+            )
+        )
+        let startedAt = ContinuousClock.now
+        let turns = try await provider.diarize(DiarizationRequest(
+            meetingID: meetingID,
+            recording: recording
+        ))
+        try write(DiarizationBenchmarkResult(
+            providerIdentifier: provider.identifier,
+            elapsedSeconds: startedAt.duration(to: .now).seconds,
+            speakerCount: Set(turns.map(\.temporarySpeakerID)).count,
+            turns: turns
+        ), to: URL(fileURLWithPath: outputPath).standardizedFileURL)
+    }
+
     func testPrivateChannelAlignmentFixture() async throws {
         let environment = ProcessInfo.processInfo.environment
         guard let microphonePath = environment["TWINVAULT_ALIGNMENT_MICROPHONE"],
@@ -249,6 +286,13 @@ private struct BenchmarkResult: Codable {
     let reviewIntervals: [TranscriptReviewInterval]
     let segments: [TranscriptSegment]
     let error: String?
+}
+
+private struct DiarizationBenchmarkResult: Codable {
+    let providerIdentifier: String
+    let elapsedSeconds: Double
+    let speakerCount: Int
+    let turns: [DiarizationTurn]
 }
 
 private struct LanguageIdentificationBenchmarkResult: Codable {

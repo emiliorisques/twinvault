@@ -32,6 +32,19 @@ struct LocalDiarizationEngineTurn: Equatable, Sendable {
     let speakerID: String
     let startTime: TimeInterval
     let endTime: TimeInterval
+    let stabilitySpeakerID: String?
+
+    init(
+        speakerID: String,
+        startTime: TimeInterval,
+        endTime: TimeInterval,
+        stabilitySpeakerID: String? = nil
+    ) {
+        self.speakerID = speakerID
+        self.startTime = startTime
+        self.endTime = endTime
+        self.stabilitySpeakerID = stabilitySpeakerID
+    }
 }
 
 protocol LocalDiarizationEngine: Sendable {
@@ -45,13 +58,20 @@ protocol LocalDiarizationEngine: Sendable {
 /// are downloaded only after the user explicitly requests diarization; audio
 /// remains a local file and is never uploaded.
 actor FluidAudioOfflineDiarizationEngine: LocalDiarizationEngine {
-    private let modelsDirectory: URL
-    private var manager: OfflineDiarizerManager?
+    private struct Runtime: Sendable {
+        let primary: OfflineDiarizerManager
+        let stability: OfflineDiarizerManager
+    }
 
-    init(modelsDirectory: URL) {
+    private let modelsDirectory: URL
+    private let stabilityClusteringThreshold: Double
+    private var runtime: Runtime?
+
+    init(modelsDirectory: URL, stabilityClusteringThreshold: Double = 1.30) {
         self.modelsDirectory = modelsDirectory
             .appending(path: "fluid-audio-offline-diarization", directoryHint: .isDirectory)
             .standardizedFileURL
+        self.stabilityClusteringThreshold = stabilityClusteringThreshold
     }
 
     func diarize(
@@ -59,29 +79,46 @@ actor FluidAudioOfflineDiarizationEngine: LocalDiarizationEngine {
         progressHandler: (@Sendable (DiarizationProgress) -> Void)?
     ) async throws -> [LocalDiarizationEngineTurn] {
         progressHandler?(DiarizationProgress(stage: .preparingModel))
-        let manager = try await loadManager(progressHandler: progressHandler)
+        let runtime = try await loadRuntime(progressHandler: progressHandler)
         try Task.checkCancellation()
         progressHandler?(DiarizationProgress(stage: .analyzingSpeakers, fractionCompleted: 0))
-        let result = try await manager.process(fileURL) { completed, total in
+
+        let sourceResult = try AudioSourceFactory().makeDiskBackedSource(
+            from: fileURL,
+            targetSampleRate: OfflineDiarizerConfig.default.sampleRate
+        )
+        defer { sourceResult.source.cleanup() }
+        let prepared = try await runtime.primary.prepare(
+            audioSource: sourceResult.source,
+            audioLoadingSeconds: sourceResult.loadDuration
+        ) { completed, total in
             progressHandler?(DiarizationProgress(
                 stage: .analyzingSpeakers,
-                fractionCompleted: total > 0 ? Double(completed) / Double(total) : nil
+                fractionCompleted: total > 0 ? 0.9 * Double(completed) / Double(total) : nil
             ))
         }
         try Task.checkCancellation()
-        return result.segments.map {
+        let primaryResult = try runtime.primary.cluster(prepared)
+        let stabilityResult = try runtime.stability.cluster(prepared)
+        progressHandler?(DiarizationProgress(stage: .analyzingSpeakers, fractionCompleted: 1))
+        return primaryResult.segments.map { segment in
             LocalDiarizationEngineTurn(
-                speakerID: $0.speakerId,
-                startTime: TimeInterval($0.startTimeSeconds),
-                endTime: TimeInterval($0.endTimeSeconds)
+                speakerID: segment.speakerId,
+                startTime: TimeInterval(segment.startTimeSeconds),
+                endTime: TimeInterval(segment.endTimeSeconds),
+                stabilitySpeakerID: stabilityResult.segments.max(by: {
+                    overlap($0, segment) < overlap($1, segment)
+                }).flatMap { stableSegment in
+                    overlap(stableSegment, segment) > 0 ? stableSegment.speakerId : nil
+                }
             )
         }
     }
 
-    private func loadManager(
+    private func loadRuntime(
         progressHandler: (@Sendable (DiarizationProgress) -> Void)?
-    ) async throws -> OfflineDiarizerManager {
-        if let manager { return manager }
+    ) async throws -> Runtime {
+        if let runtime { return runtime }
         let loadedModels = try await OfflineDiarizerModels.load(
             from: modelsDirectory,
             progressHandler: { progress in
@@ -99,10 +136,125 @@ actor FluidAudioOfflineDiarizationEngine: LocalDiarizationEngine {
             }
         )
         try Task.checkCancellation()
-        let loadedManager = OfflineDiarizerManager()
-        loadedManager.initialize(models: loadedModels)
-        manager = loadedManager
-        return loadedManager
+        let primary = OfflineDiarizerManager()
+        primary.initialize(models: loadedModels)
+        var stabilityConfiguration = OfflineDiarizerConfig.default
+        stabilityConfiguration.clusteringThreshold = stabilityClusteringThreshold
+        let stability = OfflineDiarizerManager(config: stabilityConfiguration)
+        stability.initialize(models: loadedModels)
+        let loadedRuntime = Runtime(primary: primary, stability: stability)
+        runtime = loadedRuntime
+        return loadedRuntime
+    }
+
+    private func overlap(
+        _ lhs: TimedSpeakerSegment,
+        _ rhs: TimedSpeakerSegment
+    ) -> TimeInterval {
+        TimeInterval(max(
+            0,
+            min(lhs.endTimeSeconds, rhs.endTimeSeconds)
+                - max(lhs.startTimeSeconds, rhs.startTimeSeconds)
+        ))
+    }
+}
+
+/// A second, slightly more merge-tolerant clustering pass acts only as
+/// stability evidence. It can repair a tiny unstable fragment, but it never
+/// discards a brief speaker that remains acoustically distinct in both passes.
+struct DiarizationStabilityReconciler: Sendable {
+    let maximumUnstableDuration: TimeInterval
+    let maximumUnstableShare: Double
+    let minimumStableCoverage: Double
+    let minimumDominantDuration: TimeInterval
+    let minimumDominanceRatio: Double
+
+    init(
+        maximumUnstableDuration: TimeInterval = 3,
+        maximumUnstableShare: Double = 0.12,
+        minimumStableCoverage: Double = 0.8,
+        minimumDominantDuration: TimeInterval = 10,
+        minimumDominanceRatio: Double = 3
+    ) {
+        self.maximumUnstableDuration = maximumUnstableDuration
+        self.maximumUnstableShare = maximumUnstableShare
+        self.minimumStableCoverage = minimumStableCoverage
+        self.minimumDominantDuration = minimumDominantDuration
+        self.minimumDominanceRatio = minimumDominanceRatio
+    }
+
+    func reconcile(_ turns: [LocalDiarizationEngineTurn]) -> [LocalDiarizationEngineTurn] {
+        let durations = Dictionary(grouping: turns, by: \.speakerID).mapValues {
+            $0.reduce(0) { $0 + max(0, $1.endTime - $1.startTime) }
+        }
+        let totalDuration = durations.values.reduce(0, +)
+        guard durations.count > 1, totalDuration > 0 else { return turns }
+
+        var replacements: [String: String] = [:]
+        for (candidateID, candidateDuration) in durations {
+            guard candidateDuration <= maximumUnstableDuration,
+                  candidateDuration / totalDuration <= maximumUnstableShare,
+                  let stableID = confidentStabilityID(
+                    for: candidateID,
+                    turns: turns,
+                    speakerDuration: candidateDuration
+                  ) else { continue }
+
+            let dominant = durations
+                .filter { speakerID, duration in
+                    speakerID != candidateID
+                        && duration >= minimumDominantDuration
+                        && duration >= candidateDuration * minimumDominanceRatio
+                        && confidentStabilityID(
+                            for: speakerID,
+                            turns: turns,
+                            speakerDuration: duration
+                        ) == stableID
+                        && !overlaps(candidateID, speakerID, turns: turns)
+                }
+                .max { $0.value < $1.value }
+            if let dominant { replacements[candidateID] = dominant.key }
+        }
+
+        return turns.map { turn in
+            guard let replacement = replacements[turn.speakerID] else { return turn }
+            return LocalDiarizationEngineTurn(
+                speakerID: replacement,
+                startTime: turn.startTime,
+                endTime: turn.endTime,
+                stabilitySpeakerID: turn.stabilitySpeakerID
+            )
+        }
+    }
+
+    private func confidentStabilityID(
+        for speakerID: String,
+        turns: [LocalDiarizationEngineTurn],
+        speakerDuration: TimeInterval
+    ) -> String? {
+        let coverage = turns
+            .filter { $0.speakerID == speakerID }
+            .reduce(into: [String: TimeInterval]()) { result, turn in
+                guard let stabilitySpeakerID = turn.stabilitySpeakerID else { return }
+                result[stabilitySpeakerID, default: 0] += max(0, turn.endTime - turn.startTime)
+            }
+        guard let best = coverage.max(by: { $0.value < $1.value }),
+              best.value / speakerDuration >= minimumStableCoverage else { return nil }
+        return best.key
+    }
+
+    private func overlaps(
+        _ lhsSpeakerID: String,
+        _ rhsSpeakerID: String,
+        turns: [LocalDiarizationEngineTurn]
+    ) -> Bool {
+        let lhs = turns.filter { $0.speakerID == lhsSpeakerID }
+        let rhs = turns.filter { $0.speakerID == rhsSpeakerID }
+        return lhs.contains { left in
+            rhs.contains { right in
+                min(left.endTime, right.endTime) - max(left.startTime, right.startTime) > 0.05
+            }
+        }
     }
 }
 
@@ -144,10 +296,10 @@ actor FluidAudioDiarizationProvider: DiarizationProvider {
         } catch {
             throw LocalDiarizationError.unreadableRecording
         }
-        let rawTurns = try await engine.diarize(
+        let rawTurns = DiarizationStabilityReconciler().reconcile(try await engine.diarize(
             fileURL: fileURL,
             progressHandler: request.progressHandler
-        ).filter { $0.endTime > $0.startTime }
+        )).filter { $0.endTime > $0.startTime }
         guard !rawTurns.isEmpty else { throw LocalDiarizationError.noSpeechDetected }
 
         let ordered = rawTurns.sorted {
