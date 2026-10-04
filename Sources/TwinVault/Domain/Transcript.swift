@@ -329,6 +329,66 @@ struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// A reversible, explicit user correction over session-local diarization
+/// clusters. Raw model turns remain unchanged and inspectable.
+struct SpeakerClusterCorrection: Identifiable, Codable, Equatable, Sendable {
+    enum Basis: String, Codable, Sendable {
+        case userConfirmedMerge
+    }
+
+    let id: UUID
+    let meetingID: UUID
+    let sourceRecordingID: UUID
+    let sourceTemporarySpeakerID: String
+    let canonicalTemporarySpeakerID: String
+    let basis: Basis
+    let confirmedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        sourceTemporarySpeakerID: String,
+        canonicalTemporarySpeakerID: String,
+        basis: Basis = .userConfirmedMerge,
+        confirmedAt: Date = .now
+    ) {
+        self.id = id
+        self.meetingID = meetingID
+        self.sourceRecordingID = sourceRecordingID
+        self.sourceTemporarySpeakerID = sourceTemporarySpeakerID
+        self.canonicalTemporarySpeakerID = canonicalTemporarySpeakerID
+        self.basis = basis
+        self.confirmedAt = confirmedAt
+    }
+}
+
+struct SpeakerClusterResolver: Sendable {
+    func canonicalTemporarySpeakerID(
+        for identifier: String,
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        corrections: [SpeakerClusterCorrection]
+    ) -> String {
+        let mappings = Dictionary(
+            corrections
+                .filter {
+                    $0.meetingID == meetingID
+                        && $0.sourceRecordingID == sourceRecordingID
+                        && $0.basis == .userConfirmedMerge
+                }
+                .map { ($0.sourceTemporarySpeakerID, $0.canonicalTemporarySpeakerID) },
+            uniquingKeysWith: { _, latest in latest }
+        )
+        var current = identifier
+        var visited = Set<String>()
+        while let next = mappings[current], next != current, visited.insert(current).inserted {
+            current = next
+        }
+        return current
+    }
+}
+
 struct DiarizationProgress: Equatable, Sendable {
     enum Stage: Equatable, Sendable {
         case preparingModel
@@ -373,10 +433,11 @@ protocol DiarizationProvider: Sendable {
 struct TranscriptSpeakerAttribution: Sendable {
     func temporarySpeakerID(
         for segment: TranscriptSegment,
-        turns: [DiarizationTurn]
+        turns: [DiarizationTurn],
+        corrections: [SpeakerClusterCorrection] = []
     ) -> String? {
         guard let recordingID = segment.sourceRecordingID else { return nil }
-        return turns
+        let rawIdentifier = turns
             .filter {
                 $0.sourceRecordingID == recordingID
                     && $0.endTime > segment.startTime
@@ -398,6 +459,13 @@ struct TranscriptSpeakerAttribution: Sendable {
                 return $0.overlap > $1.overlap
             }
             .first?.id
+        guard let rawIdentifier else { return nil }
+        return SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: rawIdentifier,
+            meetingID: segment.meetingID,
+            sourceRecordingID: recordingID,
+            corrections: corrections
+        )
     }
 }
 

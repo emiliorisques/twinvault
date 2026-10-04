@@ -70,7 +70,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 11)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 12)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -126,6 +126,13 @@ final class JSONMeetingRepositoryTests: XCTestCase {
                 providerIdentifier: "test.diarizer",
                 temporarySpeakerID: "speaker-1"
             )],
+            speakerClusterCorrections: [SpeakerClusterCorrection(
+                meetingID: meetingID,
+                sourceRecordingID: recordingID,
+                sourceTemporarySpeakerID: "speaker-2",
+                canonicalTemporarySpeakerID: "speaker-1",
+                confirmedAt: Date(timeIntervalSince1970: 123)
+            )],
             transcriptReviewIntervals: [reviewInterval],
             crossChannelTranscriptFindings: [finding],
             channelAlignmentEstimate: alignment,
@@ -144,6 +151,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
         XCTAssertEqual(loaded?.diarizationTurns, meeting.diarizationTurns)
+        XCTAssertEqual(loaded?.speakerClusterCorrections, meeting.speakerClusterCorrections)
         XCTAssertEqual(loaded?.transcriptReviewIntervals, [reviewInterval])
         XCTAssertEqual(loaded?.crossChannelTranscriptFindings, [finding])
         XCTAssertEqual(loaded?.channelAlignmentEstimate, alignment)

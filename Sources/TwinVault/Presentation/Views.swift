@@ -179,19 +179,48 @@ struct MeetingDetailView: View {
     }
 
     private var temporarySpeakerCount: Int {
-        Set(meeting.diarizationTurns.map(\.temporarySpeakerID)).count
+        guard let recordingID = systemAudioRecording?.id else { return 0 }
+        return Set(rawTemporarySpeakerIDs.map {
+            resolvedTemporarySpeakerID($0, recordingID: recordingID)
+        }).count
     }
 
-    private func temporarySpeakerLabel(for segment: TranscriptSegment) -> String? {
-        guard let identifier = TranscriptSpeakerAttribution().temporarySpeakerID(
-            for: segment,
-            turns: meeting.diarizationTurns
-        ) else { return nil }
+    private var rawTemporarySpeakerIDs: [String] {
+        guard let recordingID = systemAudioRecording?.id else { return [] }
+        return Set(meeting.diarizationTurns.compactMap { turn in
+            turn.sourceRecordingID == recordingID ? turn.temporarySpeakerID : nil
+        }).sorted()
+    }
+
+    private var hasSpeakerCorrections: Bool {
+        guard let recordingID = systemAudioRecording?.id else { return false }
+        return meeting.speakerClusterCorrections.contains { $0.sourceRecordingID == recordingID }
+    }
+
+    private func resolvedTemporarySpeakerID(_ identifier: String, recordingID: UUID) -> String {
+        SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: identifier,
+            meetingID: meeting.id,
+            sourceRecordingID: recordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+    }
+
+    private func speakerLabel(_ identifier: String) -> String {
         if identifier.hasPrefix("speaker-"),
            let number = identifier.split(separator: "-").last {
             return "Speaker \(number)"
         }
         return identifier
+    }
+
+    private func temporarySpeakerLabel(for segment: TranscriptSegment) -> String? {
+        guard let identifier = TranscriptSpeakerAttribution().temporarySpeakerID(
+            for: segment,
+            turns: meeting.diarizationTurns,
+            corrections: meeting.speakerClusterCorrections
+        ) else { return nil }
+        return speakerLabel(identifier)
     }
 
     var body: some View {
@@ -371,13 +400,66 @@ struct MeetingDetailView: View {
                                     || model.transcribingMeetingID != nil
                             )
                             if temporarySpeakerCount > 0 {
-                                Text("\(temporarySpeakerCount) temporary speaker\(temporarySpeakerCount == 1 ? "" : "s")")
+                                Text("\(temporarySpeakerCount) reviewed speaker\(temporarySpeakerCount == 1 ? "" : "s")")
                                     .foregroundStyle(.secondary)
+                            }
+                        }
+                        if let recordingID = systemAudioRecording?.id {
+                            ForEach(rawTemporarySpeakerIDs, id: \.self) { identifier in
+                                let resolved = resolvedTemporarySpeakerID(
+                                    identifier,
+                                    recordingID: recordingID
+                                )
+                                HStack {
+                                    Text(speakerLabel(identifier))
+                                    if resolved != identifier {
+                                        Label(
+                                            "Same as \(speakerLabel(resolved))",
+                                            systemImage: "person.2.fill"
+                                        )
+                                        .font(.caption)
+                                        .foregroundStyle(.green)
+                                    }
+                                    Spacer()
+                                    Menu("Merge with…") {
+                                        ForEach(
+                                            rawTemporarySpeakerIDs.filter { $0 != identifier },
+                                            id: \.self
+                                        ) { target in
+                                            Button("Same as \(speakerLabel(target))") {
+                                                Task {
+                                                    await model.mergeTemporarySpeaker(
+                                                        meetingID: meeting.id,
+                                                        sourceRecordingID: recordingID,
+                                                        sourceTemporarySpeakerID: identifier,
+                                                        into: target
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                    .disabled(rawTemporarySpeakerIDs.count < 2)
+                                }
+                            }
+                            if hasSpeakerCorrections {
+                                Button("Reset Speaker Corrections", role: .destructive) {
+                                    Task {
+                                        await model.resetSpeakerCorrections(
+                                            meetingID: meeting.id,
+                                            sourceRecordingID: recordingID
+                                        )
+                                    }
+                                }
                             }
                         }
                         Text("Runs locally on system audio. Labels are valid only inside this meeting and are not person identities. The first run downloads the local model.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                        if !rawTemporarySpeakerIDs.isEmpty {
+                            Text("Merges are explicit user-confirmed corrections. Original model turns are preserved and you can reset the corrections at any time.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Divider()

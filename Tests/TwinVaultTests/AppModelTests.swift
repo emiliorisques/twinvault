@@ -543,6 +543,12 @@ final class AppModelTests: XCTestCase {
             id: meetingID,
             title: "Diarization",
             audioRecordings: [microphone, system],
+            speakerClusterCorrections: [SpeakerClusterCorrection(
+                meetingID: meetingID,
+                sourceRecordingID: system.id,
+                sourceTemporarySpeakerID: "speaker-2",
+                canonicalTemporarySpeakerID: "speaker-1"
+            )],
             status: .completed
         ))
         let diarizer = FakeDiarizationProvider()
@@ -565,8 +571,74 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.diarizationTurns.count, 1)
         XCTAssertEqual(stored?.diarizationTurns.first?.sourceRecordingID, system.id)
         XCTAssertEqual(stored?.diarizationTurns.first?.temporarySpeakerID, "speaker-1")
+        XCTAssertTrue(stored?.speakerClusterCorrections.isEmpty == true)
         XCTAssertNil(model.diarizationActivity)
         XCTAssertNil(model.errorMessage)
+    }
+
+    func testUserSpeakerMergePersistsSeparatelyAndCanBeReset() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let recording = AudioRecordingReference(
+            id: recordingID,
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio
+        )
+        let rawTurns = [
+            DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 0,
+                endTime: 4,
+                sourceRecordingID: recordingID,
+                temporarySpeakerID: "speaker-1"
+            ),
+            DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 4,
+                endTime: 5,
+                sourceRecordingID: recordingID,
+                temporarySpeakerID: "speaker-2"
+            )
+        ]
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Review",
+            audioRecordings: [recording],
+            diarizationTurns: rawTurns,
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.mergeTemporarySpeaker(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            sourceTemporarySpeakerID: "speaker-2",
+            into: "speaker-1"
+        )
+
+        var stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.diarizationTurns, rawTurns)
+        XCTAssertEqual(stored?.speakerClusterCorrections.count, 1)
+        XCTAssertEqual(stored?.speakerClusterCorrections.first?.basis, .userConfirmedMerge)
+
+        await model.resetSpeakerCorrections(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID
+        )
+
+        stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.diarizationTurns, rawTurns)
+        XCTAssertTrue(stored?.speakerClusterCorrections.isEmpty == true)
     }
 }
 

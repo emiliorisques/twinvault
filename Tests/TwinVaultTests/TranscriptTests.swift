@@ -696,6 +696,70 @@ final class TranscriptTests: XCTestCase {
         )
     }
 
+    func testUserCorrectionResolvesSpeakerWithoutChangingRawDiarizationTurn() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 2,
+            text: "Closing phrase",
+            sourceRecordingID: recordingID
+        )
+        let rawTurn = DiarizationTurn(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 2,
+            sourceRecordingID: recordingID,
+            temporarySpeakerID: "speaker-2"
+        )
+        let correction = SpeakerClusterCorrection(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            sourceTemporarySpeakerID: "speaker-2",
+            canonicalTemporarySpeakerID: "speaker-1"
+        )
+
+        XCTAssertEqual(
+            TranscriptSpeakerAttribution().temporarySpeakerID(
+                for: segment,
+                turns: [rawTurn],
+                corrections: [correction]
+            ),
+            "speaker-1"
+        )
+        XCTAssertEqual(rawTurn.temporarySpeakerID, "speaker-2")
+    }
+
+    func testSpeakerCorrectionResolverTerminatesOnCircularLegacyData() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let corrections = [
+            SpeakerClusterCorrection(
+                meetingID: meetingID,
+                sourceRecordingID: recordingID,
+                sourceTemporarySpeakerID: "speaker-1",
+                canonicalTemporarySpeakerID: "speaker-2"
+            ),
+            SpeakerClusterCorrection(
+                meetingID: meetingID,
+                sourceRecordingID: recordingID,
+                sourceTemporarySpeakerID: "speaker-2",
+                canonicalTemporarySpeakerID: "speaker-1"
+            )
+        ]
+
+        XCTAssertEqual(
+            SpeakerClusterResolver().canonicalTemporarySpeakerID(
+                for: "speaker-1",
+                meetingID: meetingID,
+                sourceRecordingID: recordingID,
+                corrections: corrections
+            ),
+            "speaker-1"
+        )
+    }
+
     func testFluidDiarizationProviderKeepsSourceTimeProvenanceAndFirstAppearanceLabels() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appending(path: "TwinVaultDiarizationTests-\(UUID().uuidString)")

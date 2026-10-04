@@ -484,6 +484,11 @@ final class AppModel {
             try Task.checkCancellation()
             meeting.diarizationTurns.removeAll { $0.sourceRecordingID == recording.id }
             meeting.diarizationTurns.append(contentsOf: turns)
+            // Corrections describe a specific clustering result. A fresh model
+            // run must not silently inherit mappings for clusters it recreated.
+            meeting.speakerClusterCorrections.removeAll {
+                $0.sourceRecordingID == recording.id
+            }
             meeting.diarizationTurns.sort {
                 if $0.startTime == $1.startTime { return $0.endTime < $1.endTime }
                 return $0.startTime < $1.startTime
@@ -512,6 +517,71 @@ final class AppModel {
 
     func cancelDiarization() {
         diarizationTask?.cancel()
+    }
+
+    func mergeTemporarySpeaker(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        sourceTemporarySpeakerID: String,
+        into canonicalTemporarySpeakerID: String
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let rawIdentifiers = Set(meeting.diarizationTurns.compactMap { turn in
+            turn.sourceRecordingID == sourceRecordingID ? turn.temporarySpeakerID : nil
+        })
+        guard rawIdentifiers.contains(sourceTemporarySpeakerID),
+              rawIdentifiers.contains(canonicalTemporarySpeakerID),
+              sourceTemporarySpeakerID != canonicalTemporarySpeakerID else {
+            errorMessage = "Only detected speakers from the same recording can be merged."
+            return
+        }
+
+        var corrections = meeting.speakerClusterCorrections
+        corrections.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.sourceTemporarySpeakerID == sourceTemporarySpeakerID
+        }
+        let resolvedTarget = SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: canonicalTemporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: corrections
+        )
+        guard resolvedTarget != sourceTemporarySpeakerID else {
+            errorMessage = "That merge would create a circular speaker correction."
+            return
+        }
+
+        corrections.append(SpeakerClusterCorrection(
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            sourceTemporarySpeakerID: sourceTemporarySpeakerID,
+            canonicalTemporarySpeakerID: resolvedTarget
+        ))
+        meeting.speakerClusterCorrections = corrections
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func resetSpeakerCorrections(meetingID: UUID, sourceRecordingID: UUID) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let previousCount = meeting.speakerClusterCorrections.count
+        meeting.speakerClusterCorrections.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+        }
+        guard meeting.speakerClusterCorrections.count != previousCount else { return }
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     private func containsSpeech(_ recording: AudioRecordingReference) async throws -> Bool {
