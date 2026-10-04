@@ -1,3 +1,4 @@
+import AVFAudio
 import XCTest
 @testable import TwinVault
 
@@ -700,11 +701,11 @@ final class TranscriptTests: XCTestCase {
             .appending(path: "TwinVaultDiarizationTests-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
-        try Data([0]).write(to: directory.appending(path: "system.m4a"))
+        try writeSilentAudio(to: directory.appending(path: "system.caf"))
         let meetingID = UUID()
         let recording = AudioRecordingReference(
             meetingID: meetingID,
-            relativePath: "system.m4a",
+            relativePath: "system.caf",
             channel: .systemAudio,
             meetingTimelineOffset: 4.5
         )
@@ -728,6 +729,43 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(turns.map(\.startTime), [2, 3, 5])
         XCTAssertTrue(turns.allSatisfy { $0.sourceRecordingID == recording.id })
         XCTAssertTrue(turns.allSatisfy { $0.providerIdentifier == "fluid-audio.offline-vbx" })
+    }
+
+    func testFluidDiarizationProviderRejectsIncompleteAudioBeforeModelProcessing() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "TwinVaultDiarizationTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data("not a complete audio file".utf8).write(to: directory.appending(path: "system.m4a"))
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio
+        )
+        let provider = FluidAudioDiarizationProvider(
+            audioDirectory: directory,
+            modelsDirectory: directory,
+            engine: FixedLocalDiarizationEngine(turns: [])
+        )
+
+        do {
+            _ = try await provider.diarize(DiarizationRequest(
+                meetingID: meetingID,
+                recording: recording
+            ))
+            XCTFail("Expected incomplete audio to be rejected")
+        } catch let error as LocalDiarizationError {
+            XCTAssertEqual(error, .unreadableRecording)
+        }
+    }
+
+    private func writeSilentAudio(to url: URL) throws {
+        let format = AVAudioFormat(standardFormatWithSampleRate: 16_000, channels: 1)!
+        let file = try AVAudioFile(forWriting: url, settings: format.settings)
+        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 1_600)!
+        buffer.frameLength = 1_600
+        try file.write(from: buffer)
     }
 
     private func candidate(

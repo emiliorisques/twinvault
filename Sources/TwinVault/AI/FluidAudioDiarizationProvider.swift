@@ -1,4 +1,5 @@
 import FluidAudio
+import AVFAudio
 import Foundation
 
 // FluidAudio documents OfflineDiarizerManager as internally coordinating its
@@ -10,6 +11,7 @@ extension OfflineDiarizerManager: @retroactive @unchecked Sendable {}
 enum LocalDiarizationError: LocalizedError, Equatable {
     case invalidRecordingReference
     case recordingMissing
+    case unreadableRecording
     case noSpeechDetected
 
     var errorDescription: String? {
@@ -18,6 +20,8 @@ enum LocalDiarizationError: LocalizedError, Equatable {
             "The audio recording reference is invalid."
         case .recordingMissing:
             "The local audio file could not be found."
+        case .unreadableRecording:
+            "This audio recording is incomplete or damaged and cannot be analyzed. Choose another meeting or make a new recording."
         case .noSpeechDetected:
             "No speaker turns were detected in the system audio."
         }
@@ -129,6 +133,16 @@ actor FluidAudioDiarizationProvider: DiarizationProvider {
         }
         guard FileManager.default.fileExists(atPath: fileURL.path) else {
             throw LocalDiarizationError.recordingMissing
+        }
+        do {
+            let audioFile = try AVAudioFile(forReading: fileURL)
+            guard audioFile.length > 0,
+                  audioFile.fileFormat.sampleRate > 0,
+                  audioFile.fileFormat.channelCount > 0 else {
+                throw LocalDiarizationError.unreadableRecording
+            }
+        } catch {
+            throw LocalDiarizationError.unreadableRecording
         }
         let rawTurns = try await engine.diarize(
             fileURL: fileURL,
