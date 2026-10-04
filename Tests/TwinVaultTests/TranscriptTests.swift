@@ -654,6 +654,82 @@ final class TranscriptTests: XCTestCase {
         }
     }
 
+    func testTranscriptSpeakerAttributionUsesLargestOverlapOnSameRecording() {
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let otherRecordingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 10,
+            endTime: 14,
+            text: "A transcript segment",
+            sourceRecordingID: recordingID
+        )
+        let turns = [
+            DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 10,
+                endTime: 11,
+                sourceRecordingID: recordingID,
+                temporarySpeakerID: "speaker-1"
+            ),
+            DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 11,
+                endTime: 14,
+                sourceRecordingID: recordingID,
+                temporarySpeakerID: "speaker-2"
+            ),
+            DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 10,
+                endTime: 14,
+                sourceRecordingID: otherRecordingID,
+                temporarySpeakerID: "wrong-channel"
+            )
+        ]
+
+        XCTAssertEqual(
+            TranscriptSpeakerAttribution().temporarySpeakerID(for: segment, turns: turns),
+            "speaker-2"
+        )
+    }
+
+    func testFluidDiarizationProviderKeepsSourceTimeProvenanceAndFirstAppearanceLabels() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appending(path: "TwinVaultDiarizationTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try Data([0]).write(to: directory.appending(path: "system.m4a"))
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 4.5
+        )
+        let engine = FixedLocalDiarizationEngine(turns: [
+            LocalDiarizationEngineTurn(speakerID: "cluster-B", startTime: 2, endTime: 3),
+            LocalDiarizationEngineTurn(speakerID: "cluster-A", startTime: 3, endTime: 4),
+            LocalDiarizationEngineTurn(speakerID: "cluster-B", startTime: 5, endTime: 6)
+        ])
+        let provider = FluidAudioDiarizationProvider(
+            audioDirectory: directory,
+            modelsDirectory: directory,
+            engine: engine
+        )
+
+        let turns = try await provider.diarize(DiarizationRequest(
+            meetingID: meetingID,
+            recording: recording
+        ))
+
+        XCTAssertEqual(turns.map(\.temporarySpeakerID), ["speaker-1", "speaker-2", "speaker-1"])
+        XCTAssertEqual(turns.map(\.startTime), [2, 3, 5])
+        XCTAssertTrue(turns.allSatisfy { $0.sourceRecordingID == recording.id })
+        XCTAssertTrue(turns.allSatisfy { $0.providerIdentifier == "fluid-audio.offline-vbx" })
+    }
+
     private func candidate(
         _ meetingID: UUID, _ recordingID: UUID,
         _ start: TimeInterval, _ end: TimeInterval,
@@ -681,5 +757,17 @@ final class TranscriptTests: XCTestCase {
             localeIdentifiers: ["es-ES", "ca-ES", "en-US"],
             isRecommended: recommended
         )
+    }
+}
+
+private struct FixedLocalDiarizationEngine: LocalDiarizationEngine {
+    let turns: [LocalDiarizationEngineTurn]
+
+    func diarize(
+        fileURL: URL,
+        progressHandler: (@Sendable (DiarizationProgress) -> Void)?
+    ) async throws -> [LocalDiarizationEngineTurn] {
+        progressHandler?(DiarizationProgress(stage: .analyzingSpeakers, fractionCompleted: 1))
+        return turns
     }
 }

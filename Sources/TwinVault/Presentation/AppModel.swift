@@ -7,6 +7,12 @@ struct TranscriptionActivity: Equatable {
     var progress: TranscriptionProgress
 }
 
+struct DiarizationActivity: Equatable {
+    let id: UUID
+    let meetingID: UUID
+    var progress: DiarizationProgress
+}
+
 enum RecordingChannelStatus: Equatable {
     case notRequested
     case recording
@@ -31,13 +37,17 @@ final class AppModel {
     private let speechTurnDetector: any SpeechTurnDetecting
     private let channelAlignmentAnalyzer: any AudioChannelAlignmentAnalyzing
     private let acousticLeakageAnalyzer: any AcousticPlaybackLeakageAnalyzing
+    private let diarizationProvider: (any DiarizationProvider)?
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
+    private var diarizationTask: Task<Void, Never>?
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
     private(set) var transcriptionActivity: TranscriptionActivity?
     private(set) var transcribingMeetingID: UUID?
+    private(set) var diarizationActivity: DiarizationActivity?
+    var canDiarizeLocally: Bool { diarizationProvider != nil }
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
     var recordingCaptureStatus: RecordingCaptureStatus? {
         guard let meeting = activeSession?.meeting else { return nil }
@@ -68,7 +78,8 @@ final class AppModel {
         audioDirectory: URL,
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
-        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil
+        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
+        diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         self.repository = repository
         self.audio = audio
@@ -94,6 +105,7 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
+        self.diarizationProvider = diarizationProvider
     }
 
     init(
@@ -106,7 +118,8 @@ final class AppModel {
         audioDirectory: URL,
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
-        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil
+        acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
+        diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
         self.repository = repository
@@ -140,6 +153,7 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
+        self.diarizationProvider = diarizationProvider
     }
 
     func load() async {
@@ -342,7 +356,8 @@ final class AppModel {
         recordingID: UUID,
         profileID: String? = nil
     ) {
-        guard transcriptionTask == nil, transcriptionActivity == nil else { return }
+        guard transcriptionTask == nil, transcriptionActivity == nil,
+              diarizationTask == nil, diarizationActivity == nil else { return }
         transcriptionTask = Task { @MainActor [weak self] in
             defer { self?.transcriptionTask = nil }
             await self?.transcribe(
@@ -396,7 +411,8 @@ final class AppModel {
 
     func startMeetingTranscription(meetingID: UUID, profileID: String? = nil) {
         guard transcriptionTask == nil, transcriptionActivity == nil,
-              transcribingMeetingID == nil else { return }
+              transcribingMeetingID == nil,
+              diarizationTask == nil, diarizationActivity == nil else { return }
         errorMessage = nil
         transcriptionTask = Task { @MainActor [weak self] in
             defer { self?.transcriptionTask = nil }
@@ -406,7 +422,8 @@ final class AppModel {
 
     func startChannelAnalysis(meetingID: UUID) {
         guard transcriptionTask == nil, transcriptionActivity == nil,
-              transcribingMeetingID == nil else { return }
+              transcribingMeetingID == nil,
+              diarizationTask == nil, diarizationActivity == nil else { return }
         errorMessage = nil
         transcriptionTask = Task { @MainActor [weak self] in
             guard let self else { return }
@@ -427,6 +444,74 @@ final class AppModel {
 
     func cancelTranscription() {
         transcriptionTask?.cancel()
+    }
+
+    func diarizeSystemAudio(meetingID: UUID) async {
+        guard diarizationActivity == nil,
+              let provider = diarizationProvider,
+              var meeting = meetings.first(where: { $0.id == meetingID }) else {
+            if diarizationProvider == nil {
+                errorMessage = "Local speaker diarization is unavailable."
+            }
+            return
+        }
+        guard let recording = meeting.audioRecordings.first(where: { $0.channel == .systemAudio }) else {
+            errorMessage = "System audio is required for this first speaker-diarization phase."
+            return
+        }
+
+        let activityID = UUID()
+        diarizationActivity = DiarizationActivity(
+            id: activityID,
+            meetingID: meetingID,
+            progress: DiarizationProgress(stage: .preparingModel)
+        )
+        defer {
+            if diarizationActivity?.id == activityID { diarizationActivity = nil }
+        }
+
+        do {
+            let turns = try await provider.diarize(DiarizationRequest(
+                meetingID: meetingID,
+                recording: recording,
+                progressHandler: { [weak self] progress in
+                    Task { @MainActor [weak self] in
+                        guard self?.diarizationActivity?.id == activityID else { return }
+                        self?.diarizationActivity?.progress = progress
+                    }
+                }
+            ))
+            try Task.checkCancellation()
+            meeting.diarizationTurns.removeAll { $0.sourceRecordingID == recording.id }
+            meeting.diarizationTurns.append(contentsOf: turns)
+            meeting.diarizationTurns.sort {
+                if $0.startTime == $1.startTime { return $0.endTime < $1.endTime }
+                return $0.startTime < $1.startTime
+            }
+            meeting.updatedAt = .now
+            try await repository.save(meeting)
+            await load()
+        } catch is CancellationError {
+            // Existing turns remain untouched until a complete run is persisted.
+        } catch {
+            if Task.isCancelled { return }
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func startSystemAudioDiarization(meetingID: UUID) {
+        guard diarizationTask == nil, diarizationActivity == nil,
+              transcriptionTask == nil, transcriptionActivity == nil,
+              transcribingMeetingID == nil else { return }
+        errorMessage = nil
+        diarizationTask = Task { @MainActor [weak self] in
+            defer { self?.diarizationTask = nil }
+            await self?.diarizeSystemAudio(meetingID: meetingID)
+        }
+    }
+
+    func cancelDiarization() {
+        diarizationTask?.cancel()
     }
 
     private func containsSpeech(_ recording: AudioRecordingReference) async throws -> Bool {

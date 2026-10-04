@@ -30,6 +30,10 @@ struct TwinVaultApplication: App {
                 fastProvider: parakeet,
                 multilingualProvider: whisperKit
             )
+            let diarization = FluidAudioDiarizationProvider(
+                audioDirectory: paths.audioDirectory,
+                modelsDirectory: paths.modelsDirectory
+            )
             let transcriptionProfiles = [
                 TranscriptionProfile(
                     id: "automatic.es-ca-en.experimental",
@@ -68,7 +72,8 @@ struct TwinVaultApplication: App {
                 playback: playback,
                 speechToTextProviders: [automatic, whisperKit, appleSpeech, parakeet],
                 transcriptionProfiles: transcriptionProfiles,
-                audioDirectory: paths.audioDirectory
+                audioDirectory: paths.audioDirectory,
+                diarizationProvider: diarization
             ))
         } catch {
             fatalError("Unable to initialize local vault: \(error)")

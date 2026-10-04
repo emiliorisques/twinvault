@@ -524,6 +524,50 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.transcriptionActivity)
         XCTAssertNil(model.errorMessage)
     }
+
+    func testDiarizationUsesSystemAudioAndPersistsTemporarySpeakerEvidence() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let microphone = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "microphone.m4a",
+            meetingTimelineOffset: 0
+        )
+        let system = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio,
+            meetingTimelineOffset: 0.1
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Diarization",
+            audioRecordings: [microphone, system],
+            status: .completed
+        ))
+        let diarizer = FakeDiarizationProvider()
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory,
+            diarizationProvider: diarizer
+        )
+        await model.load()
+
+        await model.diarizeSystemAudio(meetingID: meetingID)
+
+        let stored = await repository.meeting(id: meetingID)
+        let receivedChannel = await diarizer.receivedChannel()
+        XCTAssertEqual(receivedChannel, .systemAudio)
+        XCTAssertEqual(stored?.diarizationTurns.count, 1)
+        XCTAssertEqual(stored?.diarizationTurns.first?.sourceRecordingID, system.id)
+        XCTAssertEqual(stored?.diarizationTurns.first?.temporarySpeakerID, "speaker-1")
+        XCTAssertNil(model.diarizationActivity)
+        XCTAssertNil(model.errorMessage)
+    }
 }
 
 private enum TestCaptureError: Error {
@@ -674,6 +718,26 @@ private struct CancellableSpeechToTextProvider: SpeechToTextProvider {
         try await Task.sleep(for: .seconds(30))
         return TranscriptionOutput(segments: [])
     }
+}
+
+private actor FakeDiarizationProvider: DiarizationProvider {
+    nonisolated let identifier = "test.diarizer"
+    private var channel: AudioRecordingReference.Channel?
+
+    func diarize(_ request: DiarizationRequest) async throws -> [DiarizationTurn] {
+        channel = request.recording.channel
+        request.progressHandler?(DiarizationProgress(stage: .analyzingSpeakers, fractionCompleted: 1))
+        return [DiarizationTurn(
+            meetingID: request.meetingID,
+            startTime: 1,
+            endTime: 2,
+            sourceRecordingID: request.recording.id,
+            providerIdentifier: identifier,
+            temporarySpeakerID: "speaker-1"
+        )]
+    }
+
+    func receivedChannel() -> AudioRecordingReference.Channel? { channel }
 }
 
 private struct FixedSpeechTurnDetector: SpeechTurnDetecting {

@@ -174,6 +174,26 @@ struct MeetingDetailView: View {
             && channelsWithTranscript.contains(.systemAudio)
     }
 
+    private var systemAudioRecording: AudioRecordingReference? {
+        meeting.audioRecordings.first { $0.channel == .systemAudio }
+    }
+
+    private var temporarySpeakerCount: Int {
+        Set(meeting.diarizationTurns.map(\.temporarySpeakerID)).count
+    }
+
+    private func temporarySpeakerLabel(for segment: TranscriptSegment) -> String? {
+        guard let identifier = TranscriptSpeakerAttribution().temporarySpeakerID(
+            for: segment,
+            turns: meeting.diarizationTurns
+        ) else { return nil }
+        if identifier.hasPrefix("speaker-"),
+           let number = identifier.split(separator: "-").last {
+            return "Speaker \(number)"
+        }
+        return identifier
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -240,6 +260,7 @@ struct MeetingDetailView: View {
                     } label: {
                         Label("Transcribe Meeting", systemImage: "waveform.badge.magnifyingglass")
                     }
+                    .disabled(model.diarizationActivity != nil)
                     .help("Detect speech, transcribe every useful channel locally, align both timelines, and flag probable speaker playback captured by the microphone.")
                     if hasBothChannelTranscripts {
                         Button("Refresh Channel Analysis", systemImage: "arrow.triangle.2.circlepath") {
@@ -314,9 +335,49 @@ struct MeetingDetailView: View {
                             .disabled(
                                 model.transcriptionActivity != nil
                                     || model.transcribingMeetingID != nil
+                                    || model.diarizationActivity != nil
                             )
                             .help("Choose a local transcription profile. The recommended profile supports mixed Spanish, Catalan, and English.")
                         }
+                    }
+                }
+                if systemAudioRecording != nil, model.canDiarizeLocally {
+                    Divider()
+                    Text("Temporary Speakers").font(.title2.bold())
+                    if let activity = model.diarizationActivity,
+                       activity.meetingID == meeting.id {
+                        HStack {
+                            if let fraction = activity.progress.fractionCompleted {
+                                ProgressView(value: fraction).frame(width: 100)
+                            } else {
+                                ProgressView().controlSize(.small)
+                            }
+                            Text(diarizationStatus(activity.progress))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Cancel", role: .cancel) { model.cancelDiarization() }
+                        }
+                    } else {
+                        HStack {
+                            Button(
+                                meeting.diarizationTurns.isEmpty
+                                    ? "Detect Speakers" : "Detect Speakers Again",
+                                systemImage: "person.2.wave.2"
+                            ) {
+                                model.startSystemAudioDiarization(meetingID: meeting.id)
+                            }
+                            .disabled(
+                                model.transcriptionActivity != nil
+                                    || model.transcribingMeetingID != nil
+                            )
+                            if temporarySpeakerCount > 0 {
+                                Text("\(temporarySpeakerCount) temporary speaker\(temporarySpeakerCount == 1 ? "" : "s")")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Text("Runs locally on system audio. Labels are valid only inside this meeting and are not person identities. The first run downloads the local model.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 Divider()
@@ -375,6 +436,11 @@ struct MeetingDetailView: View {
                                 if let localeIdentifier = segment.localeIdentifier {
                                     Text(languageLabel(localeIdentifier)).fontWeight(.semibold)
                                 }
+                                if let speaker = temporarySpeakerLabel(for: segment) {
+                                    Text(speaker)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.blue)
+                                }
                                 if meeting.crossChannelTranscriptFindings.contains(where: {
                                     $0.microphoneSegmentID == segment.id
                                 }) {
@@ -429,5 +495,21 @@ private func transcriptionStatus(_ activity: TranscriptionActivity) -> String {
         return "Detecting spoken languages locally…"
     case .transcribing:
         return "Transcribing locally…"
+    }
+}
+
+private func diarizationStatus(_ progress: DiarizationProgress) -> String {
+    switch progress.stage {
+    case .preparingModel:
+        return "Preparing local speaker model…"
+    case .downloadingModel:
+        if let fraction = progress.fractionCompleted {
+            return "Downloading speaker model \(Int(fraction * 100))%"
+        }
+        return "Downloading speaker model…"
+    case .loadingModel:
+        return "Loading local speaker model…"
+    case .analyzingSpeakers:
+        return "Detecting temporary speakers locally…"
     }
 }

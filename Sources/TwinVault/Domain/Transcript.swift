@@ -49,6 +49,7 @@ protocol SpeechTurnDetecting: Sendable {
 struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let meetingID: UUID
+    /// Times relative to `sourceRecordingID`.
     let startTime: TimeInterval
     let endTime: TimeInterval
     /// Temporary diarization label. It is not a person identity.
@@ -303,6 +304,7 @@ struct TranscriptionPolicy: Sendable {
 struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let meetingID: UUID
+    /// Times relative to `sourceRecordingID`, matching transcript segment time.
     let startTime: TimeInterval
     let endTime: TimeInterval
     /// Exact recording used by the diarizer; nil only for legacy/test data.
@@ -327,9 +329,76 @@ struct DiarizationTurn: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+struct DiarizationProgress: Equatable, Sendable {
+    enum Stage: Equatable, Sendable {
+        case preparingModel
+        case downloadingModel
+        case loadingModel
+        case analyzingSpeakers
+    }
+
+    let stage: Stage
+    let fractionCompleted: Double?
+
+    init(stage: Stage, fractionCompleted: Double? = nil) {
+        self.stage = stage
+        self.fractionCompleted = fractionCompleted.map { min(1, max(0, $0)) }
+    }
+}
+
+struct DiarizationRequest: Sendable {
+    let meetingID: UUID
+    let recording: AudioRecordingReference
+    let progressHandler: (@Sendable (DiarizationProgress) -> Void)?
+
+    init(
+        meetingID: UUID,
+        recording: AudioRecordingReference,
+        progressHandler: (@Sendable (DiarizationProgress) -> Void)? = nil
+    ) {
+        self.meetingID = meetingID
+        self.recording = recording
+        self.progressHandler = progressHandler
+    }
+}
+
 protocol DiarizationProvider: Sendable {
     var identifier: String { get }
-    func diarize(recordings: [AudioRecordingReference], meetingID: UUID) async throws -> [DiarizationTurn]
+    func diarize(_ request: DiarizationRequest) async throws -> [DiarizationTurn]
+}
+
+/// Joins independently persisted transcript and diarization evidence for
+/// presentation. It never writes a speaker label into the transcript and never
+/// turns a temporary cluster into a person identity.
+struct TranscriptSpeakerAttribution: Sendable {
+    func temporarySpeakerID(
+        for segment: TranscriptSegment,
+        turns: [DiarizationTurn]
+    ) -> String? {
+        guard let recordingID = segment.sourceRecordingID else { return nil }
+        return turns
+            .filter {
+                $0.sourceRecordingID == recordingID
+                    && $0.endTime > segment.startTime
+                    && $0.startTime < segment.endTime
+            }
+            .map { turn in
+                (
+                    id: turn.temporarySpeakerID,
+                    overlap: min(turn.endTime, segment.endTime) - max(turn.startTime, segment.startTime),
+                    start: turn.startTime
+                )
+            }
+            .filter { $0.overlap > 0 }
+            .sorted {
+                if $0.overlap == $1.overlap {
+                    if $0.start == $1.start { return $0.id < $1.id }
+                    return $0.start < $1.start
+                }
+                return $0.overlap > $1.overlap
+            }
+            .first?.id
+    }
 }
 
 struct SpeakerIdentityMatch: Equatable, Sendable {

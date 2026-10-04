@@ -22,6 +22,7 @@ TwinVault is a native, local-first macOS meeting memory application. It records 
 - Retry acoustically confirmed gaps from the fast ES/EN route with multilingual WhisperKit and retain only gap-covering evidence.
 - Supply a bounded, local vocabulary prompt from the user-entered meeting title to WhisperKit.
 - Estimate post-recording microphone/system delay and clock drift from bounded local acoustic fingerprints, without assuming that microphone audio is the user's voice.
+- Detect temporary speakers locally in saved system audio and show those meeting-only labels beside overlapping transcript evidence.
 
 ## Development
 
@@ -87,11 +88,13 @@ Phase 2V adds one post-meeting `Transcribe Meeting` action. It checks each saved
 
 Phase 2W makes that protection independent of ASR wording. Reliable channel alignment accounts for each recorder's actual meeting start offset, then compares aligned 100 ms acoustic envelopes for every microphone transcript segment. Strong text or acoustic agreement can create an inspectable playback-leakage finding; weak evidence fails closed. Meeting detail defaults to a derived `Conversation` view that hides only flagged microphone duplicates and offers `Raw Channels` to inspect every original segment. No evidence is deleted or copied, and unflagged microphone speech still does not imply the user's identity.
 
-WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, diarization, and speaker identification are not enabled in this increment. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for the experimental Parakeet adapter. FluidAudio currently exposes a broad package product, so it increases build size beyond the ASR code TwinVault uses; that cost must be measured before production packaging.
+Phase 2X adds explicit post-meeting speaker diarization for system audio. **Detect Speakers** runs FluidAudio's offline Community-1/VBx pipeline, persists timestamped turns with recording/provider provenance, and joins them to transcript segments by temporal overlap without modifying transcript evidence. The first use downloads the local Core ML assets into `TwinVault/models/`; meeting audio is never uploaded. Labels such as “Speaker 1” are scoped to that meeting only: they are not names, biometric identities, or proof that the microphone speaker is the user. Microphone diarization and speaker identification remain deliberately disabled until cross-channel leakage and consented evaluation justify them.
+
+WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, and speaker identification are not enabled. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for experimental Parakeet transcription and offline diarization. FluidAudio currently exposes a broad package product, so it increases build size beyond the code TwinVault uses; model-asset licensing and that packaging cost must be reviewed before distribution.
 
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, Parakeet, experimental Nemotron, and the conservative automatic router are replaceable implementations of `SpeechToTextProvider`. Nemotron is deliberately not registered in the application profile list. Acoustic language identification, diarization, and speaker identification are separate contracts; the latter two remain unimplemented. Structured memory, twins, external integrations, and generative-AI inference remain absent.
+`MeetingRepository` isolates the domain and UI from JSON storage. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, Parakeet, experimental Nemotron, and the conservative automatic router are replaceable implementations of `SpeechToTextProvider`. Nemotron is deliberately not registered in the application profile list. Acoustic language identification, diarization, and speaker identification are separate contracts. FluidAudio implements only diarization; speaker identification remains unimplemented. Structured memory, twins, external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
 Aggregate local evaluation results are recorded in [BENCHMARKS.md](BENCHMARKS.md); private fixtures and raw transcripts are excluded.
