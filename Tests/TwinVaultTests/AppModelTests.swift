@@ -110,6 +110,7 @@ final class AppModelTests: XCTestCase {
         await model.togglePlayback(recording)
 
         XCTAssertEqual(playback.playedURL, fileURL)
+        XCTAssertEqual(playback.playedStartTime, 0)
         XCTAssertNil(model.errorMessage)
         XCTAssertNil(model.playingRecordingID)
     }
@@ -136,10 +137,24 @@ final class AppModelTests: XCTestCase {
         let repository = InMemoryMeetingRepository()
         let meetingID = UUID()
         let recording = AudioRecordingReference(meetingID: meetingID, relativePath: "meeting.m4a")
+        let previousSegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 0,
+            endTime: 1,
+            text: "Previous transcript",
+            sourceRecordingID: recording.id
+        )
         let meeting = Meeting(
             id: meetingID,
             title: "Transcription",
             audioRecordings: [recording],
+            transcriptSegments: [previousSegment],
+            transcriptCorrections: [TranscriptSegmentCorrection(
+                meetingID: meetingID,
+                transcriptSegmentID: previousSegment.id,
+                originalText: previousSegment.text,
+                correctedText: "Reviewed previous transcript"
+            )],
             status: .completed
         )
         await repository.save(meeting)
@@ -159,6 +174,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments.count, 1)
         XCTAssertEqual(stored?.transcriptSegments.first?.sourceRecordingID, recording.id)
         XCTAssertEqual(stored?.transcriptSegments.first?.providerIdentifier, "test.speech")
+        XCTAssertTrue(stored?.transcriptCorrections.isEmpty == true)
         XCTAssertNil(model.transcribingRecordingID)
         XCTAssertNil(model.errorMessage)
     }
@@ -774,6 +790,94 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.speakerLabels.map(\.displayName), ["Laura", "Marc"])
         XCTAssertNotNil(model.errorMessage)
     }
+
+    func testTranscriptCorrectionPreservesOriginalAndCanBeUndone() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 12,
+            endTime: 15,
+            text: "Send the badget Friday"
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Review",
+            transcriptSegments: [segment],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.correctTranscriptSegment(
+            meetingID: meetingID,
+            segmentID: segment.id,
+            correctedText: "  Send the budget Friday  "
+        )
+
+        var stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptSegments, [segment])
+        XCTAssertEqual(stored?.transcriptCorrections.first?.originalText, segment.text)
+        XCTAssertEqual(stored?.transcriptCorrections.first?.correctedText, "Send the budget Friday")
+        XCTAssertEqual(stored?.transcriptCorrections.first?.basis, .userConfirmed)
+
+        await model.resetTranscriptCorrection(meetingID: meetingID, segmentID: segment.id)
+
+        stored = await repository.meeting(id: meetingID)
+        XCTAssertTrue(stored?.transcriptCorrections.isEmpty == true)
+        XCTAssertEqual(stored?.transcriptSegments, [segment])
+    }
+
+    func testTranscriptSegmentPlaybackStartsAtEvidenceTimestamp() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appending(path: "meeting.m4a")
+        try Data([0]).write(to: fileURL)
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "meeting.m4a"
+        )
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 42.5,
+            endTime: 45,
+            text: "Evidence",
+            sourceRecordingID: recording.id
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Playback",
+            audioRecordings: [recording],
+            transcriptSegments: [segment],
+            status: .completed
+        ))
+        let playback = FakePlaybackService()
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: playback,
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: directory
+        )
+        await model.load()
+
+        await model.playTranscriptSegment(meetingID: meetingID, segmentID: segment.id)
+
+        XCTAssertEqual(playback.playedURL, fileURL)
+        XCTAssertEqual(playback.playedStartTime, 42.5)
+        XCTAssertNil(model.errorMessage)
+    }
 }
 
 private enum TestCaptureError: Error {
@@ -867,9 +971,11 @@ private final class InterruptibleSystemAudioService: SystemAudioCaptureService {
 private final class FakePlaybackService: AudioPlaybackService {
     var isPlaying = false
     var playedURL: URL?
+    var playedStartTime: TimeInterval?
 
-    func play(fileURL: URL) async throws {
+    func play(fileURL: URL, startTime: TimeInterval) async throws {
         playedURL = fileURL
+        playedStartTime = startTime
         isPlaying = true
         isPlaying = false
     }

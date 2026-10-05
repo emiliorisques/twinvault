@@ -4,8 +4,14 @@ import Foundation
 @MainActor
 protocol AudioPlaybackService: AnyObject {
     var isPlaying: Bool { get }
-    func play(fileURL: URL) async throws
+    func play(fileURL: URL, startTime: TimeInterval) async throws
     func stop()
+}
+
+extension AudioPlaybackService {
+    func play(fileURL: URL) async throws {
+        try await play(fileURL: fileURL, startTime: 0)
+    }
 }
 
 enum AudioPlaybackError: LocalizedError {
@@ -29,13 +35,14 @@ final class LocalAudioPlaybackService: NSObject, AudioPlaybackService, AVAudioPl
 
     var isPlaying: Bool { player?.isPlaying == true }
 
-    func play(fileURL: URL) async throws {
+    func play(fileURL: URL, startTime: TimeInterval) async throws {
         stop()
         let player = try AVAudioPlayer(contentsOf: fileURL)
         player.delegate = self
         guard player.prepareToPlay() else {
             throw AudioPlaybackError.couldNotPlay
         }
+        player.currentTime = min(player.duration, max(0, startTime))
         self.player = player
         try await withCheckedThrowingContinuation { continuation in
             completion = continuation

@@ -12,6 +12,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
     var importantMoments: [ImportantMoment]
     var audioRecordings: [AudioRecordingReference]
     var transcriptSegments: [TranscriptSegment]
+    var transcriptCorrections: [TranscriptSegmentCorrection]
     var diarizationTurns: [DiarizationTurn]
     var speakerClusterCorrections: [SpeakerClusterCorrection]
     var speakerLabels: [MeetingSpeakerLabel]
@@ -31,6 +32,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         importantMoments: [ImportantMoment] = [],
         audioRecordings: [AudioRecordingReference] = [],
         transcriptSegments: [TranscriptSegment] = [],
+        transcriptCorrections: [TranscriptSegmentCorrection] = [],
         diarizationTurns: [DiarizationTurn] = [],
         speakerClusterCorrections: [SpeakerClusterCorrection] = [],
         speakerLabels: [MeetingSpeakerLabel] = [],
@@ -51,6 +53,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         self.importantMoments = importantMoments
         self.audioRecordings = audioRecordings
         self.transcriptSegments = transcriptSegments
+        self.transcriptCorrections = transcriptCorrections
         self.diarizationTurns = diarizationTurns
         self.speakerClusterCorrections = speakerClusterCorrections
         self.speakerLabels = speakerLabels
@@ -78,7 +81,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case id, title, startDate, endDate, notes, importantMoments
-        case audioRecordings, audioRecording, transcriptSegments, diarizationTurns
+        case audioRecordings, audioRecording, transcriptSegments, transcriptCorrections, diarizationTurns
         case speakerClusterCorrections, speakerLabels, transcriptReviewIntervals
         case crossChannelTranscriptFindings
         case channelAlignmentEstimate
@@ -103,6 +106,10 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
             audioRecordings = []
         }
         transcriptSegments = try container.decodeIfPresent([TranscriptSegment].self, forKey: .transcriptSegments) ?? []
+        transcriptCorrections = try container.decodeIfPresent(
+            [TranscriptSegmentCorrection].self,
+            forKey: .transcriptCorrections
+        ) ?? []
         diarizationTurns = try container.decodeIfPresent([DiarizationTurn].self, forKey: .diarizationTurns) ?? []
         speakerClusterCorrections = try container.decodeIfPresent(
             [SpeakerClusterCorrection].self,
@@ -151,6 +158,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         try container.encode(importantMoments, forKey: .importantMoments)
         try container.encode(audioRecordings, forKey: .audioRecordings)
         try container.encode(transcriptSegments, forKey: .transcriptSegments)
+        try container.encode(transcriptCorrections, forKey: .transcriptCorrections)
         try container.encode(diarizationTurns, forKey: .diarizationTurns)
         try container.encode(speakerClusterCorrections, forKey: .speakerClusterCorrections)
         try container.encode(speakerLabels, forKey: .speakerLabels)

@@ -68,10 +68,11 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertFalse(loaded.requestedSystemAudioCapture)
         XCTAssertTrue(loaded.audioCaptureIssues.isEmpty)
         XCTAssertTrue(loaded.speakerLabels.isEmpty)
+        XCTAssertTrue(loaded.transcriptCorrections.isEmpty)
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 13)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 14)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -119,6 +120,13 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             id: meetingID, title: "Stored transcript",
             audioRecordings: [recording],
             transcriptSegments: [segment],
+            transcriptCorrections: [TranscriptSegmentCorrection(
+                meetingID: meetingID,
+                transcriptSegmentID: segment.id,
+                originalText: segment.text,
+                correctedText: "Budget due Friday",
+                confirmedAt: Date(timeIntervalSince1970: 122)
+            )],
             diarizationTurns: [DiarizationTurn(
                 meetingID: meetingID,
                 startTime: 3,
@@ -158,6 +166,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         let loaded = try await repository.meeting(id: meetingID)
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
+        XCTAssertEqual(loaded?.transcriptCorrections, meeting.transcriptCorrections)
         XCTAssertEqual(loaded?.diarizationTurns, meeting.diarizationTurns)
         XCTAssertEqual(loaded?.speakerClusterCorrections, meeting.speakerClusterCorrections)
         XCTAssertEqual(loaded?.speakerLabels, meeting.speakerLabels)

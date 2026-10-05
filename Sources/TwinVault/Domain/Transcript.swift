@@ -82,6 +82,60 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     }
 }
 
+/// A reversible user correction over immutable ASR evidence.
+struct TranscriptSegmentCorrection: Identifiable, Codable, Equatable, Sendable {
+    enum Basis: String, Codable, Sendable {
+        case userConfirmed
+    }
+
+    let id: UUID
+    let meetingID: UUID
+    let transcriptSegmentID: UUID
+    let originalText: String
+    let correctedText: String
+    let basis: Basis
+    let confirmedAt: Date
+
+    init(
+        id: UUID = UUID(),
+        meetingID: UUID,
+        transcriptSegmentID: UUID,
+        originalText: String,
+        correctedText: String,
+        basis: Basis = .userConfirmed,
+        confirmedAt: Date = .now
+    ) {
+        self.id = id
+        self.meetingID = meetingID
+        self.transcriptSegmentID = transcriptSegmentID
+        self.originalText = originalText
+        self.correctedText = correctedText
+        self.basis = basis
+        self.confirmedAt = confirmedAt
+    }
+}
+
+struct TranscriptTextResolver: Sendable {
+    func correction(
+        for segment: TranscriptSegment,
+        corrections: [TranscriptSegmentCorrection]
+    ) -> TranscriptSegmentCorrection? {
+        corrections.last {
+            $0.meetingID == segment.meetingID
+                && $0.transcriptSegmentID == segment.id
+                && $0.originalText == segment.text
+                && $0.basis == .userConfirmed
+        }
+    }
+
+    func text(
+        for segment: TranscriptSegment,
+        corrections: [TranscriptSegmentCorrection]
+    ) -> String {
+        correction(for: segment, corrections: corrections)?.correctedText ?? segment.text
+    }
+}
+
 struct TranscriptionRequest: Sendable {
     let meetingID: UUID
     let recordings: [AudioRecordingReference]

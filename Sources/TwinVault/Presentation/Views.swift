@@ -148,10 +148,17 @@ struct MeetingDetailView: View {
         var id: String { "\(recordingID.uuidString)-\(identifier)" }
     }
 
+    private struct TranscriptEditingTarget: Identifiable {
+        let segment: TranscriptSegment
+        let currentText: String
+        var id: UUID { segment.id }
+    }
+
     @Environment(AppModel.self) private var model
     let meeting: Meeting
     @State private var transcriptDisplayMode = TranscriptDisplayMode.conversation
     @State private var speakerNamingTarget: SpeakerNamingTarget?
+    @State private var transcriptEditingTarget: TranscriptEditingTarget?
 
     private var conversationSegments: [TranscriptSegment] {
         MeetingConversationTranscript().segments(
@@ -252,6 +259,20 @@ struct MeetingDetailView: View {
         ) else { return nil }
         guard let recordingID = segment.sourceRecordingID else { return speakerLabel(identifier) }
         return reviewedSpeakerLabel(identifier, recordingID: recordingID)
+    }
+
+    private func transcriptCorrection(for segment: TranscriptSegment) -> TranscriptSegmentCorrection? {
+        TranscriptTextResolver().correction(
+            for: segment,
+            corrections: meeting.transcriptCorrections
+        )
+    }
+
+    private func displayedText(for segment: TranscriptSegment) -> String {
+        TranscriptTextResolver().text(
+            for: segment,
+            corrections: meeting.transcriptCorrections
+        )
     }
 
     var body: some View {
@@ -584,7 +605,8 @@ struct MeetingDetailView: View {
                     ForEach(displayedSegments) { segment in
                         VStack(alignment: .leading, spacing: 4) {
                             HStack(spacing: 8) {
-                                Text(duration(segment.startTime)).monospacedDigit()
+                                Text("\(duration(segment.startTime))–\(duration(segment.endTime))")
+                                    .monospacedDigit()
                                 if let recordingID = segment.sourceRecordingID,
                                    let channel = meeting.audioRecordings.first(where: { $0.id == recordingID })?.channel {
                                     Text(channel.displayName)
@@ -604,11 +626,56 @@ struct MeetingDetailView: View {
                                         .fontWeight(.semibold)
                                         .foregroundStyle(.orange)
                                 }
+                                if transcriptCorrection(for: segment) != nil {
+                                    Label("User confirmed", systemImage: "checkmark.seal.fill")
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.green)
+                                }
+                                Spacer()
+                                Button("Play from timestamp", systemImage: "play.circle") {
+                                    Task {
+                                        await model.playTranscriptSegment(
+                                            meetingID: meeting.id,
+                                            segmentID: segment.id
+                                        )
+                                    }
+                                }
+                                .labelStyle(.iconOnly)
+                                .help("Play source audio from \(duration(segment.startTime))")
+                                Button("Correct Transcript", systemImage: "pencil") {
+                                    transcriptEditingTarget = TranscriptEditingTarget(
+                                        segment: segment,
+                                        currentText: displayedText(for: segment)
+                                    )
+                                }
+                                .labelStyle(.iconOnly)
+                                .help("Review or correct this transcript segment")
                             }
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            Text(segment.text).textSelection(.enabled)
+                            if let provider = segment.providerIdentifier {
+                                Text("Provider: \(provider)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text(displayedText(for: segment)).textSelection(.enabled)
+                            if let correction = transcriptCorrection(for: segment) {
+                                Text("Original: \(correction.originalText)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                Button("Undo Correction", role: .destructive) {
+                                    Task {
+                                        await model.resetTranscriptCorrection(
+                                            meetingID: meeting.id,
+                                            segmentID: segment.id
+                                        )
+                                    }
+                                }
+                                .font(.caption)
+                            }
                         }
+                        .padding(.vertical, 4)
                     }
                 }
                 Divider()
@@ -635,6 +702,20 @@ struct MeetingDetailView: View {
                         sourceRecordingID: target.recordingID,
                         temporarySpeakerID: target.identifier,
                         displayName: name
+                    )
+                }
+            }
+        }
+        .sheet(item: $transcriptEditingTarget) { target in
+            TranscriptCorrectionEditor(
+                segment: target.segment,
+                initialText: target.currentText
+            ) { correctedText in
+                Task {
+                    await model.correctTranscriptSegment(
+                        meetingID: meeting.id,
+                        segmentID: target.segment.id,
+                        correctedText: correctedText
                     )
                 }
             }
@@ -678,6 +759,57 @@ private struct SpeakerNameEditor: View {
     private func save() {
         onSave(name)
         dismiss()
+    }
+}
+
+private struct TranscriptCorrectionEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let segment: TranscriptSegment
+    let onSave: (String) -> Void
+    @State private var text: String
+
+    init(
+        segment: TranscriptSegment,
+        initialText: String,
+        onSave: @escaping (String) -> Void
+    ) {
+        self.segment = segment
+        self.onSave = onSave
+        _text = State(initialValue: initialText)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Correct Transcript").font(.title2.bold())
+            Text("Audio \(duration(segment.startTime))–\(duration(segment.endTime))")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 5) {
+                Text("Original model text").font(.caption).fontWeight(.semibold)
+                Text(segment.text).textSelection(.enabled)
+            }
+            .padding(10)
+            .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
+            TextEditor(text: $text)
+                .font(.body)
+                .frame(minHeight: 150)
+                .border(.quaternary)
+            Text("Saving creates a reversible user-confirmed correction. The original model text remains unchanged.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Save Correction") {
+                    onSave(text)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 560)
     }
 }
 

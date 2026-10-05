@@ -15,6 +15,27 @@ final class TranscriptTests: XCTestCase {
         XCTAssertEqual(segment.temporarySpeakerID, "speaker-1")
     }
 
+    func testTranscriptTextResolverKeepsRawEvidenceAndUsesMatchingCorrection() {
+        let segment = TranscriptSegment(
+            meetingID: UUID(),
+            startTime: 1,
+            endTime: 2,
+            text: "Original"
+        )
+        let correction = TranscriptSegmentCorrection(
+            meetingID: segment.meetingID,
+            transcriptSegmentID: segment.id,
+            originalText: segment.text,
+            correctedText: "Corrected"
+        )
+
+        XCTAssertEqual(
+            TranscriptTextResolver().text(for: segment, corrections: [correction]),
+            "Corrected"
+        )
+        XCTAssertEqual(segment.text, "Original")
+    }
+
     func testSpeakerLabelIsNotAStablePersonIdentifier() {
         let meetingID = UUID()
         let first = TranscriptSegment(meetingID: meetingID, startTime: 1, endTime: 2, temporarySpeakerID: "speaker-2", text: "One")

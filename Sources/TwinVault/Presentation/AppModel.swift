@@ -41,6 +41,7 @@ final class AppModel {
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
     private var diarizationTask: Task<Void, Never>?
+    private var playbackActivityID: UUID?
     private(set) var meetings: [Meeting] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
@@ -244,9 +245,14 @@ final class AppModel {
         playback.stop()
         do {
             let fileURL = try validatedAudioURL(for: recording)
+            let activityID = UUID()
+            playbackActivityID = activityID
             playingRecordingID = recording.id
             defer {
-                if playingRecordingID == recording.id { playingRecordingID = nil }
+                if playbackActivityID == activityID {
+                    playbackActivityID = nil
+                    playingRecordingID = nil
+                }
             }
             try await playback.play(fileURL: fileURL)
         } catch {
@@ -257,7 +263,84 @@ final class AppModel {
 
     func stopPlayback() {
         playback.stop()
+        playbackActivityID = nil
         playingRecordingID = nil
+    }
+
+    func playTranscriptSegment(meetingID: UUID, segmentID: UUID) async {
+        guard let meeting = meetings.first(where: { $0.id == meetingID }),
+              let segment = meeting.transcriptSegments.first(where: { $0.id == segmentID }),
+              let recordingID = segment.sourceRecordingID,
+              let recording = meeting.audioRecordings.first(where: { $0.id == recordingID }) else {
+            errorMessage = "The source audio for this transcript segment is unavailable."
+            return
+        }
+
+        playback.stop()
+        do {
+            let fileURL = try validatedAudioURL(for: recording)
+            let activityID = UUID()
+            playbackActivityID = activityID
+            playingRecordingID = recording.id
+            defer {
+                if playbackActivityID == activityID {
+                    playbackActivityID = nil
+                    playingRecordingID = nil
+                }
+            }
+            try await playback.play(fileURL: fileURL, startTime: segment.startTime)
+        } catch {
+            playingRecordingID = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func correctTranscriptSegment(
+        meetingID: UUID,
+        segmentID: UUID,
+        correctedText: String
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }),
+              let segment = meeting.transcriptSegments.first(where: { $0.id == segmentID }) else {
+            errorMessage = "That transcript segment no longer exists."
+            return
+        }
+        let normalizedText = correctedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedText.isEmpty, normalizedText.count <= 10_000 else {
+            errorMessage = "Enter corrected text between 1 and 10,000 characters."
+            return
+        }
+
+        meeting.transcriptCorrections.removeAll { $0.transcriptSegmentID == segmentID }
+        if normalizedText != segment.text {
+            meeting.transcriptCorrections.append(TranscriptSegmentCorrection(
+                meetingID: meetingID,
+                transcriptSegmentID: segmentID,
+                originalText: segment.text,
+                correctedText: normalizedText
+            ))
+        }
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func resetTranscriptCorrection(meetingID: UUID, segmentID: UUID) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let previousCount = meeting.transcriptCorrections.count
+        meeting.transcriptCorrections.removeAll { $0.transcriptSegmentID == segmentID }
+        guard meeting.transcriptCorrections.count != previousCount else { return }
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func transcribe(
@@ -304,6 +387,12 @@ final class AppModel {
                 }
             ))
             try Task.checkCancellation()
+            let replacedSegmentIDs = Set(meeting.transcriptSegments.compactMap { segment in
+                segment.sourceRecordingID == recordingID ? segment.id : nil
+            })
+            meeting.transcriptCorrections.removeAll {
+                replacedSegmentIDs.contains($0.transcriptSegmentID)
+            }
             meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
             meeting.transcriptSegments.append(contentsOf: output.segments)
             meeting.transcriptSegments.sort {
@@ -716,6 +805,12 @@ final class AppModel {
         meetingID: UUID
     ) async throws {
         guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let removedSegmentIDs = Set(meeting.transcriptSegments.compactMap { segment in
+            segment.sourceRecordingID == recording.id ? segment.id : nil
+        })
+        meeting.transcriptCorrections.removeAll {
+            removedSegmentIDs.contains($0.transcriptSegmentID)
+        }
         meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recording.id }
         meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recording.id }
         meeting.channelAlignmentEstimate = nil
