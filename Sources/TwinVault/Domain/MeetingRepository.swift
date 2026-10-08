@@ -9,6 +9,10 @@ protocol MeetingRepository: Sendable {
     func person(id: UUID) async throws -> Person?
     func save(_ person: Person) async throws
     func save(_ person: Person, and meeting: Meeting) async throws
+    func workspaces() async throws -> [Workspace]
+    func externalIdentityLinks(workspaceID: UUID) async throws -> [ExternalIdentityLink]
+    func save(_ link: ExternalIdentityLink) async throws
+    func save(_ person: Person, with link: ExternalIdentityLink) async throws
 }
 
 extension MeetingRepository {
@@ -21,10 +25,20 @@ extension MeetingRepository {
         try await save(person)
         try await save(meeting)
     }
+    func workspaces() async throws -> [Workspace] { [.local] }
+    func externalIdentityLinks(workspaceID: UUID) async throws -> [ExternalIdentityLink] { [] }
+    func save(_ link: ExternalIdentityLink) async throws {
+        throw MeetingRepositoryError.externalIdentityUnsupported
+    }
+    func save(_ person: Person, with link: ExternalIdentityLink) async throws {
+        try await save(person)
+        try await save(link)
+    }
 }
 
 enum MeetingRepositoryError: Error, Equatable {
     case unsupportedSchema(Int)
     case corruptStore
     case peopleUnsupported
+    case externalIdentityUnsupported
 }

@@ -5,15 +5,25 @@ actor JSONMeetingRepository: MeetingRepository {
         var schemaVersion: Int
         var meetings: [Meeting]
         var persons: [Person]
+        var workspaces: [Workspace]
+        var externalIdentityLinks: [ExternalIdentityLink]
 
-        init(schemaVersion: Int, meetings: [Meeting], persons: [Person] = []) {
+        init(
+            schemaVersion: Int,
+            meetings: [Meeting],
+            persons: [Person] = [],
+            workspaces: [Workspace] = [.local],
+            externalIdentityLinks: [ExternalIdentityLink] = []
+        ) {
             self.schemaVersion = schemaVersion
             self.meetings = meetings
             self.persons = persons
+            self.workspaces = workspaces
+            self.externalIdentityLinks = externalIdentityLinks
         }
 
         private enum CodingKeys: String, CodingKey {
-            case schemaVersion, meetings, persons
+            case schemaVersion, meetings, persons, workspaces, externalIdentityLinks
         }
 
         init(from decoder: any Decoder) throws {
@@ -21,6 +31,12 @@ actor JSONMeetingRepository: MeetingRepository {
             schemaVersion = try container.decode(Int.self, forKey: .schemaVersion)
             meetings = try container.decode([Meeting].self, forKey: .meetings)
             persons = try container.decodeIfPresent([Person].self, forKey: .persons) ?? []
+            workspaces = try container.decodeIfPresent([Workspace].self, forKey: .workspaces)
+                ?? [.local]
+            externalIdentityLinks = try container.decodeIfPresent(
+                [ExternalIdentityLink].self,
+                forKey: .externalIdentityLinks
+            ) ?? []
         }
     }
 
@@ -28,7 +44,7 @@ actor JSONMeetingRepository: MeetingRepository {
     private let fileManager: FileManager
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
-    private static let currentSchemaVersion = 15
+    private static let currentSchemaVersion = 16
 
     init(paths: VaultPaths, fileManager: FileManager = .default) throws {
         self.paths = paths
@@ -94,6 +110,37 @@ actor JSONMeetingRepository: MeetingRepository {
         try write(store)
     }
 
+    func workspaces() async throws -> [Workspace] {
+        try load().workspaces
+    }
+
+    func externalIdentityLinks(workspaceID: UUID) async throws -> [ExternalIdentityLink] {
+        try load().externalIdentityLinks.filter { $0.workspaceID == workspaceID }
+    }
+
+    func save(_ link: ExternalIdentityLink) async throws {
+        var store = try load()
+        try validate(link, in: store)
+        store.schemaVersion = Self.currentSchemaVersion
+        upsert(link, in: &store)
+        try write(store)
+    }
+
+    func save(_ person: Person, with link: ExternalIdentityLink) async throws {
+        guard person.id == link.personID else {
+            throw ExternalIdentityLinkError.personNotFound
+        }
+        guard person.workspaceID == link.workspaceID else {
+            throw ExternalIdentityLinkError.personBelongsToDifferentWorkspace
+        }
+        var store = try load()
+        upsert(person, in: &store)
+        try validate(link, in: store)
+        store.schemaVersion = Self.currentSchemaVersion
+        upsert(link, in: &store)
+        try write(store)
+    }
+
     private func load() throws -> Store {
         guard fileManager.fileExists(atPath: paths.meetingStore.path) else {
             return Store(schemaVersion: Self.currentSchemaVersion, meetings: [], persons: [])
@@ -121,6 +168,51 @@ actor JSONMeetingRepository: MeetingRepository {
             store.persons[index] = person
         } else {
             store.persons.append(person)
+        }
+    }
+
+    private func validate(_ link: ExternalIdentityLink, in store: Store) throws {
+        guard !link.externalSystem.isEmpty else {
+            throw ExternalIdentityLinkError.emptyExternalSystem
+        }
+        guard !link.externalRecordID.isEmpty else {
+            throw ExternalIdentityLinkError.emptyExternalRecordID
+        }
+        guard store.workspaces.contains(where: { $0.id == link.workspaceID }) else {
+            throw ExternalIdentityLinkError.workspaceNotFound
+        }
+        guard let person = store.persons.first(where: { $0.id == link.personID }) else {
+            throw ExternalIdentityLinkError.personNotFound
+        }
+        guard person.workspaceID == link.workspaceID else {
+            throw ExternalIdentityLinkError.personBelongsToDifferentWorkspace
+        }
+        if let existing = store.externalIdentityLinks.first(where: {
+            $0.matches(
+                workspaceID: link.workspaceID,
+                externalSystem: link.externalSystem,
+                externalRecordID: link.externalRecordID
+            )
+        }), existing.personID != link.personID {
+            throw ExternalIdentityLinkError.conflictingPerson(existingPersonID: existing.personID)
+        }
+    }
+
+    private func upsert(_ link: ExternalIdentityLink, in store: inout Store) {
+        if let index = store.externalIdentityLinks.firstIndex(where: { $0.id == link.id }) {
+            store.externalIdentityLinks[index] = link
+            return
+        }
+        if let index = store.externalIdentityLinks.firstIndex(where: {
+            $0.matches(
+                workspaceID: link.workspaceID,
+                externalSystem: link.externalSystem,
+                externalRecordID: link.externalRecordID
+            )
+        }) {
+            store.externalIdentityLinks[index] = link
+        } else {
+            store.externalIdentityLinks.append(link)
         }
     }
 }

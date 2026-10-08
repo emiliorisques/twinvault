@@ -44,6 +44,8 @@ final class AppModel {
     private var playbackActivityID: UUID?
     private(set) var meetings: [Meeting] = []
     private(set) var persons: [Person] = []
+    private(set) var workspaces: [Workspace] = []
+    private(set) var externalIdentityLinks: [ExternalIdentityLink] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
     private(set) var transcriptionActivity: TranscriptionActivity?
@@ -162,6 +164,10 @@ final class AppModel {
         do {
             meetings = try await repository.meetings()
             persons = try await repository.persons()
+            workspaces = try await repository.workspaces()
+            externalIdentityLinks = try await repository.externalIdentityLinks(
+                workspaceID: Workspace.localID
+            )
         }
         catch { errorMessage = error.localizedDescription }
     }
@@ -170,6 +176,53 @@ final class AppModel {
         guard let person = makePerson(displayName: displayName) else { return }
         do {
             try await repository.save(person)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Integration boundary for a CRM/import adapter. The UI does not guess a
+    /// match from the person's name; the caller must provide the chosen person.
+    func linkPersonToExternalRecord(
+        personID: UUID,
+        externalSystem: String,
+        externalRecordID: String
+    ) async {
+        guard let person = persons.first(where: { $0.id == personID }) else {
+            errorMessage = "That person is no longer available."
+            return
+        }
+        let link = ExternalIdentityLink(
+            workspaceID: person.workspaceID,
+            personID: person.id,
+            externalSystem: externalSystem,
+            externalRecordID: externalRecordID
+        )
+        do {
+            try await repository.save(link)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Creates the local identity and external reference atomically after a
+    /// future connector/user has decided this is a new person.
+    func createPersonFromExternalRecord(
+        displayName: String,
+        externalSystem: String,
+        externalRecordID: String
+    ) async {
+        guard let person = makePerson(displayName: displayName) else { return }
+        let link = ExternalIdentityLink(
+            workspaceID: person.workspaceID,
+            personID: person.id,
+            externalSystem: externalSystem,
+            externalRecordID: externalRecordID
+        )
+        do {
+            try await repository.save(person, with: link)
             await load()
         } catch {
             errorMessage = error.localizedDescription
