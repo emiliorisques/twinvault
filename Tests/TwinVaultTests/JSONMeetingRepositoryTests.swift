@@ -72,7 +72,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 14)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 15)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
@@ -91,6 +91,16 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             meetingID: meetingID, startTime: 3, endTime: 5, text: "Budget Friday",
             sourceRecordingID: recordingID, providerIdentifier: "test.provider",
             localeIdentifier: "en-US"
+        )
+        let person = Person(
+            displayName: "Laura",
+            createdAt: Date(timeIntervalSince1970: 120),
+            updatedAt: Date(timeIntervalSince1970: 120)
+        )
+        let participant = MeetingParticipant(
+            meetingID: meetingID,
+            personID: person.id,
+            confirmedAt: Date(timeIntervalSince1970: 121)
         )
         let reviewInterval = TranscriptReviewInterval(
             meetingID: meetingID,
@@ -149,6 +159,14 @@ final class JSONMeetingRepositoryTests: XCTestCase {
                 displayName: "Laura",
                 confirmedAt: Date(timeIntervalSince1970: 124)
             )],
+            participants: [participant],
+            speakerPersonAssignments: [MeetingSpeakerPersonAssignment(
+                meetingID: meetingID,
+                meetingParticipantID: participant.id,
+                sourceRecordingID: recordingID,
+                canonicalTemporarySpeakerID: "speaker-1",
+                confirmedAt: Date(timeIntervalSince1970: 125)
+            )],
             transcriptReviewIntervals: [reviewInterval],
             crossChannelTranscriptFindings: [finding],
             channelAlignmentEstimate: alignment,
@@ -162,7 +180,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
             status: .completed
         )
 
-        try await repository.save(meeting)
+        try await repository.save(person, and: meeting)
         let loaded = try await repository.meeting(id: meetingID)
 
         XCTAssertEqual(loaded?.transcriptSegments, [segment])
@@ -170,6 +188,12 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded?.diarizationTurns, meeting.diarizationTurns)
         XCTAssertEqual(loaded?.speakerClusterCorrections, meeting.speakerClusterCorrections)
         XCTAssertEqual(loaded?.speakerLabels, meeting.speakerLabels)
+        XCTAssertEqual(loaded?.participants, meeting.participants)
+        XCTAssertEqual(loaded?.speakerPersonAssignments, meeting.speakerPersonAssignments)
+        let loadedPerson = try await repository.person(id: person.id)
+        let loadedPeople = try await repository.persons()
+        XCTAssertEqual(loadedPerson, person)
+        XCTAssertEqual(loadedPeople, [person])
         XCTAssertEqual(loaded?.transcriptReviewIntervals, [reviewInterval])
         XCTAssertEqual(loaded?.crossChannelTranscriptFindings, [finding])
         XCTAssertEqual(loaded?.channelAlignmentEstimate, alignment)

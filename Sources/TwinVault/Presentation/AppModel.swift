@@ -43,6 +43,7 @@ final class AppModel {
     private var diarizationTask: Task<Void, Never>?
     private var playbackActivityID: UUID?
     private(set) var meetings: [Meeting] = []
+    private(set) var persons: [Person] = []
     private(set) var activeSession: RecordingSession?
     private(set) var playingRecordingID: UUID?
     private(set) var transcriptionActivity: TranscriptionActivity?
@@ -158,8 +159,181 @@ final class AppModel {
     }
 
     func load() async {
-        do { meetings = try await repository.meetings() }
+        do {
+            meetings = try await repository.meetings()
+            persons = try await repository.persons()
+        }
         catch { errorMessage = error.localizedDescription }
+    }
+
+    func createPerson(displayName: String) async {
+        guard let person = makePerson(displayName: displayName) else { return }
+        do {
+            try await repository.save(person)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func linkSpeakerToPerson(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String,
+        personID: UUID
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }),
+              persons.contains(where: { $0.id == personID }) else {
+            errorMessage = "That person or meeting is no longer available."
+            return
+        }
+        guard linkSpeaker(
+            in: &meeting,
+            sourceRecordingID: sourceRecordingID,
+            temporarySpeakerID: temporarySpeakerID,
+            personID: personID
+        ) else { return }
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func createAndLinkPerson(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String,
+        displayName: String
+    ) async {
+        guard let person = makePerson(displayName: displayName),
+              var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        guard linkSpeaker(
+            in: &meeting,
+            sourceRecordingID: sourceRecordingID,
+            temporarySpeakerID: temporarySpeakerID,
+            personID: person.id
+        ) else { return }
+        do {
+            try await repository.save(person, and: meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func unlinkSpeakerFromPerson(
+        meetingID: UUID,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String
+    ) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        let canonicalIdentifier = SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: temporarySpeakerID,
+            meetingID: meetingID,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        let removedParticipantIDs = Set(meeting.speakerPersonAssignments.compactMap { assignment in
+            assignment.sourceRecordingID == sourceRecordingID
+                && assignment.canonicalTemporarySpeakerID == canonicalIdentifier
+                ? assignment.meetingParticipantID
+                : nil
+        })
+        meeting.speakerPersonAssignments.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == canonicalIdentifier
+        }
+        let activeParticipantIDs = Set(
+            meeting.speakerPersonAssignments.map(\.meetingParticipantID)
+        )
+        guard !removedParticipantIDs.isEmpty else { return }
+        meeting.participants.removeAll { participant in
+            removedParticipantIDs.contains(participant.id)
+                && !activeParticipantIDs.contains(participant.id)
+        }
+        meeting.updatedAt = .now
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func makePerson(displayName: String) -> Person? {
+        let normalizedName = displayName
+            .split(whereSeparator: \.isWhitespace)
+            .joined(separator: " ")
+        guard !normalizedName.isEmpty, normalizedName.count <= 120 else {
+            errorMessage = "Enter a person name between 1 and 120 characters."
+            return nil
+        }
+        return Person(displayName: normalizedName)
+    }
+
+    private func linkSpeaker(
+        in meeting: inout Meeting,
+        sourceRecordingID: UUID,
+        temporarySpeakerID: String,
+        personID: UUID
+    ) -> Bool {
+        let rawIdentifiers = Set(meeting.diarizationTurns.compactMap { turn in
+            turn.sourceRecordingID == sourceRecordingID ? turn.temporarySpeakerID : nil
+        })
+        let canonicalIdentifier = SpeakerClusterResolver().canonicalTemporarySpeakerID(
+            for: temporarySpeakerID,
+            meetingID: meeting.id,
+            sourceRecordingID: sourceRecordingID,
+            corrections: meeting.speakerClusterCorrections
+        )
+        let canonicalIdentifiers = Set(rawIdentifiers.map {
+            SpeakerClusterResolver().canonicalTemporarySpeakerID(
+                for: $0,
+                meetingID: meeting.id,
+                sourceRecordingID: sourceRecordingID,
+                corrections: meeting.speakerClusterCorrections
+            )
+        })
+        guard canonicalIdentifiers.contains(canonicalIdentifier) else {
+            errorMessage = "That temporary speaker no longer exists in this recording."
+            return false
+        }
+
+        let participant: MeetingParticipant
+        if let existing = meeting.participants.first(where: { $0.personID == personID }) {
+            participant = existing
+        } else {
+            participant = MeetingParticipant(meetingID: meeting.id, personID: personID)
+            meeting.participants.append(participant)
+        }
+        let replacedParticipantIDs = Set(meeting.speakerPersonAssignments.compactMap { assignment in
+            assignment.sourceRecordingID == sourceRecordingID
+                && assignment.canonicalTemporarySpeakerID == canonicalIdentifier
+                ? assignment.meetingParticipantID
+                : nil
+        })
+        meeting.speakerPersonAssignments.removeAll {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == canonicalIdentifier
+        }
+        meeting.speakerPersonAssignments.append(MeetingSpeakerPersonAssignment(
+            meetingID: meeting.id,
+            meetingParticipantID: participant.id,
+            sourceRecordingID: sourceRecordingID,
+            canonicalTemporarySpeakerID: canonicalIdentifier
+        ))
+        let activeParticipantIDs = Set(
+            meeting.speakerPersonAssignments.map(\.meetingParticipantID)
+        )
+        meeting.participants.removeAll { existing in
+            replacedParticipantIDs.contains(existing.id)
+                && existing.id != participant.id
+                && !activeParticipantIDs.contains(existing.id)
+        }
+        meeting.updatedAt = .now
+        return true
     }
 
     func startMeeting(title: String, captureSystemAudio: Bool = false) async {
@@ -581,6 +755,9 @@ final class AppModel {
             meeting.speakerLabels.removeAll {
                 $0.sourceRecordingID == recording.id
             }
+            meeting.speakerPersonAssignments.removeAll {
+                $0.sourceRecordingID == recording.id
+            }
             meeting.diarizationTurns.sort {
                 if $0.startTime == $1.startTime { return $0.endTime < $1.endTime }
                 return $0.startTime < $1.startTime
@@ -653,6 +830,20 @@ final class AppModel {
             errorMessage = "Remove the name from \(sourceLabel.displayName) before merging these speakers."
             return
         }
+        let sourcePersonAssignment = meeting.speakerPersonAssignments.first {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == resolvedSource
+        }
+        let targetPersonAssignment = meeting.speakerPersonAssignments.first {
+            $0.sourceRecordingID == sourceRecordingID
+                && $0.canonicalTemporarySpeakerID == resolvedExistingTarget
+        }
+        if let sourcePersonAssignment,
+           sourcePersonAssignment.meetingParticipantID
+            != targetPersonAssignment?.meetingParticipantID {
+            errorMessage = "Unlink the confirmed person before merging these speakers."
+            return
+        }
 
         var corrections = meeting.speakerClusterCorrections
         corrections.removeAll {
@@ -679,6 +870,10 @@ final class AppModel {
         meeting.speakerClusterCorrections = corrections
         if resolvedSource != resolvedTarget {
             meeting.speakerLabels.removeAll {
+                $0.sourceRecordingID == sourceRecordingID
+                    && $0.canonicalTemporarySpeakerID == resolvedSource
+            }
+            meeting.speakerPersonAssignments.removeAll {
                 $0.sourceRecordingID == sourceRecordingID
                     && $0.canonicalTemporarySpeakerID == resolvedSource
             }

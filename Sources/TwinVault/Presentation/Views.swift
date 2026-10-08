@@ -1,35 +1,65 @@
 import Combine
 import SwiftUI
 
+private enum AppNavigationRoute: Hashable {
+    case meeting(UUID)
+    case person(UUID)
+}
+
 struct MeetingsListView: View {
     @Environment(AppModel.self) private var model
     @State private var showingNewMeeting = false
+    @State private var showingNewPerson = false
 
     var body: some View {
         NavigationSplitView {
-            List(model.meetings) { meeting in
-                NavigationLink(value: meeting.id) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(meeting.title).font(.headline)
-                        Text(meeting.startDate, format: .dateTime.day().month().year().hour().minute())
-                            .font(.caption).foregroundStyle(.secondary)
+            List {
+                Section("Meetings") {
+                    ForEach(model.meetings) { meeting in
+                        NavigationLink(value: AppNavigationRoute.meeting(meeting.id)) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(meeting.title).font(.headline)
+                                Text(meeting.startDate, format: .dateTime.day().month().year().hour().minute())
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+                Section("People") {
+                    ForEach(model.persons) { person in
+                        NavigationLink(value: AppNavigationRoute.person(person.id)) {
+                            Label(person.displayName, systemImage: "person.crop.circle")
+                        }
                     }
                 }
             }
-            .navigationTitle("Meetings")
+            .navigationTitle("TwinVault")
             .toolbar {
-                Button("New Meeting", systemImage: "plus") { showingNewMeeting = true }
-                    .disabled(model.activeSession != nil)
+                Button("New Person", systemImage: "person.badge.plus") {
+                    showingNewPerson = true
+                }
+                Button("New Meeting", systemImage: "plus") {
+                    showingNewMeeting = true
+                }
+                .disabled(model.activeSession != nil)
             }
-            .navigationDestination(for: UUID.self) { id in
-                if let meeting = model.meetings.first(where: { $0.id == id }) {
-                    MeetingDetailView(meeting: meeting)
+            .navigationDestination(for: AppNavigationRoute.self) { route in
+                switch route {
+                case let .meeting(id):
+                    if let meeting = model.meetings.first(where: { $0.id == id }) {
+                        MeetingDetailView(meeting: meeting)
+                    }
+                case let .person(id):
+                    if let person = model.persons.first(where: { $0.id == id }) {
+                        PersonDetailView(person: person)
+                    }
                 }
             }
         } detail: {
             ContentUnavailableView("Select a meeting", systemImage: "waveform")
         }
         .sheet(isPresented: $showingNewMeeting) { NewMeetingView() }
+        .sheet(isPresented: $showingNewPerson) { NewPersonView() }
         .sheet(isPresented: Binding(
             get: { model.activeSession != nil },
             set: { _ in }
@@ -41,6 +71,80 @@ struct MeetingsListView: View {
             Text(model.errorMessage ?? "Unknown error")
         }
         .task { await model.load() }
+    }
+}
+
+struct NewPersonView: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var displayName = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("New Person").font(.title2.bold())
+            TextField("Name", text: $displayName)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit(save)
+            Text("This creates a stable identity inside this local vault. It does not create a voice profile.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Create", action: save)
+                    .buttonStyle(.borderedProminent)
+                    .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+    }
+
+    private func save() {
+        let name = displayName
+        dismiss()
+        Task { await model.createPerson(displayName: name) }
+    }
+}
+
+struct PersonDetailView: View {
+    @Environment(AppModel.self) private var model
+    let person: Person
+
+    private var relatedMeetings: [Meeting] {
+        model.meetings.filter { meeting in
+            meeting.participants.contains { $0.personID == person.id }
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                Label(person.displayName, systemImage: "person.crop.circle.fill")
+                    .font(.largeTitle.bold())
+                Text("Stable local person · No biometric voice profile")
+                    .foregroundStyle(.secondary)
+                Divider()
+                Text("Meetings").font(.title2.bold())
+                if relatedMeetings.isEmpty {
+                    Text("No linked meetings").foregroundStyle(.secondary)
+                } else {
+                    ForEach(relatedMeetings) { meeting in
+                        NavigationLink(value: AppNavigationRoute.meeting(meeting.id)) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(meeting.title).fontWeight(.medium)
+                                Text(meeting.startDate, format: .dateTime.day().month().year())
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: 760, alignment: .leading)
+        }
+        .navigationTitle(person.displayName)
     }
 }
 
@@ -154,11 +258,19 @@ struct MeetingDetailView: View {
         var id: UUID { segment.id }
     }
 
+    private struct SpeakerPersonLinkTarget: Identifiable {
+        let recordingID: UUID
+        let identifier: String
+        let suggestedName: String
+        var id: String { "\(recordingID.uuidString)-\(identifier)" }
+    }
+
     @Environment(AppModel.self) private var model
     let meeting: Meeting
     @State private var transcriptDisplayMode = TranscriptDisplayMode.conversation
     @State private var speakerNamingTarget: SpeakerNamingTarget?
     @State private var transcriptEditingTarget: TranscriptEditingTarget?
+    @State private var speakerPersonLinkTarget: SpeakerPersonLinkTarget?
 
     private var conversationSegments: [TranscriptSegment] {
         MeetingConversationTranscript().segments(
@@ -244,7 +356,22 @@ struct MeetingDetailView: View {
         }?.displayName
     }
 
+    private func linkedPerson(_ identifier: String, recordingID: UUID) -> Person? {
+        guard let assignment = meeting.speakerPersonAssignments.first(where: {
+            $0.sourceRecordingID == recordingID
+                && $0.canonicalTemporarySpeakerID == identifier
+                && $0.basis == .userConfirmed
+        }),
+        let participant = meeting.participants.first(where: {
+            $0.id == assignment.meetingParticipantID
+        }) else { return nil }
+        return model.persons.first { $0.id == participant.personID }
+    }
+
     private func reviewedSpeakerLabel(_ identifier: String, recordingID: UUID) -> String {
+        if let person = linkedPerson(identifier, recordingID: recordingID) {
+            return "\(person.displayName) · \(speakerLabel(identifier))"
+        }
         guard let name = confirmedSpeakerName(identifier, recordingID: recordingID) else {
             return speakerLabel(identifier)
         }
@@ -467,8 +594,37 @@ struct MeetingDetailView: View {
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
+                                        if linkedPerson(identifier, recordingID: recordingID) != nil {
+                                            Text("Linked to a stable Person by user confirmation")
+                                                .font(.caption)
+                                                .foregroundStyle(.green)
+                                        }
                                     }
                                     Spacer()
+                                    Button(
+                                        linkedPerson(identifier, recordingID: recordingID) == nil
+                                            ? "Link Person" : "Change Person"
+                                    ) {
+                                        speakerPersonLinkTarget = SpeakerPersonLinkTarget(
+                                            recordingID: recordingID,
+                                            identifier: identifier,
+                                            suggestedName: confirmedSpeakerName(
+                                                identifier,
+                                                recordingID: recordingID
+                                            ) ?? ""
+                                        )
+                                    }
+                                    if linkedPerson(identifier, recordingID: recordingID) != nil {
+                                        Button("Unlink Person", role: .destructive) {
+                                            Task {
+                                                await model.unlinkSpeakerFromPerson(
+                                                    meetingID: meeting.id,
+                                                    sourceRecordingID: recordingID,
+                                                    temporarySpeakerID: identifier
+                                                )
+                                            }
+                                        }
+                                    }
                                     Button(
                                         confirmedSpeakerName(identifier, recordingID: recordingID) == nil
                                             ? "Add Name" : "Edit Name"
@@ -720,6 +876,33 @@ struct MeetingDetailView: View {
                 }
             }
         }
+        .sheet(item: $speakerPersonLinkTarget) { target in
+            SpeakerPersonLinkEditor(
+                speakerLabel: speakerLabel(target.identifier),
+                persons: model.persons,
+                suggestedName: target.suggestedName,
+                onSelect: { personID in
+                    Task {
+                        await model.linkSpeakerToPerson(
+                            meetingID: meeting.id,
+                            sourceRecordingID: target.recordingID,
+                            temporarySpeakerID: target.identifier,
+                            personID: personID
+                        )
+                    }
+                },
+                onCreate: { displayName in
+                    Task {
+                        await model.createAndLinkPerson(
+                            meetingID: meeting.id,
+                            sourceRecordingID: target.recordingID,
+                            temporarySpeakerID: target.identifier,
+                            displayName: displayName
+                        )
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -810,6 +993,75 @@ private struct TranscriptCorrectionEditor: View {
         }
         .padding(24)
         .frame(width: 560)
+    }
+}
+
+private struct SpeakerPersonLinkEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let speakerLabel: String
+    let persons: [Person]
+    let onSelect: (UUID) -> Void
+    let onCreate: (String) -> Void
+    @State private var newPersonName: String
+
+    init(
+        speakerLabel: String,
+        persons: [Person],
+        suggestedName: String,
+        onSelect: @escaping (UUID) -> Void,
+        onCreate: @escaping (String) -> Void
+    ) {
+        self.speakerLabel = speakerLabel
+        self.persons = persons
+        self.onSelect = onSelect
+        self.onCreate = onCreate
+        _newPersonName = State(initialValue: suggestedName)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Link \(speakerLabel) to a Person").font(.title2.bold())
+            Text("This is an explicit identity confirmation for this meeting, not biometric recognition.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            if persons.isEmpty {
+                Text("No people in this vault yet.")
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Existing people").font(.headline)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(persons) { person in
+                            Button {
+                                onSelect(person.id)
+                                dismiss()
+                            } label: {
+                                Label(person.displayName, systemImage: "person.crop.circle")
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                    }
+                }
+                .frame(maxHeight: 180)
+            }
+            Divider()
+            Text("Create a new person").font(.headline)
+            TextField("Name", text: $newPersonName)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Spacer()
+                Button("Cancel") { dismiss() }
+                Button("Create and Link") {
+                    onCreate(newPersonName)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(newPersonName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 460)
     }
 }
 

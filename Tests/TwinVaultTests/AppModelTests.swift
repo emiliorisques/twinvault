@@ -555,6 +555,10 @@ final class AppModelTests: XCTestCase {
             channel: .systemAudio,
             meetingTimelineOffset: 0.1
         )
+        let previousParticipant = MeetingParticipant(
+            meetingID: meetingID,
+            personID: UUID()
+        )
         await repository.save(Meeting(
             id: meetingID,
             title: "Diarization",
@@ -570,6 +574,13 @@ final class AppModelTests: XCTestCase {
                 sourceRecordingID: system.id,
                 canonicalTemporarySpeakerID: "speaker-1",
                 displayName: "Previous speaker"
+            )],
+            participants: [previousParticipant],
+            speakerPersonAssignments: [MeetingSpeakerPersonAssignment(
+                meetingID: meetingID,
+                meetingParticipantID: previousParticipant.id,
+                sourceRecordingID: system.id,
+                canonicalTemporarySpeakerID: "speaker-1"
             )],
             status: .completed
         ))
@@ -595,6 +606,8 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.diarizationTurns.first?.temporarySpeakerID, "speaker-1")
         XCTAssertTrue(stored?.speakerClusterCorrections.isEmpty == true)
         XCTAssertTrue(stored?.speakerLabels.isEmpty == true)
+        XCTAssertTrue(stored?.speakerPersonAssignments.isEmpty == true)
+        XCTAssertEqual(stored?.participants, [previousParticipant])
         XCTAssertNil(model.diarizationActivity)
         XCTAssertNil(model.errorMessage)
     }
@@ -878,6 +891,69 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(playback.playedStartTime, 42.5)
         XCTAssertNil(model.errorMessage)
     }
+
+    func testCreateAndLinkPersonPersistsStableIdentityAndCanUnlink() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let recording = AudioRecordingReference(
+            id: recordingID,
+            meetingID: meetingID,
+            relativePath: "system.m4a",
+            channel: .systemAudio
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Identity",
+            audioRecordings: [recording],
+            diarizationTurns: [DiarizationTurn(
+                meetingID: meetingID,
+                startTime: 0,
+                endTime: 5,
+                sourceRecordingID: recordingID,
+                temporarySpeakerID: "speaker-1"
+            )],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.createAndLinkPerson(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            temporarySpeakerID: "speaker-1",
+            displayName: "  Laura   García "
+        )
+
+        var stored = await repository.meeting(id: meetingID)
+        let people = await repository.persons()
+        XCTAssertEqual(people.map(\.displayName), ["Laura García"])
+        XCTAssertEqual(stored?.participants.first?.personID, people.first?.id)
+        XCTAssertEqual(
+            stored?.speakerPersonAssignments.first?.meetingParticipantID,
+            stored?.participants.first?.id
+        )
+        XCTAssertEqual(stored?.speakerPersonAssignments.first?.basis, .userConfirmed)
+
+        await model.unlinkSpeakerFromPerson(
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            temporarySpeakerID: "speaker-1"
+        )
+
+        stored = await repository.meeting(id: meetingID)
+        let remainingPeople = await repository.persons()
+        XCTAssertTrue(stored?.speakerPersonAssignments.isEmpty == true)
+        XCTAssertTrue(stored?.participants.isEmpty == true)
+        XCTAssertEqual(remainingPeople.count, 1)
+    }
 }
 
 private enum TestCaptureError: Error {
@@ -886,6 +962,7 @@ private enum TestCaptureError: Error {
 
 private actor InMemoryMeetingRepository: MeetingRepository {
     private var stored: [Meeting] = []
+    private var storedPersons: [Person] = []
 
     func meetings() -> [Meeting] { stored }
     func meeting(id: UUID) -> Meeting? { stored.first { $0.id == id } }
@@ -894,6 +971,16 @@ private actor InMemoryMeetingRepository: MeetingRepository {
         stored.append(meeting)
     }
     func delete(id: UUID) { stored.removeAll { $0.id == id } }
+    func persons() async -> [Person] { storedPersons }
+    func person(id: UUID) async -> Person? { storedPersons.first { $0.id == id } }
+    func save(_ person: Person) async {
+        storedPersons.removeAll { $0.id == person.id }
+        storedPersons.append(person)
+    }
+    func save(_ person: Person, and meeting: Meeting) async {
+        await save(person)
+        save(meeting)
+    }
 }
 
 @MainActor
