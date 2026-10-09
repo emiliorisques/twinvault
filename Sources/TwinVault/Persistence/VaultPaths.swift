@@ -6,6 +6,8 @@ struct VaultPaths: Sendable {
     var audioDirectory: URL { root.appending(path: "audio", directoryHint: .isDirectory) }
     var modelsDirectory: URL { root.appending(path: "models", directoryHint: .isDirectory) }
     var meetingStore: URL { databaseDirectory.appending(path: "meetings-v1.json") }
+    var sqliteStore: URL { databaseDirectory.appending(path: "twinvault.sqlite") }
+    var importedJSONBackup: URL { databaseDirectory.appending(path: "meetings-v1.imported.json") }
 
     static func applicationDefault(fileManager: FileManager = .default) throws -> VaultPaths {
         let support = try fileManager.url(

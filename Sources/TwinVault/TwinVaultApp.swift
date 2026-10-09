@@ -7,7 +7,7 @@ struct TwinVaultApplication: App {
     init() {
         do {
             let paths = try VaultPaths.applicationDefault()
-            let repository = try JSONMeetingRepository(paths: paths)
+            let repository = try SQLiteMeetingRepository(paths: paths)
             let audio = LocalAudioRecordingService(audioDirectory: paths.audioDirectory)
             let systemAudio = ScreenCaptureSystemAudioService(audioDirectory: paths.audioDirectory)
             let playback = LocalAudioPlaybackService()

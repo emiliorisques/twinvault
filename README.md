@@ -34,7 +34,9 @@ Runtime data is stored below `~/Library/Application Support/TwinVault/`:
 
 ```text
 TwinVault/
-├── database/meetings-v1.json
+├── database/twinvault.sqlite
+├── database/twinvault.sqlite-wal       # may exist while the app is running
+├── database/meetings-v1.imported.json  # recovery copy after legacy migration
 ├── audio/<meeting UUID>.m4a
 ├── audio/<meeting UUID>-system.m4a
 └── models/                       # downloaded local model assets
@@ -100,11 +102,13 @@ Phase 3B adds stable, local people. Create a person from the sidebar or link a r
 
 Phase 3C prepares safe CRM interoperability without connecting to a CRM. Every person belongs to a workspace, and an `ExternalIdentityLink` maps `(workspace, external system, external record ID)` to exactly one local person. Known identifiers reuse that person; unknown identifiers require an explicit create-or-link decision. Names never trigger automatic merging. Person creation plus its first link is one atomic local write, and conflicting links are rejected. Existing people migrate into the deterministic local workspace. No CRM credentials, contact-field copies, network synchronization, or remote database have been added.
 
+Phase 3D replaces the live JSON metadata store with Apple-platform SQLite. Existing `meetings-v1.json` data is imported automatically in one transaction on first launch and then retained as `meetings-v1.imported.json` for recovery. People, workspaces, CRM identifiers, participants, and confirmed speaker assignments use relational constraints. Meeting evidence remains a versioned aggregate payload inside SQLite, while audio and local model assets remain separate files. The legacy JSON repository remains only for migration and tests.
+
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, and speaker identification are not enabled. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for experimental Parakeet transcription and offline diarization. FluidAudio currently exposes a broad package product, so it increases build size beyond the code TwinVault uses; model-asset licensing and that packaging cost must be reviewed before distribution.
 
 ## Current boundaries
 
-`MeetingRepository` isolates the domain and UI from JSON storage and now persists stable people and external identity references beside meetings. A `MeetingParticipant` is attendance context; a `MeetingSpeakerPersonAssignment` is a separate user-confirmed bridge from reviewed acoustic evidence. An external identity link prevents a future connector from duplicating a known CRM record but does not copy or synchronize the CRM contact. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, Parakeet, experimental Nemotron, and the conservative automatic router are replaceable implementations of `SpeechToTextProvider`. Nemotron is deliberately not registered in the application profile list. Acoustic language identification, diarization, and speaker identification are separate contracts. FluidAudio implements only diarization; biometric speaker identification remains unimplemented. Companies, structured memory, twins, live external integrations, and generative-AI inference remain absent.
+`MeetingRepository` isolates the domain and UI from SQLite storage. A `MeetingParticipant` is attendance context; a `MeetingSpeakerPersonAssignment` is a separate user-confirmed bridge from reviewed acoustic evidence. An external identity link prevents a future connector from duplicating a known CRM record but does not copy or synchronize the CRM contact. `AudioRecordingService` isolates recording and permission handling from presentation. Apple Speech, WhisperKit, Parakeet, experimental Nemotron, and the conservative automatic router are replaceable implementations of `SpeechToTextProvider`. Nemotron is deliberately not registered in the application profile list. Acoustic language identification, diarization, and speaker identification are separate contracts. FluidAudio implements only diarization; biometric speaker identification remains unimplemented. Companies, structured memory, twins, live external integrations, and generative-AI inference remain absent.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for decisions and Phase 2 boundaries.
 Aggregate local evaluation results are recorded in [BENCHMARKS.md](BENCHMARKS.md); private fixtures and raw transcripts are excluded.
