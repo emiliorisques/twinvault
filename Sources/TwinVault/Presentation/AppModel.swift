@@ -52,6 +52,7 @@ final class AppModel {
     private(set) var transcriptionActivity: TranscriptionActivity?
     private(set) var transcribingMeetingID: UUID?
     private(set) var diarizationActivity: DiarizationActivity?
+    private(set) var evidenceBackfillMeetingID: UUID?
     var canDiarizeLocally: Bool { diarizationProvider != nil }
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
     var recordingCaptureStatus: RecordingCaptureStatus? {
@@ -484,6 +485,70 @@ final class AppModel {
             activeSession = nil
             await load()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    /// Completes recoverability metadata for historical local evidence without
+    /// changing or uploading any source file. Successful assets are persisted
+    /// even when another historical file is no longer available.
+    func completeLocalEvidence(meetingID: UUID) async {
+        guard evidenceBackfillMeetingID == nil,
+              var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        evidenceBackfillMeetingID = meetingID
+        defer { evidenceBackfillMeetingID = nil }
+
+        var changed = false
+        var failures: [String] = []
+        for recording in meeting.audioRecordings {
+            let versionCount = meeting.transcriptionVersions.count
+            meeting.preserveLegacyTranscriptIfNeeded(for: recording.id)
+            changed = changed || meeting.transcriptionVersions.count != versionCount
+
+            guard recording.assetMetadata == nil else { continue }
+            do {
+                let metadata = try await audioAssetInspector.metadata(
+                    for: recording,
+                    in: audioDirectory
+                )
+                if let index = meeting.audioRecordings.firstIndex(where: { $0.id == recording.id }) {
+                    meeting.audioRecordings[index].assetMetadata = metadata
+                    changed = true
+                }
+            } catch {
+                failures.append("\(recording.channel.displayName): \(error.localizedDescription)")
+            }
+        }
+
+        do {
+            if changed {
+                meeting.updatedAt = .now
+                try await repository.save(meeting)
+                await load()
+            }
+            if !failures.isEmpty {
+                errorMessage = "Some historical audio metadata could not be recovered. "
+                    + failures.joined(separator: " ")
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func markTranscriptionReviewed(meetingID: UUID, versionID: UUID) async {
+        guard var meeting = meetings.first(where: { $0.id == meetingID }),
+              let version = meeting.transcriptionVersions.first(where: { $0.id == versionID }) else {
+            errorMessage = "That transcription version is no longer available."
+            return
+        }
+        guard meeting.markTranscriptionReviewed(
+            transcriptionID: version.transcriptionID,
+            version: version.version
+        ) else { return }
+        do {
+            try await repository.save(meeting)
+            await load()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func togglePlayback(_ recording: AudioRecordingReference) async {

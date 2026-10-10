@@ -305,6 +305,26 @@ struct MeetingDetailView: View {
         meeting.audioRecordings.first { $0.channel == .systemAudio }
     }
 
+    private var needsEvidenceBackfill: Bool {
+        if meeting.audioRecordings.contains(where: { $0.assetMetadata == nil }) { return true }
+        return meeting.audioRecordings.contains { recording in
+            meeting.transcriptSegments.contains { $0.sourceRecordingID == recording.id }
+                && meeting.latestTranscriptionVersion(for: recording.id) == nil
+        }
+    }
+
+    private var transcriptionVersions: [TranscriptionVersion] {
+        meeting.transcriptionVersions.sorted { lhs, rhs in
+            if lhs.createdAt != rhs.createdAt { return lhs.createdAt > rhs.createdAt }
+            return lhs.version > rhs.version
+        }
+    }
+
+    private func recordingLabel(_ recordingID: UUID) -> String {
+        meeting.audioRecordings.first(where: { $0.id == recordingID })?.channel.displayName
+            ?? "Unknown channel"
+    }
+
     private var temporarySpeakerCount: Int {
         guard let recordingID = systemAudioRecording?.id else { return 0 }
         return Set(rawTemporarySpeakerIDs.map {
@@ -412,7 +432,23 @@ struct MeetingDetailView: View {
                     "Transcription Languages",
                     value: meeting.transcriptionLocaleIdentifiers.map(languageLabel).joined(separator: " · ")
                 )
-                Text("Audio Channels").font(.title2.bold())
+                HStack {
+                    Text("Audio Channels").font(.title2.bold())
+                    Spacer()
+                    if needsEvidenceBackfill {
+                        if model.evidenceBackfillMeetingID == meeting.id {
+                            ProgressView().controlSize(.small)
+                            Text("Completing local evidence…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Button("Complete Local Evidence", systemImage: "externaldrive.badge.checkmark") {
+                                Task { await model.completeLocalEvidence(meetingID: meeting.id) }
+                            }
+                            .help("Recover missing local metadata and preserve legacy transcripts as version 1. No file leaves this Mac.")
+                        }
+                    }
+                }
                 if meeting.requestedSystemAudioCapture,
                    !meeting.audioRecordings.contains(where: { $0.channel == .systemAudio }) {
                     Label(
@@ -492,6 +528,16 @@ struct MeetingDetailView: View {
                                 Text("Timeline +\(duration(offset))")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                            }
+                            if let metadata = recording.assetMetadata {
+                                Text("\(duration(metadata.duration)) · \(fileSize(metadata.byteSize)) · SHA-256 \(metadata.sha256.prefix(12))…")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            } else {
+                                Label("Recovery metadata not yet available", systemImage: "exclamationmark.circle")
+                                    .font(.caption2)
+                                    .foregroundStyle(.orange)
                             }
                         }
                         Spacer()
@@ -710,6 +756,72 @@ struct MeetingDetailView: View {
                             Text("Names and merges are explicit user-confirmed labels for this meeting. Original model turns are preserved, and no biometric identity is created.")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Divider()
+                Text("Transcription History").font(.title2.bold())
+                if transcriptionVersions.isEmpty {
+                    Text(
+                        meeting.transcriptSegments.isEmpty
+                            ? "No transcription versions"
+                            : "Legacy transcript. Complete local evidence to preserve it as version 1."
+                    )
+                    .foregroundStyle(.secondary)
+                } else {
+                    ForEach(transcriptionVersions) { version in
+                        DisclosureGroup {
+                            VStack(alignment: .leading, spacing: 8) {
+                                LabeledContent("Created", value: version.createdAt.formatted(date: .abbreviated, time: .shortened))
+                                LabeledContent("Segments", value: "\(version.segments.count)")
+                                if !version.engines.isEmpty {
+                                    LabeledContent(
+                                        "Engines",
+                                        value: version.engines.map(\.providerIdentifier).joined(separator: " · ")
+                                    )
+                                }
+                                if let failure = version.failureDescription {
+                                    Text(failure).font(.caption).foregroundStyle(.orange)
+                                }
+                                ForEach(version.segments.sorted(by: TranscriptSegment.stableOrder)) { segment in
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("\(duration(segment.startTime))–\(duration(segment.endTime)) · Segment \((segment.sequenceNumber ?? 0) + 1)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        Text(segment.text).textSelection(.enabled)
+                                        if let correction = transcriptCorrection(for: segment) {
+                                            Label("User correction: \(correction.correctedText)", systemImage: "checkmark.seal.fill")
+                                                .font(.caption)
+                                                .foregroundStyle(.green)
+                                                .textSelection(.enabled)
+                                        }
+                                    }
+                                    .padding(.vertical, 2)
+                                }
+                                if version.status == .completed {
+                                    Button("Mark Version as Reviewed", systemImage: "checkmark.seal") {
+                                        Task {
+                                            await model.markTranscriptionReviewed(
+                                                meetingID: meeting.id,
+                                                versionID: version.id
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(.top, 8)
+                        } label: {
+                            HStack {
+                                Text("Version \(version.version) · \(recordingLabel(version.sourceRecordingID))")
+                                    .fontWeight(.semibold)
+                                Text(transcriptionVersionStatus(version.status))
+                                    .font(.caption)
+                                    .foregroundStyle(transcriptionVersionColor(version.status))
+                                Spacer()
+                                Text(version.profileIdentifier ?? "Legacy")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }
@@ -1068,6 +1180,29 @@ private struct SpeakerPersonLinkEditor: View {
 private func duration(_ interval: TimeInterval) -> String {
     let seconds = max(0, Int(interval))
     return String(format: "%02d:%02d:%02d", seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+}
+
+private func fileSize(_ bytes: Int64) -> String {
+    ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file)
+}
+
+private func transcriptionVersionStatus(_ status: TranscriptionVersion.Status) -> String {
+    switch status {
+    case .processing: "Processing"
+    case .completed: "Automatic"
+    case .reviewed: "Reviewed by user"
+    case .failed: "Failed"
+    case .cancelled: "Cancelled"
+    }
+}
+
+private func transcriptionVersionColor(_ status: TranscriptionVersion.Status) -> Color {
+    switch status {
+    case .reviewed: .green
+    case .failed, .cancelled: .orange
+    case .processing: .blue
+    case .completed: .secondary
+    }
 }
 
 private func languageLabel(_ localeIdentifier: String) -> String {

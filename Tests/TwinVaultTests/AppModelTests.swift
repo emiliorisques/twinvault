@@ -857,6 +857,118 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments, [segment])
     }
 
+    func testCompletingLocalEvidenceBackfillsOnlyMissingAudioAndVersionsLegacyTranscript() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let completeMetadata = AudioAssetMetadata(
+            sha256: String(repeating: "a", count: 64),
+            mimeType: "audio/mp4",
+            byteSize: 10,
+            duration: 2
+        )
+        let recoveredMetadata = AudioAssetMetadata(
+            sha256: String(repeating: "b", count: 64),
+            mimeType: "audio/mp4",
+            byteSize: 20,
+            duration: 4
+        )
+        let completeRecording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "complete.m4a",
+            assetMetadata: completeMetadata
+        )
+        let legacyRecording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "legacy.m4a"
+        )
+        let legacySegment = TranscriptSegment(
+            meetingID: meetingID,
+            startTime: 1,
+            endTime: 3,
+            text: "Legacy evidence",
+            sourceRecordingID: legacyRecording.id,
+            providerIdentifier: "legacy.provider"
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Historical",
+            audioRecordings: [completeRecording, legacyRecording],
+            transcriptSegments: [legacySegment],
+            status: .completed
+        ))
+        let inspector = FixedAudioAssetInspector(metadata: recoveredMetadata)
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory,
+            audioAssetInspector: inspector
+        )
+        await model.load()
+
+        await model.completeLocalEvidence(meetingID: meetingID)
+
+        let stored = await repository.meeting(id: meetingID)
+        let requestedRecordingIDs = await inspector.requestedRecordingIDs()
+        XCTAssertEqual(stored?.audioRecordings[0].assetMetadata, completeMetadata)
+        XCTAssertEqual(stored?.audioRecordings[1].assetMetadata, recoveredMetadata)
+        XCTAssertEqual(requestedRecordingIDs, [legacyRecording.id])
+        XCTAssertEqual(stored?.transcriptionVersions.count, 1)
+        XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.id), [legacySegment.id])
+        XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.startTime), [1])
+        XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.endTime), [3])
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testMarkingTranscriptionReviewedPersistsExplicitStateWithoutChangingEvidence() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recordingID = UUID()
+        let transcriptionID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            transcriptionID: transcriptionID,
+            transcriptionVersion: 1,
+            sequenceNumber: 0,
+            startTime: 5,
+            endTime: 7,
+            text: "Immutable evidence",
+            sourceRecordingID: recordingID
+        )
+        let version = TranscriptionVersion(
+            transcriptionID: transcriptionID,
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            version: 1,
+            status: .completed,
+            segments: [segment]
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Review",
+            transcriptionVersions: [version],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory
+        )
+        await model.load()
+
+        await model.markTranscriptionReviewed(meetingID: meetingID, versionID: version.id)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.transcriptionVersions.first?.status, .reviewed)
+        XCTAssertNotNil(stored?.transcriptionVersions.first?.reviewedAt)
+        XCTAssertEqual(stored?.transcriptionVersions.first?.segments, [segment])
+    }
+
     func testTranscriptSegmentPlaybackStartsAtEvidenceTimestamp() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -1188,6 +1300,25 @@ private struct FixedAcousticLeakageAnalyzer: AcousticPlaybackLeakageAnalyzing {
     ) async throws -> [UUID: Double] {
         Dictionary(uniqueKeysWithValues: microphoneSegments.map { ($0.id, similarity) })
     }
+}
+
+private actor FixedAudioAssetInspector: AudioAssetInspecting {
+    let fixedMetadata: AudioAssetMetadata
+    private var requestedIDs: [UUID] = []
+
+    init(metadata: AudioAssetMetadata) {
+        fixedMetadata = metadata
+    }
+
+    func metadata(
+        for recording: AudioRecordingReference,
+        in audioDirectory: URL
+    ) async throws -> AudioAssetMetadata {
+        requestedIDs.append(recording.id)
+        return fixedMetadata
+    }
+
+    func requestedRecordingIDs() -> [UUID] { requestedIDs }
 }
 
 private func testAudioDirectory() -> URL {
