@@ -24,10 +24,50 @@ final class SQLiteMeetingRepositoryTests: XCTestCase {
             canonicalTemporarySpeakerID: "speaker-1",
             confirmedAt: timestamp
         )
+        let audioMetadata = AudioAssetMetadata(
+            sha256: String(repeating: "a", count: 64),
+            mimeType: "audio/mp4",
+            byteSize: 42,
+            duration: 12,
+            finalizedAt: timestamp
+        )
+        let recording = AudioRecordingReference(
+            id: recordingID,
+            meetingID: meetingID,
+            relativePath: "recording.m4a",
+            createdAt: timestamp,
+            assetMetadata: audioMetadata
+        )
+        let transcriptionID = UUID()
+        let segment = TranscriptSegment(
+            meetingID: meetingID,
+            transcriptionID: transcriptionID,
+            transcriptionVersion: 1,
+            sequenceNumber: 0,
+            startTime: 1,
+            endTime: 2,
+            text: "Evidence",
+            sourceRecordingID: recordingID,
+            providerIdentifier: "test.provider"
+        )
+        let version = TranscriptionVersion(
+            transcriptionID: transcriptionID,
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            version: 1,
+            status: .completed,
+            engines: [TranscriptionEngineMetadata(providerIdentifier: "test.provider")],
+            segments: [segment],
+            createdAt: timestamp,
+            completedAt: timestamp
+        )
         let meeting = Meeting(
             id: meetingID,
             title: "Relational evidence",
             startDate: timestamp,
+            audioRecordings: [recording],
+            transcriptSegments: [segment],
+            transcriptionVersions: [version],
             participants: [participant],
             speakerPersonAssignments: [assignment],
             status: .completed,
@@ -41,6 +81,9 @@ final class SQLiteMeetingRepositoryTests: XCTestCase {
         let loaded = try XCTUnwrap(storedMeeting)
         XCTAssertEqual(loaded.participants, [participant])
         XCTAssertEqual(loaded.speakerPersonAssignments, [assignment])
+        XCTAssertEqual(loaded.audioRecordings.first?.assetMetadata, audioMetadata)
+        XCTAssertEqual(loaded.transcriptionVersions, [version])
+        XCTAssertEqual(loaded.transcriptionVersions.first?.segments.first?.id, segment.id)
         XCTAssertTrue(FileManager.default.fileExists(atPath: paths.sqliteStore.path))
 
         var updated = loaded

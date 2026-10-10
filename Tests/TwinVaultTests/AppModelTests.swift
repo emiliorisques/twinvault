@@ -86,7 +86,10 @@ final class AppModelTests: XCTestCase {
         await model.stopMeeting()
         let storedMeetings = await repository.meetings()
         XCTAssertEqual(storedMeetings.first?.status, .completed)
-        XCTAssertEqual(storedMeetings.first?.audioCaptureIssues.map(\.kind), [.startFailed])
+        XCTAssertEqual(
+            storedMeetings.first?.audioCaptureIssues.map(\.kind),
+            [.startFailed, .metadataInspectionFailed]
+        )
         XCTAssertFalse(microphone.isRecording)
     }
 
@@ -174,7 +177,11 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptSegments.count, 1)
         XCTAssertEqual(stored?.transcriptSegments.first?.sourceRecordingID, recording.id)
         XCTAssertEqual(stored?.transcriptSegments.first?.providerIdentifier, "test.speech")
-        XCTAssertTrue(stored?.transcriptCorrections.isEmpty == true)
+        XCTAssertEqual(stored?.transcriptCorrections.count, 1)
+        XCTAssertEqual(stored?.transcriptionVersions.map(\.version), [1, 2])
+        XCTAssertEqual(stored?.transcriptionVersions.map(\.status), [.completed, .completed])
+        XCTAssertEqual(stored?.transcriptSegments.first?.transcriptionVersion, 2)
+        XCTAssertEqual(stored?.transcriptSegments.first?.sequenceNumber, 0)
         XCTAssertNil(model.transcribingRecordingID)
         XCTAssertNil(model.errorMessage)
     }
@@ -536,7 +543,9 @@ final class AppModelTests: XCTestCase {
         }
 
         let stored = await repository.meeting(id: meetingID)
-        XCTAssertEqual(stored?.transcriptSegments, [existing])
+        XCTAssertEqual(stored?.transcriptSegments.map(\.id), [existing.id])
+        XCTAssertEqual(stored?.transcriptSegments.map(\.text), [existing.text])
+        XCTAssertEqual(stored?.transcriptionVersions.map(\.status), [.completed, .cancelled])
         XCTAssertNil(model.transcriptionActivity)
         XCTAssertNil(model.errorMessage)
     }

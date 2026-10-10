@@ -40,6 +40,9 @@
 		A10000000000000000000031 /* SQLiteMeetingRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* SQLiteMeetingRepository.swift */; };
 		A10000000000000000000032 /* ExternalIdentityTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000035 /* ExternalIdentityTests.swift */; };
 		A10000000000000000000033 /* SQLiteMeetingRepositoryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000036 /* SQLiteMeetingRepositoryTests.swift */; };
+		A10000000000000000000034 /* AudioAssetInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000037 /* AudioAssetInspector.swift */; };
+		A10000000000000000000035 /* TranscriptionVersion.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000038 /* TranscriptionVersion.swift */; };
+		A10000000000000000000036 /* TranscriptionVersionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000039 /* TranscriptionVersionTests.swift */; };
 		A20000000000000000000001 /* WhisperKit in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000001 /* WhisperKit */; };
 		A20000000000000000000002 /* FluidAudio in Frameworks */ = {isa = PBXBuildFile; productRef = N20000000000000000000002 /* FluidAudio */; };
 /* End PBXBuildFile section */
@@ -91,6 +94,9 @@
 		B10000000000000000000034 /* SQLiteMeetingRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteMeetingRepository.swift; sourceTree = "<group>"; };
 		B10000000000000000000035 /* ExternalIdentityTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExternalIdentityTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000036 /* SQLiteMeetingRepositoryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteMeetingRepositoryTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000037 /* AudioAssetInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAssetInspector.swift; sourceTree = "<group>"; };
+		B10000000000000000000038 /* TranscriptionVersion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionVersion.swift; sourceTree = "<group>"; };
+		B10000000000000000000039 /* TranscriptionVersionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TranscriptionVersionTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -147,6 +153,7 @@
 				B10000000000000000000029 /* CrossChannelEvidence.swift */,
 				B10000000000000000000032 /* People.swift */,
 				B10000000000000000000033 /* ExternalIdentity.swift */,
+				B10000000000000000000038 /* TranscriptionVersion.swift */,
 			);
 			path = Domain;
 			sourceTree = "<group>";
@@ -168,6 +175,7 @@
 				B10000000000000000000016 /* SystemAudioCaptureService.swift */,
 				B10000000000000000000030 /* AudioChannelAlignment.swift */,
 				B10000000000000000000019 /* AudioPlaybackService.swift */,
+				B10000000000000000000037 /* AudioAssetInspector.swift */,
 			);
 			path = Audio;
 			sourceTree = "<group>";
@@ -215,6 +223,7 @@
 				B10000000000000000000024 /* LocalTranscriptionBenchmarkTests.swift */,
 				B10000000000000000000035 /* ExternalIdentityTests.swift */,
 				B10000000000000000000036 /* SQLiteMeetingRepositoryTests.swift */,
+				B10000000000000000000039 /* TranscriptionVersionTests.swift */,
 			);
 			path = Tests/TwinVaultTests;
 			sourceTree = "<group>";
@@ -359,6 +368,8 @@
 				A10000000000000000000029 /* People.swift in Sources */,
 				A10000000000000000000030 /* ExternalIdentity.swift in Sources */,
 				A10000000000000000000031 /* SQLiteMeetingRepository.swift in Sources */,
+				A10000000000000000000034 /* AudioAssetInspector.swift in Sources */,
+				A10000000000000000000035 /* TranscriptionVersion.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -374,6 +385,7 @@
 				A10000000000000000000021 /* LocalTranscriptionBenchmarkTests.swift in Sources */,
 				A10000000000000000000032 /* ExternalIdentityTests.swift in Sources */,
 				A10000000000000000000033 /* SQLiteMeetingRepositoryTests.swift in Sources */,
+				A10000000000000000000036 /* TranscriptionVersionTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

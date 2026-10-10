@@ -14,6 +14,7 @@ private final class SQLiteConnection: @unchecked Sendable {
 }
 
 actor SQLiteMeetingRepository: MeetingRepository {
+    private static let payloadSchemaVersion = 2
     private let paths: VaultPaths
     private let fileManager: FileManager
     private let encoder: JSONEncoder
@@ -281,7 +282,7 @@ actor SQLiteMeetingRepository: MeetingRepository {
             """)
         try execute("CREATE INDEX IF NOT EXISTS meetings_start_date ON meetings(start_date DESC)")
         try execute("CREATE INDEX IF NOT EXISTS participants_person_id ON meeting_participants(person_id)")
-        try setMetadataValue("1", for: "schema_version")
+        try setMetadataValue("2", for: "schema_version")
     }
 
     private func saveMeeting(_ meeting: Meeting) throws {
@@ -290,7 +291,7 @@ actor SQLiteMeetingRepository: MeetingRepository {
         payloadMeeting.speakerPersonAssignments = []
         let payload = try encoder.encode(payloadMeeting)
         let statement = try prepare("""
-            INSERT INTO meetings(id, start_date, payload_schema_version, payload) VALUES(?, ?, 1, ?)
+            INSERT INTO meetings(id, start_date, payload_schema_version, payload) VALUES(?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET start_date = excluded.start_date,
                 payload_schema_version = excluded.payload_schema_version,
                 payload = excluded.payload
@@ -298,7 +299,8 @@ actor SQLiteMeetingRepository: MeetingRepository {
         defer { sqlite3_finalize(statement) }
         bind(meeting.id.uuidString, to: 1, in: statement)
         sqlite3_bind_double(statement, 2, meeting.startDate.timeIntervalSince1970)
-        bind(payload, to: 3, in: statement)
+        sqlite3_bind_int(statement, 3, Int32(Self.payloadSchemaVersion))
+        bind(payload, to: 4, in: statement)
         try stepDone(statement)
 
         try deleteRelations(meetingID: meeting.id)

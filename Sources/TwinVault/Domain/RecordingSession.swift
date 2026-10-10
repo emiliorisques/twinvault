@@ -40,6 +40,16 @@ struct RecordingSession: Equatable, Sendable {
         meeting.updatedAt = now
     }
 
+    mutating func finalizeAudio(
+        recordingID: UUID,
+        metadata: AudioAssetMetadata,
+        now: Date = .now
+    ) {
+        guard let index = meeting.audioRecordings.firstIndex(where: { $0.id == recordingID }) else { return }
+        meeting.audioRecordings[index].assetMetadata = metadata
+        meeting.updatedAt = now
+    }
+
     mutating func recordCaptureIssue(
         channel: AudioRecordingReference.Channel,
         kind: AudioCaptureIssue.Kind,

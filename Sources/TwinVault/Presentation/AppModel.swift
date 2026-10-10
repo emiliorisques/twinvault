@@ -37,6 +37,7 @@ final class AppModel {
     private let speechTurnDetector: any SpeechTurnDetecting
     private let channelAlignmentAnalyzer: any AudioChannelAlignmentAnalyzing
     private let acousticLeakageAnalyzer: any AcousticPlaybackLeakageAnalyzing
+    private let audioAssetInspector: any AudioAssetInspecting
     private let diarizationProvider: (any DiarizationProvider)?
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
@@ -83,6 +84,7 @@ final class AppModel {
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
+        audioAssetInspector: (any AudioAssetInspecting)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         self.repository = repository
@@ -109,6 +111,7 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
+        self.audioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
         self.diarizationProvider = diarizationProvider
     }
 
@@ -123,6 +126,7 @@ final class AppModel {
         speechTurnDetector: any SpeechTurnDetecting = LocalEnergySpeechTurnDetector(),
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
+        audioAssetInspector: (any AudioAssetInspecting)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
@@ -157,6 +161,7 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
+        self.audioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
         self.diarizationProvider = diarizationProvider
     }
 
@@ -456,6 +461,24 @@ final class AppModel {
             errorMessage = error.localizedDescription
         }
         session.stop()
+        for recording in session.meeting.audioRecordings {
+            do {
+                let metadata = try await audioAssetInspector.metadata(
+                    for: recording,
+                    in: audioDirectory
+                )
+                session.finalizeAudio(recordingID: recording.id, metadata: metadata)
+            } catch {
+                session.recordCaptureIssue(
+                    channel: recording.channel,
+                    kind: .metadataInspectionFailed,
+                    message: error.localizedDescription
+                )
+                if errorMessage == nil {
+                    errorMessage = "The meeting was saved, but some audio metadata is unavailable. \(error.localizedDescription)"
+                }
+            }
+        }
         do {
             try await repository.save(session.meeting)
             activeSession = nil
@@ -543,6 +566,8 @@ final class AppModel {
             meeting.transcriptCorrections.append(TranscriptSegmentCorrection(
                 meetingID: meetingID,
                 transcriptSegmentID: segmentID,
+                transcriptionID: segment.transcriptionID,
+                transcriptionVersion: segment.transcriptionVersion,
                 originalText: segment.text,
                 correctedText: normalizedText
             ))
@@ -588,6 +613,21 @@ final class AppModel {
             return
         }
 
+        meeting.preserveLegacyTranscriptIfNeeded(for: recordingID)
+        let previousVersion = meeting.latestTranscriptionVersion(for: recordingID)
+        let run = TranscriptionVersion(
+            transcriptionID: previousVersion?.transcriptionID ?? UUID(),
+            meetingID: meetingID,
+            sourceRecordingID: recordingID,
+            version: (previousVersion?.version ?? 0) + 1,
+            status: .processing,
+            profileIdentifier: profile.id,
+            requestedLocaleIdentifiers: profile.localeIdentifiers,
+            engines: [TranscriptionEngineMetadata(providerIdentifier: speechToText.identifier)]
+        )
+        meeting.transcriptionVersions.append(run)
+        meeting.updatedAt = .now
+
         let activityID = UUID()
         transcriptionActivity = TranscriptionActivity(
             id: activityID,
@@ -601,6 +641,7 @@ final class AppModel {
             }
         }
         do {
+            try await repository.save(meeting)
             let output = try await speechToText.transcribe(TranscriptionRequest(
                 meetingID: meetingID,
                 recordings: [recording],
@@ -614,20 +655,25 @@ final class AppModel {
                 }
             ))
             try Task.checkCancellation()
-            let replacedSegmentIDs = Set(meeting.transcriptSegments.compactMap { segment in
-                segment.sourceRecordingID == recordingID ? segment.id : nil
-            })
-            meeting.transcriptCorrections.removeAll {
-                replacedSegmentIDs.contains($0.transcriptSegmentID)
+            let assignedSegments = output.segments
+                .sorted(by: TranscriptSegment.stableOrder)
+                .enumerated()
+                .map { sequence, segment in
+                    segment.assigned(
+                        transcriptionID: run.transcriptionID,
+                        transcriptionVersion: run.version,
+                        sequenceNumber: sequence
+                    )
+                }
+            if let runIndex = meeting.transcriptionVersions.firstIndex(where: { $0.id == run.id }) {
+                meeting.transcriptionVersions[runIndex].status = .completed
+                meeting.transcriptionVersions[runIndex].engines = output.engines
+                meeting.transcriptionVersions[runIndex].segments = assignedSegments
+                meeting.transcriptionVersions[runIndex].completedAt = .now
             }
             meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recordingID }
-            meeting.transcriptSegments.append(contentsOf: output.segments)
-            meeting.transcriptSegments.sort {
-                if $0.startTime == $1.startTime {
-                    return $0.endTime < $1.endTime
-                }
-                return $0.startTime < $1.startTime
-            }
+            meeting.transcriptSegments.append(contentsOf: assignedSegments)
+            meeting.transcriptSegments.sort(by: TranscriptSegment.stableOrder)
             meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recordingID }
             meeting.transcriptReviewIntervals.append(contentsOf: output.reviewIntervals)
             meeting.crossChannelTranscriptFindings = CrossChannelTranscriptReconciler().findings(
@@ -659,10 +705,50 @@ final class AppModel {
                 errorMessage = crossChannelAnalysisError
             }
         } catch is CancellationError {
-            // Cancellation is a user action, not an application error. Existing
-            // transcript data remains untouched because persistence happens later.
+            await finishTranscriptionVersion(
+                meetingID: meetingID,
+                versionID: run.id,
+                status: .cancelled,
+                failureDescription: nil
+            )
         } catch {
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                await finishTranscriptionVersion(
+                    meetingID: meetingID,
+                    versionID: run.id,
+                    status: .cancelled,
+                    failureDescription: nil
+                )
+                return
+            }
+            await finishTranscriptionVersion(
+                meetingID: meetingID,
+                versionID: run.id,
+                status: .failed,
+                failureDescription: error.localizedDescription
+            )
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func finishTranscriptionVersion(
+        meetingID: UUID,
+        versionID: UUID,
+        status: TranscriptionVersion.Status,
+        failureDescription: String?
+    ) async {
+        do {
+            guard var persisted = try await repository.meeting(id: meetingID),
+                  let index = persisted.transcriptionVersions.firstIndex(where: { $0.id == versionID }) else {
+                return
+            }
+            persisted.transcriptionVersions[index].status = status
+            persisted.transcriptionVersions[index].completedAt = .now
+            persisted.transcriptionVersions[index].failureDescription = failureDescription
+            persisted.updatedAt = .now
+            try await repository.save(persisted)
+            await load()
+        } catch {
             errorMessage = error.localizedDescription
         }
     }
@@ -1053,12 +1139,6 @@ final class AppModel {
         meetingID: UUID
     ) async throws {
         guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
-        let removedSegmentIDs = Set(meeting.transcriptSegments.compactMap { segment in
-            segment.sourceRecordingID == recording.id ? segment.id : nil
-        })
-        meeting.transcriptCorrections.removeAll {
-            removedSegmentIDs.contains($0.transcriptSegmentID)
-        }
         meeting.transcriptSegments.removeAll { $0.sourceRecordingID == recording.id }
         meeting.transcriptReviewIntervals.removeAll { $0.sourceRecordingID == recording.id }
         meeting.channelAlignmentEstimate = nil

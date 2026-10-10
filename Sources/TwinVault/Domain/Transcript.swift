@@ -49,6 +49,9 @@ protocol SpeechTurnDetecting: Sendable {
 struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let meetingID: UUID
+    let transcriptionID: UUID?
+    let transcriptionVersion: Int?
+    let sequenceNumber: Int?
     /// Times relative to `sourceRecordingID`.
     let startTime: TimeInterval
     let endTime: TimeInterval
@@ -63,7 +66,9 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     let localeIdentifier: String?
 
     init(
-        id: UUID = UUID(), meetingID: UUID, startTime: TimeInterval,
+        id: UUID = UUID(), meetingID: UUID,
+        transcriptionID: UUID? = nil, transcriptionVersion: Int? = nil,
+        sequenceNumber: Int? = nil, startTime: TimeInterval,
         endTime: TimeInterval, temporarySpeakerID: String? = nil,
         text: String, confidence: Double? = nil,
         sourceRecordingID: UUID? = nil, providerIdentifier: String? = nil,
@@ -71,6 +76,9 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
     ) {
         self.id = id
         self.meetingID = meetingID
+        self.transcriptionID = transcriptionID
+        self.transcriptionVersion = transcriptionVersion.map { max(1, $0) }
+        self.sequenceNumber = sequenceNumber.map { max(0, $0) }
         self.startTime = max(0, startTime)
         self.endTime = max(max(0, startTime), endTime)
         self.temporarySpeakerID = temporarySpeakerID
@@ -79,6 +87,34 @@ struct TranscriptSegment: Identifiable, Codable, Equatable, Sendable {
         self.sourceRecordingID = sourceRecordingID
         self.providerIdentifier = providerIdentifier
         self.localeIdentifier = localeIdentifier
+    }
+
+    func assigned(
+        transcriptionID: UUID,
+        transcriptionVersion: Int,
+        sequenceNumber: Int
+    ) -> TranscriptSegment {
+        TranscriptSegment(
+            id: id,
+            meetingID: meetingID,
+            transcriptionID: transcriptionID,
+            transcriptionVersion: transcriptionVersion,
+            sequenceNumber: sequenceNumber,
+            startTime: startTime,
+            endTime: endTime,
+            temporarySpeakerID: temporarySpeakerID,
+            text: text,
+            confidence: confidence,
+            sourceRecordingID: sourceRecordingID,
+            providerIdentifier: providerIdentifier,
+            localeIdentifier: localeIdentifier
+        )
+    }
+
+    static func stableOrder(_ lhs: TranscriptSegment, _ rhs: TranscriptSegment) -> Bool {
+        if lhs.startTime != rhs.startTime { return lhs.startTime < rhs.startTime }
+        if lhs.endTime != rhs.endTime { return lhs.endTime < rhs.endTime }
+        return lhs.id.uuidString < rhs.id.uuidString
     }
 }
 
@@ -91,6 +127,8 @@ struct TranscriptSegmentCorrection: Identifiable, Codable, Equatable, Sendable {
     let id: UUID
     let meetingID: UUID
     let transcriptSegmentID: UUID
+    let transcriptionID: UUID?
+    let transcriptionVersion: Int?
     let originalText: String
     let correctedText: String
     let basis: Basis
@@ -100,6 +138,8 @@ struct TranscriptSegmentCorrection: Identifiable, Codable, Equatable, Sendable {
         id: UUID = UUID(),
         meetingID: UUID,
         transcriptSegmentID: UUID,
+        transcriptionID: UUID? = nil,
+        transcriptionVersion: Int? = nil,
         originalText: String,
         correctedText: String,
         basis: Basis = .userConfirmed,
@@ -108,6 +148,8 @@ struct TranscriptSegmentCorrection: Identifiable, Codable, Equatable, Sendable {
         self.id = id
         self.meetingID = meetingID
         self.transcriptSegmentID = transcriptSegmentID
+        self.transcriptionID = transcriptionID
+        self.transcriptionVersion = transcriptionVersion.map { max(1, $0) }
         self.originalText = originalText
         self.correctedText = correctedText
         self.basis = basis
@@ -206,15 +248,18 @@ struct TranscriptionOutput: Equatable, Sendable {
     let reviewIntervals: [TranscriptReviewInterval]
     /// Requested locales that the provider could not use for this run.
     let unavailableLocaleIdentifiers: [String]
+    let engines: [TranscriptionEngineMetadata]
 
     init(
         segments: [TranscriptSegment],
         reviewIntervals: [TranscriptReviewInterval] = [],
-        unavailableLocaleIdentifiers: [String] = []
+        unavailableLocaleIdentifiers: [String] = [],
+        engines: [TranscriptionEngineMetadata]? = nil
     ) {
         self.segments = segments
         self.reviewIntervals = reviewIntervals
         self.unavailableLocaleIdentifiers = unavailableLocaleIdentifiers
+        self.engines = engines ?? TranscriptionEngineMetadata.uniqueProviders(from: segments)
     }
 }
 

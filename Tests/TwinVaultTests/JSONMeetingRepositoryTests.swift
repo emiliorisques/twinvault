@@ -72,7 +72,7 @@ final class JSONMeetingRepositoryTests: XCTestCase {
         try await repository.save(loaded)
 
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: paths.meetingStore)) as? [String: Any])
-        XCTAssertEqual(object["schemaVersion"] as? Int, 16)
+        XCTAssertEqual(object["schemaVersion"] as? Int, 17)
     }
 
     func testPersistsTranscriptWithRecordingProvenance() async throws {
