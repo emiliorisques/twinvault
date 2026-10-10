@@ -38,6 +38,7 @@ final class AppModel {
     private let channelAlignmentAnalyzer: any AudioChannelAlignmentAnalyzing
     private let acousticLeakageAnalyzer: any AcousticPlaybackLeakageAnalyzing
     private let audioAssetInspector: any AudioAssetInspecting
+    private let evidenceHealthAuditor: any EvidenceHealthAuditing
     private let diarizationProvider: (any DiarizationProvider)?
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
@@ -53,6 +54,8 @@ final class AppModel {
     private(set) var transcribingMeetingID: UUID?
     private(set) var diarizationActivity: DiarizationActivity?
     private(set) var evidenceBackfillMeetingID: UUID?
+    private(set) var evidenceAuditMeetingID: UUID?
+    private(set) var evidenceHealthReports: [UUID: EvidenceHealthReport] = [:]
     var canDiarizeLocally: Bool { diarizationProvider != nil }
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
     var recordingCaptureStatus: RecordingCaptureStatus? {
@@ -86,6 +89,7 @@ final class AppModel {
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
         audioAssetInspector: (any AudioAssetInspecting)? = nil,
+        evidenceHealthAuditor: (any EvidenceHealthAuditing)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         self.repository = repository
@@ -112,7 +116,10 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
-        self.audioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
+        let resolvedAudioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
+        self.audioAssetInspector = resolvedAudioAssetInspector
+        self.evidenceHealthAuditor = evidenceHealthAuditor
+            ?? LocalEvidenceHealthAuditor(audioAssetInspector: resolvedAudioAssetInspector)
         self.diarizationProvider = diarizationProvider
     }
 
@@ -128,6 +135,7 @@ final class AppModel {
         channelAlignmentAnalyzer: (any AudioChannelAlignmentAnalyzing)? = nil,
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
         audioAssetInspector: (any AudioAssetInspecting)? = nil,
+        evidenceHealthAuditor: (any EvidenceHealthAuditing)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
@@ -162,7 +170,10 @@ final class AppModel {
             ?? LocalAudioChannelAlignmentAnalyzer(audioDirectory: audioDirectory)
         self.acousticLeakageAnalyzer = acousticLeakageAnalyzer
             ?? LocalAcousticPlaybackLeakageAnalyzer(audioDirectory: audioDirectory)
-        self.audioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
+        let resolvedAudioAssetInspector = audioAssetInspector ?? LocalAudioAssetInspector()
+        self.audioAssetInspector = resolvedAudioAssetInspector
+        self.evidenceHealthAuditor = evidenceHealthAuditor
+            ?? LocalEvidenceHealthAuditor(audioAssetInspector: resolvedAudioAssetInspector)
         self.diarizationProvider = diarizationProvider
     }
 
@@ -549,6 +560,18 @@ final class AppModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func runEvidenceHealthCheck(meetingID: UUID) async {
+        guard evidenceAuditMeetingID == nil,
+              let meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        evidenceAuditMeetingID = meetingID
+        defer { evidenceAuditMeetingID = nil }
+        evidenceHealthReports[meetingID] = await evidenceHealthAuditor.audit(
+            meeting: meeting,
+            audioDirectory: audioDirectory,
+            now: .now
+        )
     }
 
     func togglePlayback(_ recording: AudioRecordingReference) async {

@@ -826,6 +826,60 @@ struct MeetingDetailView: View {
                     }
                 }
                 Divider()
+                HStack {
+                    Text("Evidence Health").font(.title2.bold())
+                    Spacer()
+                    if model.evidenceAuditMeetingID == meeting.id {
+                        ProgressView().controlSize(.small)
+                        Text("Checking local evidence…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Button("Run Health Check", systemImage: "checkmark.shield") {
+                            Task { await model.runEvidenceHealthCheck(meetingID: meeting.id) }
+                        }
+                        .help("Read-only offline check of audio integrity, timestamps, versions, and corrections.")
+                    }
+                }
+                if let report = model.evidenceHealthReports[meeting.id] {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if report.isHealthy {
+                            Label("No evidence integrity issues found", systemImage: "checkmark.shield.fill")
+                                .foregroundStyle(.green)
+                                .fontWeight(.semibold)
+                        } else {
+                            Label(
+                                "\(report.errorCount) error\(report.errorCount == 1 ? "" : "s") · \(report.warningCount) warning\(report.warningCount == 1 ? "" : "s")",
+                                systemImage: report.errorCount > 0
+                                    ? "exclamationmark.shield.fill"
+                                    : "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(report.errorCount > 0 ? Color.red : Color.orange)
+                            .fontWeight(.semibold)
+                            ForEach(report.findings) { finding in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: finding.severity == .error
+                                        ? "xmark.octagon.fill"
+                                        : "exclamationmark.triangle.fill")
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(finding.message)
+                                        Text(finding.code.rawValue)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .foregroundStyle(finding.severity == .error ? Color.red : Color.orange)
+                            }
+                        }
+                        Text("Checked \(report.checkedAt.formatted(date: .abbreviated, time: .standard)) · Read-only · Offline")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("Not checked yet. The diagnostic never changes or deletes evidence.")
+                        .foregroundStyle(.secondary)
+                }
+                Divider()
                 Text("Transcript").font(.title2.bold())
                 if meeting.transcriptSegments.isEmpty {
                     Text("Not transcribed").foregroundStyle(.secondary)
