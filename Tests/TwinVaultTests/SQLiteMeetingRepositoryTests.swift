@@ -38,6 +38,14 @@ final class SQLiteMeetingRepositoryTests: XCTestCase {
             createdAt: timestamp,
             assetMetadata: audioMetadata
         )
+        let repairRecord = EvidenceRepairRecord(
+            meetingID: meetingID,
+            recordingID: recordingID,
+            action: .rebuiltAudioMetadata,
+            previousMetadata: nil,
+            resultingMetadata: audioMetadata,
+            performedAt: timestamp
+        )
         let transcriptionID = UUID()
         let segment = TranscriptSegment(
             meetingID: meetingID,
@@ -70,6 +78,7 @@ final class SQLiteMeetingRepositoryTests: XCTestCase {
             transcriptionVersions: [version],
             participants: [participant],
             speakerPersonAssignments: [assignment],
+            evidenceRepairRecords: [repairRecord],
             status: .completed,
             createdAt: timestamp,
             updatedAt: timestamp
@@ -84,6 +93,7 @@ final class SQLiteMeetingRepositoryTests: XCTestCase {
         XCTAssertEqual(loaded.audioRecordings.first?.assetMetadata, audioMetadata)
         XCTAssertEqual(loaded.transcriptionVersions, [version])
         XCTAssertEqual(loaded.transcriptionVersions.first?.segments.first?.id, segment.id)
+        XCTAssertEqual(loaded.evidenceRepairRecords, [repairRecord])
         XCTAssertTrue(FileManager.default.fileExists(atPath: paths.sqliteStore.path))
 
         var updated = loaded

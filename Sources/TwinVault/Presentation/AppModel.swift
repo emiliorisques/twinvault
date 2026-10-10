@@ -39,6 +39,7 @@ final class AppModel {
     private let acousticLeakageAnalyzer: any AcousticPlaybackLeakageAnalyzing
     private let audioAssetInspector: any AudioAssetInspecting
     private let evidenceHealthAuditor: any EvidenceHealthAuditing
+    private let evidenceRepairer: any EvidenceRepairing
     private let diarizationProvider: (any DiarizationProvider)?
     private var systemAudioMonitoringTask: Task<Void, Never>?
     private var transcriptionTask: Task<Void, Never>?
@@ -55,6 +56,7 @@ final class AppModel {
     private(set) var diarizationActivity: DiarizationActivity?
     private(set) var evidenceBackfillMeetingID: UUID?
     private(set) var evidenceAuditMeetingID: UUID?
+    private(set) var evidenceRepairMeetingID: UUID?
     private(set) var evidenceHealthReports: [UUID: EvidenceHealthReport] = [:]
     var canDiarizeLocally: Bool { diarizationProvider != nil }
     var transcribingRecordingID: UUID? { transcriptionActivity?.recordingID }
@@ -90,6 +92,7 @@ final class AppModel {
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
         audioAssetInspector: (any AudioAssetInspecting)? = nil,
         evidenceHealthAuditor: (any EvidenceHealthAuditing)? = nil,
+        evidenceRepairer: (any EvidenceRepairing)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         self.repository = repository
@@ -120,6 +123,8 @@ final class AppModel {
         self.audioAssetInspector = resolvedAudioAssetInspector
         self.evidenceHealthAuditor = evidenceHealthAuditor
             ?? LocalEvidenceHealthAuditor(audioAssetInspector: resolvedAudioAssetInspector)
+        self.evidenceRepairer = evidenceRepairer
+            ?? LocalEvidenceRepairer(audioAssetInspector: resolvedAudioAssetInspector)
         self.diarizationProvider = diarizationProvider
     }
 
@@ -136,6 +141,7 @@ final class AppModel {
         acousticLeakageAnalyzer: (any AcousticPlaybackLeakageAnalyzing)? = nil,
         audioAssetInspector: (any AudioAssetInspecting)? = nil,
         evidenceHealthAuditor: (any EvidenceHealthAuditing)? = nil,
+        evidenceRepairer: (any EvidenceRepairing)? = nil,
         diarizationProvider: (any DiarizationProvider)? = nil
     ) {
         precondition(!speechToTextProviders.isEmpty, "At least one speech-to-text provider is required.")
@@ -174,6 +180,8 @@ final class AppModel {
         self.audioAssetInspector = resolvedAudioAssetInspector
         self.evidenceHealthAuditor = evidenceHealthAuditor
             ?? LocalEvidenceHealthAuditor(audioAssetInspector: resolvedAudioAssetInspector)
+        self.evidenceRepairer = evidenceRepairer
+            ?? LocalEvidenceRepairer(audioAssetInspector: resolvedAudioAssetInspector)
         self.diarizationProvider = diarizationProvider
     }
 
@@ -522,6 +530,13 @@ final class AppModel {
                 )
                 if let index = meeting.audioRecordings.firstIndex(where: { $0.id == recording.id }) {
                     meeting.audioRecordings[index].assetMetadata = metadata
+                    meeting.evidenceRepairRecords.append(EvidenceRepairRecord(
+                        meetingID: meeting.id,
+                        recordingID: recording.id,
+                        action: .rebuiltAudioMetadata,
+                        previousMetadata: nil,
+                        resultingMetadata: metadata
+                    ))
                     changed = true
                 }
             } catch {
@@ -572,6 +587,41 @@ final class AppModel {
             audioDirectory: audioDirectory,
             now: .now
         )
+    }
+
+    /// Applies only repairs explicitly classified as safe by the local health
+    /// report. Changed or missing audio is never accepted or replaced here.
+    func repairSafeEvidenceIssues(meetingID: UUID) async {
+        guard evidenceRepairMeetingID == nil,
+              let meeting = meetings.first(where: { $0.id == meetingID }),
+              let report = evidenceHealthReports[meetingID] else { return }
+        evidenceRepairMeetingID = meetingID
+        defer { evidenceRepairMeetingID = nil }
+
+        let outcome = await evidenceRepairer.repairSafeIssues(
+            in: meeting,
+            identifiedBy: report,
+            audioDirectory: audioDirectory,
+            now: .now
+        )
+        do {
+            if !outcome.repairedRecordingIDs.isEmpty {
+                try await repository.save(outcome.meeting)
+                await load()
+            }
+            if !outcome.failures.isEmpty {
+                errorMessage = "Some safe evidence repairs could not be completed. "
+                    + outcome.failures.map(\.message).joined(separator: " ")
+            }
+            guard let refreshedMeeting = meetings.first(where: { $0.id == meetingID }) else { return }
+            evidenceHealthReports[meetingID] = await evidenceHealthAuditor.audit(
+                meeting: refreshedMeeting,
+                audioDirectory: audioDirectory,
+                now: .now
+            )
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     func togglePlayback(_ recording: AudioRecordingReference) async {

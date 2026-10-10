@@ -919,6 +919,51 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.id), [legacySegment.id])
         XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.startTime), [1])
         XCTAssertEqual(stored?.transcriptionVersions.first?.segments.map(\.endTime), [3])
+        XCTAssertEqual(stored?.evidenceRepairRecords.count, 1)
+        XCTAssertEqual(stored?.evidenceRepairRecords.first?.recordingID, legacyRecording.id)
+        XCTAssertEqual(stored?.evidenceRepairRecords.first?.resultingMetadata, recoveredMetadata)
+        XCTAssertNil(model.errorMessage)
+    }
+
+    func testSafeEvidenceRepairPersistsAuditTrailAndRefreshesHealthReport() async {
+        let repository = InMemoryMeetingRepository()
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "recoverable.m4a"
+        )
+        let metadata = AudioAssetMetadata(
+            sha256: String(repeating: "d", count: 64),
+            mimeType: "audio/mp4",
+            byteSize: 44,
+            duration: 8
+        )
+        await repository.save(Meeting(
+            id: meetingID,
+            title: "Repair",
+            audioRecordings: [recording],
+            status: .completed
+        ))
+        let model = AppModel(
+            repository: repository,
+            audio: FakeMicrophoneService(),
+            systemAudio: FailingSystemAudioService(),
+            playback: FakePlaybackService(),
+            speechToText: FakeSpeechToTextProvider(),
+            audioDirectory: FileManager.default.temporaryDirectory,
+            audioAssetInspector: FixedAudioAssetInspector(metadata: metadata)
+        )
+        await model.load()
+
+        await model.runEvidenceHealthCheck(meetingID: meetingID)
+        XCTAssertEqual(model.evidenceHealthReports[meetingID]?.safelyRepairableCount, 1)
+
+        await model.repairSafeEvidenceIssues(meetingID: meetingID)
+
+        let stored = await repository.meeting(id: meetingID)
+        XCTAssertEqual(stored?.audioRecordings.first?.assetMetadata, metadata)
+        XCTAssertEqual(stored?.evidenceRepairRecords.count, 1)
+        XCTAssertTrue(model.evidenceHealthReports[meetingID]?.isHealthy == true)
         XCTAssertNil(model.errorMessage)
     }
 

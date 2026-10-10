@@ -176,3 +176,71 @@ actor LocalEvidenceHealthAuditor: EvidenceHealthAuditing {
         return EvidenceHealthReport(meetingID: meeting.id, checkedAt: now, findings: findings)
     }
 }
+
+actor LocalEvidenceRepairer: EvidenceRepairing {
+    private let audioAssetInspector: any AudioAssetInspecting
+
+    init(audioAssetInspector: any AudioAssetInspecting) {
+        self.audioAssetInspector = audioAssetInspector
+    }
+
+    func repairSafeIssues(
+        in meeting: Meeting,
+        identifiedBy report: EvidenceHealthReport,
+        audioDirectory: URL,
+        now: Date = .now
+    ) async -> EvidenceRepairOutcome {
+        guard report.meetingID == meeting.id else {
+            return EvidenceRepairOutcome(meeting: meeting, repairedRecordingIDs: [], failures: [])
+        }
+
+        var repairedMeeting = meeting
+        var repairedRecordingIDs: [UUID] = []
+        var failures: [EvidenceRepairFailure] = []
+        let blockedRecordingIDs = Set(report.findings.compactMap { finding in
+            finding.severity == .error ? finding.recordingID : nil
+        })
+        let repairableRecordingIDs: Set<UUID> = Set(report.findings.compactMap { finding -> UUID? in
+            guard finding.code == .audioMetadataMissing,
+                  let recordingID = finding.recordingID,
+                  !blockedRecordingIDs.contains(recordingID) else { return nil }
+            return recordingID
+        })
+
+        for recordingID in repairableRecordingIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            guard let index = repairedMeeting.audioRecordings.firstIndex(where: { $0.id == recordingID }),
+                  repairedMeeting.audioRecordings[index].assetMetadata == nil else { continue }
+            let recording = repairedMeeting.audioRecordings[index]
+            do {
+                let metadata = try await audioAssetInspector.metadata(
+                    for: recording,
+                    in: audioDirectory
+                )
+                repairedMeeting.audioRecordings[index].assetMetadata = metadata
+                repairedMeeting.evidenceRepairRecords.append(EvidenceRepairRecord(
+                    meetingID: meeting.id,
+                    recordingID: recordingID,
+                    action: .rebuiltAudioMetadata,
+                    previousMetadata: nil,
+                    resultingMetadata: metadata,
+                    performedAt: now
+                ))
+                repairedRecordingIDs.append(recordingID)
+            } catch {
+                failures.append(EvidenceRepairFailure(
+                    recordingID: recordingID,
+                    message: error.localizedDescription
+                ))
+            }
+        }
+
+        if !repairedRecordingIDs.isEmpty {
+            repairedMeeting.updatedAt = now
+        }
+        return EvidenceRepairOutcome(
+            meeting: repairedMeeting,
+            repairedRecordingIDs: repairedRecordingIDs,
+            failures: failures
+        )
+    }
+}

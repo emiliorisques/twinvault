@@ -110,6 +110,8 @@ Phase 3F displays the version history in each meeting and shows audio duration, 
 
 Phase 3G adds an explicit `Run Health Check` action to each meeting. The read-only offline audit verifies audio SHA-256 and size, file availability, recording references, timestamp bounds, transcription-version membership, correction provenance, workspace ownership, and stale processing runs. Findings are shown as warnings or errors but are never repaired automatically. The report is intentionally transient; stored evidence remains unchanged.
 
+Phase 3H adds an explicit `Repair Safe Issues` action only when the health report finds missing audio metadata. It rebuilds that metadata from the unchanged local file, records the action and resulting integrity fingerprint in durable repair history, and automatically reruns the audit. It never replaces audio, accepts a changed hash, rewrites timestamps, or edits transcript evidence.
+
 TwinVault remains offline and autonomous. There is no Supabase dependency, no direct PostgreSQL access, and no automatic Company OS synchronization. `ARCHITECTURE.md` defines only the future publication envelope: an authenticated, selective, idempotent API boundary where transcript metadata and original-audio upload are separate user-controlled decisions.
 
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, and speaker identification are not enabled. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for experimental Parakeet transcription and offline diarization. FluidAudio currently exposes a broad package product, so it increases build size beyond the code TwinVault uses; model-asset licensing and that packaging cost must be reviewed before distribution.

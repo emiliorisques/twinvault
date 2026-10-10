@@ -829,12 +829,24 @@ struct MeetingDetailView: View {
                 HStack {
                     Text("Evidence Health").font(.title2.bold())
                     Spacer()
-                    if model.evidenceAuditMeetingID == meeting.id {
+                    if model.evidenceRepairMeetingID == meeting.id {
+                        ProgressView().controlSize(.small)
+                        Text("Repairing safe metadata issues…")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else if model.evidenceAuditMeetingID == meeting.id {
                         ProgressView().controlSize(.small)
                         Text("Checking local evidence…")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     } else {
+                        if let report = model.evidenceHealthReports[meeting.id],
+                           report.safelyRepairableCount > 0 {
+                            Button("Repair Safe Issues", systemImage: "wrench.and.screwdriver") {
+                                Task { await model.repairSafeEvidenceIssues(meetingID: meeting.id) }
+                            }
+                            .help("Rebuild only missing audio metadata, record the repair, and run the health check again. Audio and transcripts are not changed.")
+                        }
                         Button("Run Health Check", systemImage: "checkmark.shield") {
                             Task { await model.runEvidenceHealthCheck(meetingID: meeting.id) }
                         }
@@ -878,6 +890,26 @@ struct MeetingDetailView: View {
                 } else {
                     Text("Not checked yet. The diagnostic never changes or deletes evidence.")
                         .foregroundStyle(.secondary)
+                }
+                if !meeting.evidenceRepairRecords.isEmpty {
+                    DisclosureGroup("Repair History (\(meeting.evidenceRepairRecords.count))") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(meeting.evidenceRepairRecords.sorted(by: { $0.performedAt > $1.performedAt })) { repair in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Label("Audio metadata rebuilt", systemImage: "checkmark.seal")
+                                        .fontWeight(.semibold)
+                                    Text("\(recordingLabel(repair.recordingID)) · \(repair.performedAt.formatted(date: .abbreviated, time: .standard))")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text("SHA-256 \(repair.resultingMetadata.sha256)")
+                                        .font(.caption2.monospaced())
+                                        .foregroundStyle(.secondary)
+                                        .textSelection(.enabled)
+                                }
+                            }
+                        }
+                        .padding(.top, 6)
+                    }
                 }
                 Divider()
                 Text("Transcript").font(.title2.bold())

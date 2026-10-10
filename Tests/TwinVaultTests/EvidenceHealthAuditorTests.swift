@@ -170,6 +170,141 @@ final class EvidenceHealthAuditorTests: XCTestCase {
         XCTAssertEqual(meeting, original)
     }
 
+    func testSafeRepairRebuildsOnlyMissingMetadataAndRecordsAuditTrail() async {
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "recoverable.m4a"
+        )
+        let meeting = Meeting(
+            id: meetingID,
+            title: "Recoverable",
+            audioRecordings: [recording],
+            status: .completed
+        )
+        let metadata = makeMetadata(hash: "c", size: 321, duration: 12)
+        let report = EvidenceHealthReport(
+            meetingID: meetingID,
+            checkedAt: Date(timeIntervalSince1970: 10),
+            findings: [EvidenceHealthFinding(
+                severity: .warning,
+                code: .audioMetadataMissing,
+                message: "Missing metadata",
+                recordingID: recording.id
+            )]
+        )
+        let repairDate = Date(timeIntervalSince1970: 20)
+        let repairer = LocalEvidenceRepairer(
+            audioAssetInspector: StubHealthAudioInspector(results: [recording.id: .success(metadata)])
+        )
+
+        let outcome = await repairer.repairSafeIssues(
+            in: meeting,
+            identifiedBy: report,
+            audioDirectory: URL(fileURLWithPath: "/private/tmp"),
+            now: repairDate
+        )
+
+        XCTAssertEqual(outcome.repairedRecordingIDs, [recording.id])
+        XCTAssertTrue(outcome.failures.isEmpty)
+        XCTAssertEqual(outcome.meeting.audioRecordings.first?.assetMetadata, metadata)
+        XCTAssertNil(meeting.audioRecordings.first?.assetMetadata)
+        XCTAssertEqual(outcome.meeting.evidenceRepairRecords.count, 1)
+        XCTAssertEqual(outcome.meeting.evidenceRepairRecords.first?.recordingID, recording.id)
+        XCTAssertEqual(outcome.meeting.evidenceRepairRecords.first?.resultingMetadata, metadata)
+        XCTAssertEqual(outcome.meeting.evidenceRepairRecords.first?.performedAt, repairDate)
+    }
+
+    func testSafeRepairNeverAcceptsIntegrityMismatchAsNewTruth() async {
+        let meetingID = UUID()
+        let storedMetadata = makeMetadata(hash: "a", size: 100, duration: 5)
+        let changedMetadata = makeMetadata(hash: "b", size: 101, duration: 5)
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "changed.m4a",
+            assetMetadata: storedMetadata
+        )
+        let meeting = Meeting(
+            id: meetingID,
+            title: "Changed",
+            audioRecordings: [recording],
+            status: .completed
+        )
+        let report = EvidenceHealthReport(
+            meetingID: meetingID,
+            checkedAt: .now,
+            findings: [EvidenceHealthFinding(
+                severity: .error,
+                code: .audioIntegrityMismatch,
+                message: "Changed audio",
+                recordingID: recording.id
+            )]
+        )
+        let repairer = LocalEvidenceRepairer(
+            audioAssetInspector: StubHealthAudioInspector(results: [recording.id: .success(changedMetadata)])
+        )
+
+        let outcome = await repairer.repairSafeIssues(
+            in: meeting,
+            identifiedBy: report,
+            audioDirectory: URL(fileURLWithPath: "/private/tmp"),
+            now: .now
+        )
+
+        XCTAssertTrue(outcome.repairedRecordingIDs.isEmpty)
+        XCTAssertEqual(outcome.meeting.audioRecordings.first?.assetMetadata, storedMetadata)
+        XCTAssertTrue(outcome.meeting.evidenceRepairRecords.isEmpty)
+    }
+
+    func testSafeRepairIsBlockedWhenSameRecordingHasAnError() async {
+        let meetingID = UUID()
+        let recording = AudioRecordingReference(
+            meetingID: meetingID,
+            relativePath: "wrong-workspace.m4a"
+        )
+        let meeting = Meeting(
+            id: meetingID,
+            title: "Blocked",
+            audioRecordings: [recording],
+            status: .completed
+        )
+        let report = EvidenceHealthReport(
+            meetingID: meetingID,
+            checkedAt: .now,
+            findings: [
+                EvidenceHealthFinding(
+                    severity: .warning,
+                    code: .audioMetadataMissing,
+                    message: "Missing metadata",
+                    recordingID: recording.id
+                ),
+                EvidenceHealthFinding(
+                    severity: .error,
+                    code: .workspaceMismatch,
+                    message: "Wrong workspace",
+                    recordingID: recording.id
+                )
+            ]
+        )
+        let repairer = LocalEvidenceRepairer(
+            audioAssetInspector: StubHealthAudioInspector(results: [
+                recording.id: .success(makeMetadata(hash: "e", size: 20, duration: 2))
+            ])
+        )
+
+        let outcome = await repairer.repairSafeIssues(
+            in: meeting,
+            identifiedBy: report,
+            audioDirectory: URL(fileURLWithPath: "/private/tmp"),
+            now: .now
+        )
+
+        XCTAssertEqual(report.safelyRepairableCount, 0)
+        XCTAssertTrue(outcome.repairedRecordingIDs.isEmpty)
+        XCTAssertNil(outcome.meeting.audioRecordings.first?.assetMetadata)
+        XCTAssertTrue(outcome.meeting.evidenceRepairRecords.isEmpty)
+    }
+
     private func makeMetadata(
         hash: Character,
         size: Int64,

@@ -26,6 +26,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
     var transcriptionLocaleIdentifiers: [String]
     var requestedSystemAudioCapture: Bool
     var audioCaptureIssues: [AudioCaptureIssue]
+    var evidenceRepairRecords: [EvidenceRepairRecord]
     var status: Status
     let createdAt: Date
     var updatedAt: Date
@@ -50,6 +51,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         transcriptionLocaleIdentifiers: [String] = Meeting.defaultTranscriptionLocaleIdentifiers,
         requestedSystemAudioCapture: Bool = false,
         audioCaptureIssues: [AudioCaptureIssue] = [],
+        evidenceRepairRecords: [EvidenceRepairRecord] = [],
         status: Status = .recording, createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -75,6 +77,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         self.transcriptionLocaleIdentifiers = transcriptionLocaleIdentifiers
         self.requestedSystemAudioCapture = requestedSystemAudioCapture
         self.audioCaptureIssues = audioCaptureIssues
+        self.evidenceRepairRecords = evidenceRepairRecords
         self.status = status
         self.createdAt = createdAt
         self.updatedAt = updatedAt
@@ -100,6 +103,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         case channelAlignmentEstimate
         case transcriptionLocaleIdentifiers
         case requestedSystemAudioCapture, audioCaptureIssues
+        case evidenceRepairRecords
         case status, createdAt, updatedAt
     }
 
@@ -169,6 +173,10 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
             [AudioCaptureIssue].self,
             forKey: .audioCaptureIssues
         ) ?? []
+        evidenceRepairRecords = try container.decodeIfPresent(
+            [EvidenceRepairRecord].self,
+            forKey: .evidenceRepairRecords
+        ) ?? []
         status = try container.decode(Status.self, forKey: .status)
         createdAt = try container.decode(Date.self, forKey: .createdAt)
         updatedAt = try container.decode(Date.self, forKey: .updatedAt)
@@ -198,6 +206,7 @@ struct Meeting: Identifiable, Codable, Equatable, Sendable {
         try container.encode(transcriptionLocaleIdentifiers, forKey: .transcriptionLocaleIdentifiers)
         try container.encode(requestedSystemAudioCapture, forKey: .requestedSystemAudioCapture)
         try container.encode(audioCaptureIssues, forKey: .audioCaptureIssues)
+        try container.encode(evidenceRepairRecords, forKey: .evidenceRepairRecords)
         try container.encode(status, forKey: .status)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(updatedAt, forKey: .updatedAt)
