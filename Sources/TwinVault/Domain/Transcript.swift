@@ -162,12 +162,17 @@ struct TranscriptTextResolver: Sendable {
         for segment: TranscriptSegment,
         corrections: [TranscriptSegmentCorrection]
     ) -> TranscriptSegmentCorrection? {
-        corrections.last {
-            $0.meetingID == segment.meetingID
-                && $0.transcriptSegmentID == segment.id
-                && $0.originalText == segment.text
-                && $0.basis == .userConfirmed
-        }
+        corrections
+            .filter {
+                $0.meetingID == segment.meetingID
+                    && $0.transcriptSegmentID == segment.id
+                    && $0.originalText == segment.text
+                    && $0.basis == .userConfirmed
+            }
+            .max {
+                if $0.confirmedAt != $1.confirmedAt { return $0.confirmedAt < $1.confirmedAt }
+                return $0.id.uuidString < $1.id.uuidString
+            }
     }
 
     func text(

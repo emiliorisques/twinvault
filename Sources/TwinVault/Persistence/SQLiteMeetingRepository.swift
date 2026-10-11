@@ -14,7 +14,8 @@ private final class SQLiteConnection: @unchecked Sendable {
 }
 
 actor SQLiteMeetingRepository: MeetingRepository {
-    private static let payloadSchemaVersion = 2
+    private static let payloadSchemaVersion = 3
+    private static let databaseSchemaVersion = 3
     private let paths: VaultPaths
     private let fileManager: FileManager
     private let encoder: JSONEncoder
@@ -56,6 +57,7 @@ actor SQLiteMeetingRepository: MeetingRepository {
                 var meeting = try decoder.decode(Meeting.self, from: dataColumn(statement, index: 1))
                 meeting.participants = try participants(meetingID: id)
                 meeting.speakerPersonAssignments = try speakerAssignments(meetingID: id)
+                meeting.transcriptReviewAttestations = try reviewAttestations(meetingID: id)
                 result.append(meeting)
             case SQLITE_DONE:
                 return result
@@ -188,6 +190,7 @@ actor SQLiteMeetingRepository: MeetingRepository {
         try execute("PRAGMA foreign_keys = ON")
         try execute("PRAGMA journal_mode = WAL")
         try createSchema()
+        try migrateSchema()
         try insertWorkspaceIfMissing(.local)
         if try metadataValue(for: "legacy_json_imported") == "1" {
             isPrepared = true
@@ -282,13 +285,55 @@ actor SQLiteMeetingRepository: MeetingRepository {
             """)
         try execute("CREATE INDEX IF NOT EXISTS meetings_start_date ON meetings(start_date DESC)")
         try execute("CREATE INDEX IF NOT EXISTS participants_person_id ON meeting_participants(person_id)")
-        try setMetadataValue("2", for: "schema_version")
+    }
+
+    private func migrateSchema() throws {
+        let storedVersion = try metadataValue(for: "schema_version").flatMap(Int.init) ?? 2
+        guard storedVersion <= Self.databaseSchemaVersion else {
+            throw SQLiteMeetingRepositoryError.corruptData(
+                "Unsupported database schema version \(storedVersion)"
+            )
+        }
+        if storedVersion < 3 {
+            try transaction {
+                try createReviewAttestationTable()
+                try setMetadataValue("3", for: "schema_version")
+            }
+        } else {
+            try createReviewAttestationTable()
+        }
+    }
+
+    private func createReviewAttestationTable() throws {
+        try execute("""
+            CREATE TABLE IF NOT EXISTS transcript_review_attestations (
+                id TEXT PRIMARY KEY,
+                meeting_id TEXT NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+                transcription_id TEXT NOT NULL,
+                transcription_version_id TEXT NOT NULL,
+                transcription_version INTEGER NOT NULL CHECK(transcription_version > 0),
+                source_recording_id TEXT NOT NULL,
+                review_content_revision INTEGER NOT NULL CHECK(review_content_revision >= 0),
+                canonicalization_version INTEGER NOT NULL CHECK(canonicalization_version > 0),
+                content_sha256 TEXT NOT NULL CHECK(length(content_sha256) = 64),
+                canonical_content BLOB NOT NULL,
+                certified_at REAL NOT NULL,
+                local_reviewer_id TEXT
+            )
+            """)
+        try execute("""
+            CREATE INDEX IF NOT EXISTS review_attestations_version
+            ON transcript_review_attestations(
+                meeting_id, transcription_id, transcription_version_id, certified_at
+            )
+            """)
     }
 
     private func saveMeeting(_ meeting: Meeting) throws {
         var payloadMeeting = meeting
         payloadMeeting.participants = []
         payloadMeeting.speakerPersonAssignments = []
+        payloadMeeting.transcriptReviewAttestations = []
         let payload = try encoder.encode(payloadMeeting)
         let statement = try prepare("""
             INSERT INTO meetings(id, start_date, payload_schema_version, payload) VALUES(?, ?, ?, ?)
@@ -306,6 +351,9 @@ actor SQLiteMeetingRepository: MeetingRepository {
         try deleteRelations(meetingID: meeting.id)
         for participant in meeting.participants { try insertParticipant(participant) }
         for assignment in meeting.speakerPersonAssignments { try insertSpeakerAssignment(assignment) }
+        for attestation in meeting.transcriptReviewAttestations {
+            try preserveReviewAttestation(attestation, in: meeting)
+        }
     }
 
     private func meetingValue(id: UUID) throws -> Meeting? {
@@ -316,7 +364,134 @@ actor SQLiteMeetingRepository: MeetingRepository {
         var meeting = try decoder.decode(Meeting.self, from: dataColumn(statement, index: 0))
         meeting.participants = try participants(meetingID: id)
         meeting.speakerPersonAssignments = try speakerAssignments(meetingID: id)
+        meeting.transcriptReviewAttestations = try reviewAttestations(meetingID: id)
         return meeting
+    }
+
+    private func reviewAttestations(meetingID: UUID) throws -> [TranscriptReviewAttestation] {
+        let statement = try prepare("""
+            SELECT id, meeting_id, transcription_id, transcription_version_id,
+                   transcription_version, source_recording_id, review_content_revision,
+                   canonicalization_version, content_sha256, canonical_content,
+                   certified_at, local_reviewer_id
+            FROM transcript_review_attestations
+            WHERE meeting_id = ? ORDER BY certified_at, id
+            """)
+        defer { sqlite3_finalize(statement) }
+        bind(meetingID.uuidString, to: 1, in: statement)
+        var result: [TranscriptReviewAttestation] = []
+        while true {
+            switch sqlite3_step(statement) {
+            case SQLITE_ROW:
+                let reviewerValue = sqlite3_column_type(statement, 11) == SQLITE_NULL
+                    ? nil
+                    : try uuidColumn(statement, index: 11)
+                let attestation = TranscriptReviewAttestation(
+                    id: try uuidColumn(statement, index: 0),
+                    meetingID: try uuidColumn(statement, index: 1),
+                    transcriptionID: try uuidColumn(statement, index: 2),
+                    transcriptionVersionID: try uuidColumn(statement, index: 3),
+                    transcriptionVersion: Int(sqlite3_column_int(statement, 4)),
+                    sourceRecordingID: try uuidColumn(statement, index: 5),
+                    reviewContentRevision: Int(sqlite3_column_int(statement, 6)),
+                    canonicalizationVersion: Int(sqlite3_column_int(statement, 7)),
+                    contentSHA256: stringColumn(statement, index: 8),
+                    canonicalContent: dataColumn(statement, index: 9),
+                    certifiedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 10)),
+                    localReviewerID: reviewerValue
+                )
+                guard attestation.hasValidStoredDigest else {
+                    throw SQLiteMeetingRepositoryError.corruptData(
+                        "Transcript review attestation digest mismatch"
+                    )
+                }
+                result.append(attestation)
+            case SQLITE_DONE: return result
+            default: throw databaseError()
+            }
+        }
+    }
+
+    private func preserveReviewAttestation(
+        _ attestation: TranscriptReviewAttestation,
+        in meeting: Meeting
+    ) throws {
+        guard attestation.meetingID == meeting.id,
+              attestation.hasValidStoredDigest,
+              meeting.transcriptionVersions.contains(where: {
+                  $0.id == attestation.transcriptionVersionID
+                      && $0.transcriptionID == attestation.transcriptionID
+                      && $0.version == attestation.transcriptionVersion
+                      && $0.sourceRecordingID == attestation.sourceRecordingID
+              }) else {
+            throw SQLiteMeetingRepositoryError.corruptData(
+                "Invalid transcript review attestation"
+            )
+        }
+        if let stored = try reviewAttestation(id: attestation.id) {
+            guard stored == attestation else {
+                throw SQLiteMeetingRepositoryError.corruptData(
+                    "Historical transcript review attestations are immutable"
+                )
+            }
+            return
+        }
+        let statement = try prepare("""
+            INSERT INTO transcript_review_attestations(
+                id, meeting_id, transcription_id, transcription_version_id,
+                transcription_version, source_recording_id, review_content_revision,
+                canonicalization_version, content_sha256, canonical_content,
+                certified_at, local_reviewer_id
+            ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """)
+        defer { sqlite3_finalize(statement) }
+        bind(attestation.id.uuidString, to: 1, in: statement)
+        bind(attestation.meetingID.uuidString, to: 2, in: statement)
+        bind(attestation.transcriptionID.uuidString, to: 3, in: statement)
+        bind(attestation.transcriptionVersionID.uuidString, to: 4, in: statement)
+        sqlite3_bind_int(statement, 5, Int32(attestation.transcriptionVersion))
+        bind(attestation.sourceRecordingID.uuidString, to: 6, in: statement)
+        sqlite3_bind_int(statement, 7, Int32(attestation.reviewContentRevision))
+        sqlite3_bind_int(statement, 8, Int32(attestation.canonicalizationVersion))
+        bind(attestation.contentSHA256, to: 9, in: statement)
+        bind(attestation.canonicalContent, to: 10, in: statement)
+        sqlite3_bind_double(statement, 11, attestation.certifiedAt.timeIntervalSince1970)
+        if let reviewerID = attestation.localReviewerID {
+            bind(reviewerID.uuidString, to: 12, in: statement)
+        } else {
+            sqlite3_bind_null(statement, 12)
+        }
+        try stepDone(statement)
+    }
+
+    private func reviewAttestation(id: UUID) throws -> TranscriptReviewAttestation? {
+        let statement = try prepare("""
+            SELECT meeting_id, transcription_id, transcription_version_id,
+                   transcription_version, source_recording_id, review_content_revision,
+                   canonicalization_version, content_sha256, canonical_content,
+                   certified_at, local_reviewer_id
+            FROM transcript_review_attestations WHERE id = ?
+            """)
+        defer { sqlite3_finalize(statement) }
+        bind(id.uuidString, to: 1, in: statement)
+        guard try stepHasRow(statement) else { return nil }
+        let reviewerValue = sqlite3_column_type(statement, 10) == SQLITE_NULL
+            ? nil
+            : try uuidColumn(statement, index: 10)
+        return TranscriptReviewAttestation(
+            id: id,
+            meetingID: try uuidColumn(statement, index: 0),
+            transcriptionID: try uuidColumn(statement, index: 1),
+            transcriptionVersionID: try uuidColumn(statement, index: 2),
+            transcriptionVersion: Int(sqlite3_column_int(statement, 3)),
+            sourceRecordingID: try uuidColumn(statement, index: 4),
+            reviewContentRevision: Int(sqlite3_column_int(statement, 5)),
+            canonicalizationVersion: Int(sqlite3_column_int(statement, 6)),
+            contentSHA256: stringColumn(statement, index: 7),
+            canonicalContent: dataColumn(statement, index: 8),
+            certifiedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 9)),
+            localReviewerID: reviewerValue
+        )
     }
 
     private func savePerson(_ person: Person) throws {

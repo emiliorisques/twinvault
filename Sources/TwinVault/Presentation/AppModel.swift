@@ -559,17 +559,14 @@ final class AppModel {
         }
     }
 
-    func markTranscriptionReviewed(meetingID: UUID, versionID: UUID) async {
+    func certifyTranscriptionReview(meetingID: UUID, versionID: UUID) async {
         guard var meeting = meetings.first(where: { $0.id == meetingID }),
-              let version = meeting.transcriptionVersions.first(where: { $0.id == versionID }) else {
+              meeting.transcriptionVersions.contains(where: { $0.id == versionID }) else {
             errorMessage = "That transcription version is no longer available."
             return
         }
-        guard meeting.markTranscriptionReviewed(
-            transcriptionID: version.transcriptionID,
-            version: version.version
-        ) else { return }
         do {
+            try meeting.certifyTranscriptionReview(versionID: versionID)
             try await repository.save(meeting)
             await load()
         } catch {
@@ -699,6 +696,12 @@ final class AppModel {
             return
         }
 
+        let existingText = TranscriptTextResolver().text(
+            for: segment,
+            corrections: meeting.transcriptCorrections
+        )
+        guard normalizedText != existingText else { return }
+
         meeting.transcriptCorrections.removeAll { $0.transcriptSegmentID == segmentID }
         if normalizedText != segment.text {
             meeting.transcriptCorrections.append(TranscriptSegmentCorrection(
@@ -710,6 +713,7 @@ final class AppModel {
                 correctedText: normalizedText
             ))
         }
+        meeting.invalidateTranscriptReview(for: segment)
         meeting.updatedAt = .now
         do {
             try await repository.save(meeting)
@@ -720,10 +724,14 @@ final class AppModel {
     }
 
     func resetTranscriptCorrection(meetingID: UUID, segmentID: UUID) async {
-        guard var meeting = meetings.first(where: { $0.id == meetingID }) else { return }
+        guard var meeting = meetings.first(where: { $0.id == meetingID }),
+              let segment = meeting.transcriptSegments.first(where: { $0.id == segmentID }) else {
+            return
+        }
         let previousCount = meeting.transcriptCorrections.count
         meeting.transcriptCorrections.removeAll { $0.transcriptSegmentID == segmentID }
         guard meeting.transcriptCorrections.count != previousCount else { return }
+        meeting.invalidateTranscriptReview(for: segment)
         meeting.updatedAt = .now
         do {
             try await repository.save(meeting)

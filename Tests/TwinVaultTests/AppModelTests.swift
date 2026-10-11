@@ -967,7 +967,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
-    func testMarkingTranscriptionReviewedPersistsExplicitStateWithoutChangingEvidence() async {
+    func testCertifyingTranscriptionReviewPersistsExactStateAndDetectsLaterCorrection() async {
         let repository = InMemoryMeetingRepository()
         let meetingID = UUID()
         let recordingID = UUID()
@@ -990,9 +990,16 @@ final class AppModelTests: XCTestCase {
             status: .completed,
             segments: [segment]
         )
+        let recording = AudioRecordingReference(
+            id: recordingID,
+            meetingID: meetingID,
+            relativePath: "review.m4a"
+        )
         await repository.save(Meeting(
             id: meetingID,
             title: "Review",
+            audioRecordings: [recording],
+            transcriptSegments: [segment],
             transcriptionVersions: [version],
             status: .completed
         ))
@@ -1006,12 +1013,34 @@ final class AppModelTests: XCTestCase {
         )
         await model.load()
 
-        await model.markTranscriptionReviewed(meetingID: meetingID, versionID: version.id)
+        await model.certifyTranscriptionReview(meetingID: meetingID, versionID: version.id)
 
         let stored = await repository.meeting(id: meetingID)
         XCTAssertEqual(stored?.transcriptionVersions.first?.status, .reviewed)
         XCTAssertNotNil(stored?.transcriptionVersions.first?.reviewedAt)
         XCTAssertEqual(stored?.transcriptionVersions.first?.segments, [segment])
+        XCTAssertEqual(stored?.transcriptReviewAttestations.count, 1)
+        XCTAssertTrue(stored?.transcriptReviewAttestations.first?.hasValidStoredDigest == true)
+
+        await model.correctTranscriptSegment(
+            meetingID: meetingID,
+            segmentID: segment.id,
+            correctedText: "Corrected evidence"
+        )
+
+        let corrected = await repository.meeting(id: meetingID)
+        XCTAssertEqual(corrected?.transcriptionVersions.first?.status, .completed)
+        XCTAssertNil(corrected?.transcriptionVersions.first?.reviewedAt)
+        XCTAssertEqual(corrected?.transcriptReviewAttestations.count, 1)
+        if let corrected, let correctedVersion = corrected.transcriptionVersions.first,
+           let historical = corrected.transcriptReviewAttestations.first {
+            XCTAssertEqual(
+                corrected.transcriptReviewIntegrity(for: correctedVersion),
+                .changed(historical)
+            )
+        } else {
+            XCTFail("Expected persisted historical certification")
+        }
     }
 
     func testTranscriptSegmentPlaybackStartsAtEvidenceTimestamp() async throws {

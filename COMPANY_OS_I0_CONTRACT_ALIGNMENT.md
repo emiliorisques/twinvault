@@ -404,6 +404,9 @@ revocación global de SourceVersion.
 
 ## 7. Incremento I1 preciso: certificación local, sin red
 
+**Implementado localmente en TwinVault tras aprobación posterior.** El alcance
+continúa sin red ni publicación; I2 permanece sin autorizar.
+
 I1 debe limitarse a TwinVault y seguir offline. Requiere una aprobación
 posterior antes de implementarse.
 

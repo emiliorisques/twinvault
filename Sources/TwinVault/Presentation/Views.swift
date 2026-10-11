@@ -422,6 +422,64 @@ struct MeetingDetailView: View {
         )
     }
 
+    private func reviewStatusText(for version: TranscriptionVersion) -> String {
+        switch meeting.transcriptReviewIntegrity(for: version) {
+        case .intact: "Certified"
+        case .changed: "Changed after certification"
+        case .notCertified where version.status == .reviewed: "Legacy review · Not certified"
+        case .notCertified: transcriptionVersionStatus(version.status)
+        }
+    }
+
+    private func reviewStatusColor(for version: TranscriptionVersion) -> Color {
+        switch meeting.transcriptReviewIntegrity(for: version) {
+        case .intact: .green
+        case .changed: .orange
+        case .notCertified where version.status == .reviewed: .orange
+        case .notCertified: transcriptionVersionColor(version.status)
+        }
+    }
+
+    private func canCertify(_ version: TranscriptionVersion) -> Bool {
+        guard version.status == .completed || version.status == .reviewed else { return false }
+        if case .intact = meeting.transcriptReviewIntegrity(for: version) { return false }
+        return true
+    }
+
+    @ViewBuilder
+    private func reviewIntegrityView(for version: TranscriptionVersion) -> some View {
+        switch meeting.transcriptReviewIntegrity(for: version) {
+        case let .intact(attestation):
+            VStack(alignment: .leading, spacing: 3) {
+                Label("Certified content intact", systemImage: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+                    .fontWeight(.semibold)
+                Text("Reviewed \(attestation.certifiedAt.formatted(date: .abbreviated, time: .shortened)) · SHA-256 \(attestation.contentSHA256.prefix(12))… · Canonicalization v\(attestation.canonicalizationVersion)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+        case let .changed(attestation):
+            VStack(alignment: .leading, spacing: 3) {
+                Label("Content changed after certification", systemImage: "exclamationmark.shield.fill")
+                    .foregroundStyle(.orange)
+                    .fontWeight(.semibold)
+                Text("Previous certification from \(attestation.certifiedAt.formatted(date: .abbreviated, time: .shortened)) remains in history. Review this exact content again to create a new certification.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        case .notCertified:
+            Label(
+                version.status == .reviewed
+                    ? "Legacy review has no content certification"
+                    : "This version has not been certified",
+                systemImage: "shield.slash"
+            )
+            .font(.caption)
+            .foregroundStyle(version.status == .reviewed ? .orange : .secondary)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -783,6 +841,7 @@ struct MeetingDetailView: View {
                                 if let failure = version.failureDescription {
                                     Text(failure).font(.caption).foregroundStyle(.orange)
                                 }
+                                reviewIntegrityView(for: version)
                                 ForEach(version.segments.sorted(by: TranscriptSegment.stableOrder)) { segment in
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text("\(duration(segment.startTime))–\(duration(segment.endTime)) · Segment \((segment.sequenceNumber ?? 0) + 1)")
@@ -798,10 +857,10 @@ struct MeetingDetailView: View {
                                     }
                                     .padding(.vertical, 2)
                                 }
-                                if version.status == .completed {
-                                    Button("Mark Version as Reviewed", systemImage: "checkmark.seal") {
+                                if canCertify(version) {
+                                    Button("Certify Reviewed Content", systemImage: "checkmark.shield") {
                                         Task {
-                                            await model.markTranscriptionReviewed(
+                                            await model.certifyTranscriptionReview(
                                                 meetingID: meeting.id,
                                                 versionID: version.id
                                             )
@@ -814,9 +873,9 @@ struct MeetingDetailView: View {
                             HStack {
                                 Text("Version \(version.version) · \(recordingLabel(version.sourceRecordingID))")
                                     .fontWeight(.semibold)
-                                Text(transcriptionVersionStatus(version.status))
+                                Text(reviewStatusText(for: version))
                                     .font(.caption)
-                                    .foregroundStyle(transcriptionVersionColor(version.status))
+                                    .foregroundStyle(reviewStatusColor(for: version))
                                 Spacer()
                                 Text(version.profileIdentifier ?? "Legacy")
                                     .font(.caption)

@@ -28,6 +28,7 @@ no synchronization, credentials, remote calls, or database changes are present.
 - Supply a bounded, local vocabulary prompt from the user-entered meeting title to WhisperKit.
 - Estimate post-recording microphone/system delay and clock drift from bounded local acoustic fingerprints, without assuming that microphone audio is the user's voice.
 - Detect temporary speakers locally in saved system audio and show those meeting-only labels beside overlapping transcript evidence.
+- Certify an exact reviewed transcript snapshot locally with deterministic SHA-256 integrity, retain historical certifications after edits, and show when later corrections require a new review.
 
 ## Development
 
@@ -116,6 +117,8 @@ Phase 3F displays the version history in each meeting and shows audio duration, 
 Phase 3G adds an explicit `Run Health Check` action to each meeting. The read-only offline audit verifies audio SHA-256 and size, file availability, recording references, timestamp bounds, transcription-version membership, correction provenance, workspace ownership, and stale processing runs. Findings are shown as warnings or errors but are never repaired automatically. The report is intentionally transient; stored evidence remains unchanged.
 
 Phase 3H adds an explicit `Repair Safe Issues` action only when the health report finds missing audio metadata. It rebuilds that metadata from the unchanged local file, records the action and resulting integrity fingerprint in durable repair history, and automatically reruns the audit. It never replaces audio, accepts a changed hash, rewrites timestamps, or edits transcript evidence.
+
+Phase 3I replaces the former review timestamp as publication evidence with an immutable `TranscriptReviewAttestation`. The user certifies one exact transcription version; canonicalization v1 includes every segment, original and effective corrected text, exact timestamps, source recording metadata, engine provenance, and a monotonic content revision. A SHA-256 over canonical UTF-8 JSON provides deterministic integrity. SQLite stores the complete canonical snapshot in a separate append-only table, so later corrections invalidate only the current-review condition and never erase history. Legacy `reviewed` versions remain readable but explicitly show that they have no certification. This phase is offline and contains no Company OS client or publication action.
 
 TwinVault remains offline and autonomous. There is no Supabase dependency, no direct PostgreSQL access, and no automatic Company OS synchronization. `ARCHITECTURE.md` defines only the future publication envelope: an authenticated, selective, idempotent API boundary where transcript metadata and original-audio upload are separate user-controlled decisions.
 
