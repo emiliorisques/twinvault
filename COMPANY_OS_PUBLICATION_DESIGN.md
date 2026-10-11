@@ -12,6 +12,8 @@
 > mediante endpoints exclusivos de TwinVault. La fuente normativa para la
 > siguiente decisión es
 > [`COMPANY_OS_I0_CONTRACT_ALIGNMENT.md`](COMPANY_OS_I0_CONTRACT_ALIGNMENT.md).
+> El manifiesto candidato posterior, todavía solo de diseño, se especifica en
+> [`COMPANY_OS_I2_MANIFEST_DESIGN.md`](COMPANY_OS_I2_MANIFEST_DESIGN.md).
 
 ## 1. Decisión arquitectónica
 

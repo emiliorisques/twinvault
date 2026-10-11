@@ -6,6 +6,11 @@
 Intelligence, Microsoft Loop Importer, propuesta de Document Service y modelo
 local de TwinVault.
 
+> **Continuación aprobada:** I1 quedó cerrado en `75274c9`. El diseño limitado
+> de I2, sin implementación, está en
+> [`COMPANY_OS_I2_MANIFEST_DESIGN.md`](COMPANY_OS_I2_MANIFEST_DESIGN.md), junto
+> con un JSON Schema candidato y fixtures exclusivamente sintéticos.
+
 Este incremento no modifica Swift, SQLite, PostgreSQL, Core, Agent Service ni
 ningún servicio externo. Tampoco declara que los contratos propuestos existan.
 

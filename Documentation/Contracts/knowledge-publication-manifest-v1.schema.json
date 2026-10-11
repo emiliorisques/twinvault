@@ -1,0 +1,548 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://company-os.example/contracts/knowledge-publication-manifest/1-0/schema",
+  "title": "Knowledge Publication Manifest 1.0 (design candidate)",
+  "description": "Design-only common Knowledge publication manifest. This is not an implemented Company OS endpoint.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "manifest",
+    "origin",
+    "content",
+    "review",
+    "health_check",
+    "approval",
+    "provenance",
+    "selection",
+    "relationships",
+    "privacy",
+    "assertion_verification",
+    "supersession",
+    "integrity"
+  ],
+  "properties": {
+    "schema": { "$ref": "#/$defs/schemaIdentity" },
+    "manifest": { "$ref": "#/$defs/manifestIdentity" },
+    "origin": { "$ref": "#/$defs/origin" },
+    "content": { "$ref": "#/$defs/content" },
+    "review": { "$ref": "#/$defs/review" },
+    "health_check": { "$ref": "#/$defs/healthCheck" },
+    "approval": { "$ref": "#/$defs/approval" },
+    "provenance": { "$ref": "#/$defs/provenance" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "relationships": { "$ref": "#/$defs/relationships" },
+    "privacy": { "$ref": "#/$defs/privacy" },
+    "assertion_verification": { "$ref": "#/$defs/assertionVerification" },
+    "supersession": { "$ref": "#/$defs/supersession" },
+    "integrity": { "$ref": "#/$defs/integrity" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "nullableUuid": {
+      "oneOf": [
+        { "$ref": "#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "nullableString": {
+      "type": ["string", "null"]
+    },
+    "schemaIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "major", "minor"],
+      "properties": {
+        "contract": {
+          "const": "knowledge-publication-manifest"
+        },
+        "major": { "const": 1 },
+        "minor": { "const": 0 }
+      }
+    },
+    "manifestIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "manifest_id",
+        "created_at",
+        "producer",
+        "producer_version",
+        "idempotency_key",
+        "request_kind"
+      ],
+      "properties": {
+        "manifest_id": { "$ref": "#/$defs/uuid" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "producer": {
+          "type": "string",
+          "enum": ["twinvault", "communications", "loop", "document_service"]
+        },
+        "producer_version": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "idempotency_key": { "$ref": "#/$defs/uuid" },
+        "request_kind": { "const": "publish_source_version" }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "namespace",
+        "installation_id",
+        "local_workspace_id",
+        "meeting_id",
+        "source_type"
+      ],
+      "properties": {
+        "namespace": { "const": "twinvault" },
+        "installation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+        },
+        "local_workspace_id": { "$ref": "#/$defs/uuid" },
+        "meeting_id": { "$ref": "#/$defs/uuid" },
+        "source_type": { "const": "meeting.transcript" }
+      }
+    },
+    "content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transcript_id",
+        "transcript_version_id",
+        "transcript_version",
+        "content_revision",
+        "canonicalization_version",
+        "content_sha256",
+        "review_attestation_id",
+        "recordings",
+        "certified_content"
+      ],
+      "properties": {
+        "transcript_id": { "$ref": "#/$defs/uuid" },
+        "transcript_version_id": { "$ref": "#/$defs/uuid" },
+        "transcript_version": { "type": "integer", "minimum": 1 },
+        "content_revision": { "type": "integer", "minimum": 0 },
+        "canonicalization_version": { "type": "integer", "minimum": 1 },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "review_attestation_id": { "$ref": "#/$defs/uuid" },
+        "recordings": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/recording" }
+        },
+        "certified_content": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["media_type", "encoding", "bytes_base64"],
+          "properties": {
+            "media_type": {
+              "const": "application/vnd.twinvault.transcript-review+json"
+            },
+            "encoding": { "const": "base64" },
+            "bytes_base64": {
+              "type": "string",
+              "minLength": 4,
+              "pattern": "^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+            }
+          }
+        }
+      }
+    },
+    "recording": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recording_id",
+        "channel",
+        "sha256",
+        "mime_type",
+        "byte_size",
+        "duration_seconds",
+        "binary_included"
+      ],
+      "properties": {
+        "recording_id": { "$ref": "#/$defs/uuid" },
+        "channel": {
+          "type": "string",
+          "enum": ["microphone", "systemAudio"]
+        },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "mime_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "byte_size": { "type": "integer", "minimum": 0 },
+        "duration_seconds": { "type": "number", "minimum": 0 },
+        "timeline_offset_seconds": { "type": ["number", "null"] },
+        "binary_included": { "const": false }
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["local_declaration", "reviewer_identity"],
+      "properties": {
+        "local_declaration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "attestation_id", "certified_at"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["attested", "stale", "absent"]
+            },
+            "attestation_id": { "$ref": "#/$defs/nullableUuid" },
+            "certified_at": { "type": ["string", "null"], "format": "date-time" }
+          }
+        },
+        "reviewer_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "local_reviewer_id", "authority", "subject"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["absent", "local_unverified", "authenticated"]
+            },
+            "local_reviewer_id": { "$ref": "#/$defs/nullableUuid" },
+            "authority": { "$ref": "#/$defs/nullableString" },
+            "subject": { "$ref": "#/$defs/nullableString" }
+          }
+        }
+      }
+    },
+    "healthCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "health_check_id",
+        "auditor_version",
+        "policy_version",
+        "checked_at",
+        "binding",
+        "findings"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_run", "passed", "passed_with_warnings", "failed", "stale"]
+        },
+        "health_check_id": { "$ref": "#/$defs/nullableUuid" },
+        "auditor_version": { "$ref": "#/$defs/nullableString" },
+        "policy_version": { "$ref": "#/$defs/nullableString" },
+        "checked_at": { "type": ["string", "null"], "format": "date-time" },
+        "binding": {
+          "oneOf": [
+            { "$ref": "#/$defs/healthBinding" },
+            { "type": "null" }
+          ]
+        },
+        "findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/healthFinding" }
+        }
+      }
+    },
+    "healthBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "meeting_id",
+        "recording_id",
+        "recording_sha256",
+        "transcript_id",
+        "transcript_version_id",
+        "transcript_version",
+        "content_revision",
+        "content_sha256",
+        "review_attestation_id"
+      ],
+      "properties": {
+        "meeting_id": { "$ref": "#/$defs/uuid" },
+        "recording_id": { "$ref": "#/$defs/uuid" },
+        "recording_sha256": { "$ref": "#/$defs/sha256" },
+        "transcript_id": { "$ref": "#/$defs/uuid" },
+        "transcript_version_id": { "$ref": "#/$defs/uuid" },
+        "transcript_version": { "type": "integer", "minimum": 1 },
+        "content_revision": { "type": "integer", "minimum": 0 },
+        "content_sha256": { "$ref": "#/$defs/sha256" },
+        "review_attestation_id": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "healthFinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "accepted_for_publication"],
+      "properties": {
+        "severity": { "type": "string", "enum": ["warning", "error"] },
+        "code": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "accepted_for_publication": { "type": "boolean" }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "approval_id",
+        "authority",
+        "subject",
+        "approved_at",
+        "approved_manifest_sha256"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_requested", "pending", "approved", "rejected", "revoked"]
+        },
+        "approval_id": { "$ref": "#/$defs/nullableUuid" },
+        "authority": { "$ref": "#/$defs/nullableString" },
+        "subject": { "$ref": "#/$defs/nullableString" },
+        "approved_at": { "type": ["string", "null"], "format": "date-time" },
+        "approved_manifest_sha256": {
+          "oneOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["origin_system", "capture_mode", "derived_from"],
+      "properties": {
+        "origin_system": { "const": "twinvault" },
+        "capture_mode": {
+          "type": "string",
+          "enum": ["microphone", "system_audio", "multi_channel"]
+        },
+        "derived_from": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "local_id", "sha256"],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["audio_recording", "transcript_version", "review_attestation"]
+              },
+              "local_id": { "$ref": "#/$defs/uuid" },
+              "sha256": {
+                "oneOf": [
+                  { "$ref": "#/$defs/sha256" },
+                  { "type": "null" }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["included_categories", "excluded_categories", "audio_binary_included"],
+      "properties": {
+        "included_categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "meeting_metadata",
+              "transcript_reviewed",
+              "segment_timestamps",
+              "audio_metadata",
+              "participant_links",
+              "speaker_labels",
+              "notes",
+              "important_moments"
+            ]
+          }
+        },
+        "excluded_categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "audio_binary_included": { "const": false }
+      }
+    },
+    "relationships": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposals"],
+      "properties": {
+        "proposals": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relationshipProposal" }
+        }
+      }
+    },
+    "relationshipProposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal_id",
+        "entity_type",
+        "relation_type",
+        "resolution_status",
+        "basis",
+        "canonical_entity_id",
+        "source_evidence_ids"
+      ],
+      "properties": {
+        "proposal_id": { "$ref": "#/$defs/uuid" },
+        "entity_type": {
+          "type": "string",
+          "enum": [
+            "company",
+            "person",
+            "project",
+            "process",
+            "process_run",
+            "participation",
+            "sector",
+            "decision",
+            "outcome"
+          ]
+        },
+        "relation_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "resolution_status": {
+          "type": "string",
+          "enum": [
+            "selected_existing",
+            "confirmed_external_identity",
+            "unresolved_candidate",
+            "rejected"
+          ]
+        },
+        "basis": {
+          "type": "string",
+          "enum": [
+            "user_selected",
+            "confirmed_external_link",
+            "source_declared",
+            "model_suggested"
+          ]
+        },
+        "canonical_entity_id": { "$ref": "#/$defs/nullableUuid" },
+        "source_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uuid" }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sensitivity",
+        "data_categories",
+        "contains_personal_data",
+        "contains_special_category_data",
+        "user_twin_included",
+        "requested_acl"
+      ],
+      "properties": {
+        "sensitivity": {
+          "type": "string",
+          "enum": ["local_private", "internal", "confidential", "restricted"]
+        },
+        "data_categories": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 128 }
+        },
+        "contains_personal_data": { "type": "boolean" },
+        "contains_special_category_data": {
+          "type": "string",
+          "enum": ["yes", "no", "unknown"]
+        },
+        "user_twin_included": { "const": false },
+        "requested_acl": { "$ref": "#/$defs/requestedAcl" }
+      }
+    },
+    "requestedAcl": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workspace_id", "principals", "allow_reshare", "allow_derivation"],
+      "properties": {
+        "workspace_id": { "$ref": "#/$defs/uuid" },
+        "principals": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type", "id", "permissions"],
+            "properties": {
+              "type": { "type": "string", "enum": ["workspace", "group", "user"] },
+              "id": { "$ref": "#/$defs/uuid" },
+              "permissions": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": ["knowledge:read", "knowledge:derive"]
+                }
+              }
+            }
+          }
+        },
+        "allow_reshare": { "type": "boolean" },
+        "allow_derivation": { "type": "boolean" }
+      }
+    },
+    "assertionVerification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "scope"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["not_applicable", "not_evaluated", "unverified", "verified", "rejected"]
+        },
+        "scope": { "type": "string", "enum": ["none", "selected_assertions"] }
+      }
+    },
+    "supersession": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "supersedes_publication_id", "reason_code"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["none", "supersede", "revoke"] },
+        "supersedes_publication_id": { "$ref": "#/$defs/nullableUuid" },
+        "reason_code": { "$ref": "#/$defs/nullableString" }
+      }
+    },
+    "integrity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "content_digest_algorithm",
+        "manifest_canonicalization",
+        "manifest_sha256"
+      ],
+      "properties": {
+        "content_digest_algorithm": { "const": "sha-256" },
+        "manifest_canonicalization": { "const": "rfc8785-zeroed-integrity-field-v1" },
+        "manifest_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
