@@ -114,6 +114,8 @@ Phase 3H adds an explicit `Repair Safe Issues` action only when the health repor
 
 TwinVault remains offline and autonomous. There is no Supabase dependency, no direct PostgreSQL access, and no automatic Company OS synchronization. `ARCHITECTURE.md` defines only the future publication envelope: an authenticated, selective, idempotent API boundary where transcript metadata and original-audio upload are separate user-controlled decisions.
 
+The proposed integration contract is documented in [COMPANY_OS_PUBLICATION_DESIGN.md](COMPANY_OS_PUBLICATION_DESIGN.md). It is design-only: no network client, credentials, Company OS changes, PostgreSQL changes, or automatic synchronization are implemented.
+
 WhisperKit is an MIT-licensed third-party dependency. Only its `WhisperKit` package product is linked; SpeakerKit, TTSKit, and speaker identification are not enabled. Apache-2.0-licensed FluidAudio 0.17.4 is pinned for experimental Parakeet transcription and offline diarization. FluidAudio currently exposes a broad package product, so it increases build size beyond the code TwinVault uses; model-asset licensing and that packaging cost must be reviewed before distribution.
 
 ## Current boundaries

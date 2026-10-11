@@ -123,6 +123,8 @@ TwinVault remains autonomous and never connects directly to PostgreSQL. A future
 
 Uploading original audio is a separate, explicit policy decision from publishing transcript metadata. A later correction creates a new publishable state; Company OS can then invalidate or supersede derivatives that cite the older transcription version. Direct database writes, background publication of every recording, Supabase, and CRM tables inside TwinVault are outside this boundary.
 
+The complete design proposal, proposed API surface, security model, and phased implementation gates are documented in [COMPANY_OS_PUBLICATION_DESIGN.md](COMPANY_OS_PUBLICATION_DESIGN.md). That document defines requested future contracts only; it does not assert that Company OS currently implements them.
+
 `TranscriptionRequest` carries an optional `Sendable` progress sink. Providers report semantic stages without coupling the domain to SwiftUI. FluidAudio supplies Parakeet's determinate download fraction; WhisperKit and Apple Speech report indeterminate preparation/loading stages because their adapters cannot obtain a trustworthy equivalent fraction. `AppModel` owns the single active task and cancellation boundary. It checks cancellation before replacing transcript data, suppresses cancellation as a user-requested error, and keeps all previously persisted evidence unchanged. Provider cancellation is cooperative, so a Core ML call may return only after its current non-interruptible operation finishes.
 
 ## ADR-001: versioned JSON before SQLite
