@@ -2,6 +2,11 @@
 
 TwinVault is a native, local-first macOS meeting memory application. It records meeting audio, keeps notes and important timestamps inspectable on-device, and can transcribe a selected local audio channel using replaceable on-device speech engines. It has no cloud inference, analytics, or audio upload.
 
+The future Company OS integration remains design-only. The verified I0 contract
+inventory and common Knowledge publication proposal are documented in
+[`COMPANY_OS_I0_CONTRACT_ALIGNMENT.md`](COMPANY_OS_I0_CONTRACT_ALIGNMENT.md);
+no synchronization, credentials, remote calls, or database changes are present.
+
 ## Current capabilities
 
 - Create and record a meeting with explicit microphone permission.

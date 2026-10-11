@@ -4,6 +4,15 @@
 **Ámbito:** contrato futuro entre TwinVault y Company OS  
 **Fuera de alcance:** sincronización, cliente de red, credenciales, cambios en Company OS Core, PostgreSQL o almacenamiento local
 
+> **Alineación I0 (2026-10-11):** este documento conserva el flujo y los
+> requisitos de producto de TwinVault, pero sus rutas API y su manifiesto son
+> propuestas históricas, no contratos aprobados. La inspección de Core,
+> Agent Service, Communications Intelligence y Microsoft Loop demuestra que
+> la publicación debe resolverse mediante un contrato común de Knowledge, no
+> mediante endpoints exclusivos de TwinVault. La fuente normativa para la
+> siguiente decisión es
+> [`COMPANY_OS_I0_CONTRACT_ALIGNMENT.md`](COMPANY_OS_I0_CONTRACT_ALIGNMENT.md).
+
 ## 1. Decisión arquitectónica
 
 TwinVault seguirá siendo la fuente local de las grabaciones y de su evidencia técnica. Company OS podrá recibir una copia explícitamente autorizada de una versión concreta de una reunión, pero no tendrá acceso directo al vault, a SQLite ni al sistema de archivos del Mac.
