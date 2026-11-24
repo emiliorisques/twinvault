@@ -85,7 +85,7 @@ enum DecisionItemValidator {
             if item.batchKey != nil { problems.append(.batchNotAllowedForSend) }
         case .attach, .link:
             if item.exitsFrom != .core { problems.append(.exitsFromMismatch) }
-            if item.type == .link && (item.what.linkFrom == nil || item.what.linkTo == nil) {
+            if item.type == .link && ((item.what.linkFrom ?? "").isEmpty || (item.what.linkTo ?? "").isEmpty) {
                 problems.append(.emptyField("what.link_from/link_to"))
             }
         }

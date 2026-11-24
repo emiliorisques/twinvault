@@ -77,3 +77,19 @@ Primera ronda sobre 787e31e: **NO CONFORME**, con 3 P1, 7 P2 y 5 P3.
   LinkedIn; lotes por grupo; foco de VoiceOver sin usar eliminado; cerrar la ventana.
 - Queda de P3 «elegir motivos con teclado tras N» (con Tab en la configuración por defecto de macOS no se llega a los
   botones). Pendiente de mirar con Emilio delante.
+
+Segunda ronda sobre ff33a44: **CONFORME**. Los P1 y P2 están cerrados.
+- Del P2 nuevo y los P3, arreglados en el commit siguiente:
+  - solo cuenta el cierre de la ventana propia, con aviso al descartar lo que estaba en espera;
+  - Bloq Mayús ya no anula los atajos;
+  - «Ahora no» se oculta si no hay motivos permitidos;
+  - `link_from`/`link_to` no pueden estar vacíos;
+  - la confirmación manual de LinkedIn se registra aunque haya caducado;
+  - si el puente no responde, se dice «no se sabe si lo aceptó»;
+  - se avisa si no se puede pasar el resultado a Core.
+- Quedan para F3 (con Core real):
+  - reintentar los resultados del puente que no lleguen a Core;
+  - reconciliar «aprobado en Core pero no entregado al puente» (entrega idempotente por `item_id` al abrir);
+  - rechazar claves desconocidas al abrir el sobre;
+  - un ejemplo de sobre firmado;
+  - elegir los motivos con el teclado tras pulsar N.

@@ -378,6 +378,7 @@ final class DecisionInboxModel {
 
     /// Si la app o la ventana se cierran durante el margen, lo que estaba en espera se descarta (vuelve pendiente).
     func discardHeld() {
+        if !held.isEmpty { notice = "Se ha descartado lo que estaba en espera: no ha salido nada." }
         for entry in held {
             timers[entry.id]?.cancel()
             if entry.fromManualSend { awaitingManualSend.formUnion(entry.itemIds) }
@@ -388,7 +389,8 @@ final class DecisionInboxModel {
 
     /// Devuelve el mensaje final, o `nil` si no quedó decidida (vuelve a la bandeja).
     private func execute(_ item: DecisionItem, entry: Held) async -> String? {
-        if isExpired(item) {
+        // Un envío que Emilio ya hizo a mano (LinkedIn) se registra aunque la tarjeta haya caducado entretanto.
+        if isExpired(item) && !entry.fromManualSend {
             notice = "Una tarjeta caducó antes de confirmarse: no se ha hecho nada."
             return "Caducada: no se hizo nada."
         }
@@ -417,16 +419,27 @@ final class DecisionInboxModel {
         guard entry.action == .approve || entry.action == .editApprove, item.type == .send, item.channel == .whatsapp else {
             return receipt.resultDetail
         }
-        let result = (try? await bridgeSink.submit(BridgeApproval(
-            itemId: item.itemId, payloadSha256: edited ? item.payloadSha256(withBody: body) : item.payloadSha256,
-            body: body))) ?? .failed
+        let result: DecisionResult
         let detail: String
-        switch result {
-        case .scheduled, .executed: detail = "Programado por el puente para \(bridge?.nextWindow ?? "la siguiente franja")."
-        case .blocked: detail = "El puente no lo dejó salir (tope, horario o envíos parados). No ha salido nada."
-        default: detail = "El puente dio un error. No ha salido nada; revisa el puente."
+        do {
+            result = try await bridgeSink.submit(BridgeApproval(
+                itemId: item.itemId, payloadSha256: edited ? item.payloadSha256(withBody: body) : item.payloadSha256,
+                body: body))
+            switch result {
+            case .scheduled, .executed: detail = "Programado por el puente para \(bridge?.nextWindow ?? "la siguiente franja")."
+            case .blocked: detail = "El puente no lo dejó salir (tope, horario o envíos parados). No ha salido nada."
+            default: detail = "El puente dio un error. No ha salido nada; revisa el puente."
+            }
+        } catch {
+            // Sin respuesta del puente no se puede saber si lo aceptó: se dice así, sin prometer nada.
+            result = .failed
+            detail = "No se sabe si el puente lo aceptó. Revisa la página del puente antes de volver a enviarlo."
         }
-        try? await server.reportResult(itemId: item.itemId, result: result, detail: detail)
+        do {
+            try await server.reportResult(itemId: item.itemId, result: result, detail: detail)
+        } catch {
+            notice = "No se pudo pasar a Company OS el resultado del puente. (En F3 se reintenta solo.)"
+        }
         if result != .scheduled && result != .executed { notice = detail }
         return detail
     }

@@ -6,6 +6,7 @@ struct DecisionsRootView: View {
     @Environment(DecisionInboxModel.self) private var model
     @State private var focusMode = false
     @State private var showingSettings = false
+    @State private var hostWindow: NSWindow?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,9 +29,12 @@ struct DecisionsRootView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
             model.discardHeld()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { note in
+            // Solo la ventana de esta bandeja, no cualquier otra (⌘N, hojas, paneles del sistema).
+            guard let closing = note.object as? NSWindow, closing === hostWindow else { return }
             model.discardHeld()
         }
+        .background(WindowReader(window: $hostWindow))
     }
 }
 
@@ -342,9 +346,11 @@ struct DecisionCardView: View {
                         .buttonStyle(.borderedProminent)
                         .controlSize(.large)
                         .disabled(model.problem(for: item) != nil)
-                    Button("Ahora no") { showingLater.toggle(); model.laterRequestedFor = nil }
-                        .controlSize(.large)
-                        .accessibilityValue(showingLater ? "motivos abiertos" : "")
+                    if !model.allowedReasons(item).isEmpty {
+                        Button("Ahora no") { showingLater.toggle(); model.laterRequestedFor = nil }
+                            .controlSize(.large)
+                            .accessibilityValue(showingLater ? "motivos abiertos" : "")
+                    }
                 }
                 if showingLater || model.laterRequestedFor == item.itemId { laterChips }
             }
@@ -476,7 +482,7 @@ struct DecisionFocusView: View {
         .onKeyPress(characters: .letters, phases: .down) { press in
             // Solo letras sin modificadores y con el foco en el contenedor: al escribir, las letras son texto,
             // y ⌘A, ⌘Z… siguen siendo de macOS.
-            guard press.modifiers.isEmpty, focus == .container else { return .ignored }
+            guard press.modifiers.subtracting(.capsLock).isEmpty, focus == .container else { return .ignored }
             guard let current else { return .ignored }
             switch press.characters.lowercased() {
             case "a":
@@ -586,5 +592,18 @@ struct DecisionSettingsView: View {
         .formStyle(.grouped)
         .frame(minWidth: 520, minHeight: 520)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Hecho") { dismiss() } } }
+    }
+}
+
+/// Lee la ventana que contiene la vista, para no confundirla con otras al cerrarse.
+private struct WindowReader: NSViewRepresentable {
+    @Binding var window: NSWindow?
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        DispatchQueue.main.async { window = view.window }
+        return view
+    }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        if window !== nsView.window { DispatchQueue.main.async { window = nsView.window } }
     }
 }
