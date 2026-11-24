@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://os.solutionpuzzle.com/contracts/decision-item-v1.schema.json",
   "title": "decision-item/1 — tarjeta de la bandeja de decisiones",
-  "description": "Tarjeta de la bandeja de decisiones. Viaja dentro de un sobre decision-envelope/1 (ver decision-envelope-v1.schema.json): Core firma con Ed25519 los bytes exactos del JSON de la tarjeta, y la app solo enseña lo que sale de esos bytes; así la firma cubre todo lo que se lee. Es un dato, nunca una orden: nada se ejecuta sin la decisión de la persona. owner_user_id debe ser el usuario de la app. payload_sha256 = SHA-256 (hex) de la concatenación, en este orden, de type, channel, subject.person_id (minúsculas), subject.source_ref, what.title, what.body, what.quote, what.email_subject, what.link_from, what.link_to; cada campo presente se normaliza a NFC y se escribe como «<longitud en bytes UTF-8>:<valor>», y cada campo ausente o nulo como «-». Las longitudes máximas cuentan puntos de código. Especificación: company-os docs/company-os/app-local-comunicaciones-spec.md §3.2 y §3.3 bis.",
+  "description": "Tarjeta de la bandeja de decisiones. Viaja dentro de un sobre decision-envelope/1 (ver decision-envelope-v1.schema.json): Core firma con Ed25519 los bytes exactos del JSON de la tarjeta, y la app solo enseña lo que sale de esos bytes; así la firma cubre todo lo que se lee. Es un dato, nunca una orden: nada se ejecuta sin la decisión de la persona. owner_user_id debe ser el usuario de la app. payload_sha256 = SHA-256 (hex) de la concatenación, en este orden, de type, channel, subject.person_id (minúsculas), subject.source_ref, what.title, what.body, what.quote, what.email_subject, what.link_from, what.link_to, slots, meeting; slots = huecos «inicio/fin» en ISO 8601 UTC sin fracciones, separados por «,»; meeting = «inicio/fin|persona|teams o sin-teams|liberados»; cada campo presente se normaliza a NFC y se escribe como «<longitud en bytes UTF-8>:<valor>», y cada campo ausente o nulo como «-». Las longitudes máximas cuentan puntos de código. Especificación: company-os docs/company-os/app-local-comunicaciones-spec.md §3.2 y §3.3 bis.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -40,7 +40,8 @@
       "enum": [
         "send",
         "attach",
-        "link"
+        "link",
+        "schedule"
       ]
     },
     "channel": {
@@ -112,7 +113,8 @@
         "whatsapp_puente_mac",
         "correo_d6",
         "linkedin_manual",
-        "core"
+        "core",
+        "calendario_m365"
       ]
     },
     "batch_key": {
@@ -269,6 +271,58 @@
     "state": {
       "const": "pending",
       "description": "Solo bajan tarjetas pendientes."
+    },
+    "slots": {
+      "type": [
+        "array",
+        "null"
+      ],
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "$ref": "#/$defs/slot"
+      },
+      "description": "Solo en send: huecos reales del calendario del dueño (solo libre/ocupado), propuestos en el texto. Al enviarse quedan como citas provisionales."
+    },
+    "meeting": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "attendee_person_id",
+        "teams",
+        "release_slots"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "attendee_person_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "teams": {
+          "type": "boolean"
+        },
+        "release_slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slot"
+          }
+        }
+      },
+      "description": "Solo en schedule: la reunión que se crea al aprobar (con Teams e invitación de Exchange) y las provisionales que se liberan."
     }
   },
   "allOf": [
@@ -404,6 +458,94 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "schedule"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "meeting"
+        ],
+        "properties": {
+          "exits_from": {
+            "const": "calendario_m365"
+          },
+          "meeting": {
+            "type": "object"
+          },
+          "slots": {
+            "type": "null"
+          },
+          "batch_key": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "enum": [
+              "attach",
+              "link"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "slots": {
+            "type": "null"
+          },
+          "meeting": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "type": {
+            "const": "send"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "meeting": {
+            "type": "null"
+          }
+        }
+      }
     }
-  ]
+  ],
+  "$defs": {
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$"
+        }
+      }
+    }
+  }
 }

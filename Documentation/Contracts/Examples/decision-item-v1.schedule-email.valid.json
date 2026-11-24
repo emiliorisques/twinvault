@@ -1,0 +1,62 @@
+{
+  "allowed": [
+    "approve",
+    "reject",
+    "snooze"
+  ],
+  "approve_where": "mac_or_web",
+  "channel": "email",
+  "checks": [
+    {
+      "name": "El hueco sigue libre en tu Outlook",
+      "ok": true
+    },
+    {
+      "name": "Correo del invitado en su ficha",
+      "ok": true
+    }
+  ],
+  "contract": "decision-item/1",
+  "created_at": "2026-11-24T08:00:00Z",
+  "exits_from": "calendario_m365",
+  "expires_at": "2026-11-27T18:00:00Z",
+  "item_id": "20000000-0000-4000-8000-000000000004",
+  "meeting": {
+    "attendee_person_id": "00000000-0000-4000-8000-000000000020",
+    "end": "2026-11-26T11:30:00Z",
+    "release_slots": [
+      {
+        "end": "2026-11-26T11:30:00Z",
+        "start": "2026-11-26T11:00:00Z"
+      },
+      {
+        "end": "2026-11-27T10:30:00Z",
+        "start": "2026-11-27T10:00:00Z"
+      }
+    ],
+    "start": "2026-11-26T11:00:00Z",
+    "teams": true
+  },
+  "origin": {
+    "created_by_source": "core",
+    "kind": "rule",
+    "ref": "aceptacion_hueco v1"
+  },
+  "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
+  "payload_sha256": "5d9b28b2a8f02d5c00cb746a0d1d75ed82c84322e60ca0f93269ffe9189893eb",
+  "primary_label": "Crear reunión y enviar invitación",
+  "recommendation": "Crearla ya: el hueco sigue libre y la provisional caduca el lunes.",
+  "state": "pending",
+  "subject": {
+    "person_id": "00000000-0000-4000-8000-000000000020",
+    "source_ref": "mail:hilo-ejemplo-20"
+  },
+  "summary_line": "Pedro acepta el jueves 26 a las 12:00: crear la reunión de Teams y enviarle la invitación.",
+  "thread_preview": "approved_summary",
+  "type": "schedule",
+  "what": {
+    "body": "Fondo Inventado · TMT · PWS 2027",
+    "title": "Reunión con Pedro Ejemplo"
+  },
+  "why": "Respondió hoy en el hilo que el jueves a las 12 le va bien."
+}

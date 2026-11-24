@@ -93,3 +93,17 @@ Segunda ronda sobre ff33a44: **CONFORME**. Los P1 y P2 están cerrados.
   - rechazar claves desconocidas al abrir el sobre;
   - un ejemplo de sobre firmado;
   - elegir los motivos con el teclado tras pulsar N.
+
+## Agenda (24 nov; Emilio: «si»)
+
+- **Contrato:**
+  - tipo nuevo `schedule` («X acepta → crear la reunión de Teams y enviar la invitación»), con `exits_from`
+    `calendario_m365` y el campo `meeting`;
+  - en los `send`, el campo `slots` (como mucho 2 huecos reales, futuros);
+  - los huecos y la reunión entran en la huella: cambiar un hueco cambia lo que se aprueba.
+- **Esquema y ejemplos actualizados**, con un ejemplo `schedule` nuevo.
+- **Lote:** los lotes nunca incluyen `schedule`, solo `attach` y `link`.
+- **MOCK:** dos envíos de trato personal llevan huecos, y hay una tarjeta de reunión aceptada. No hay calendario real:
+  el libre u ocupado, las provisionales y la reunión son de Core y del módulo M365, y van en F2 con un calendario
+  falso y en F3 de verdad (spec §3.6).
+- **Pruebas:** 30 de la bandeja.

@@ -19,6 +19,7 @@ enum DecisionItemProblem: Error, Equatable, Sendable {
     case expired
     case wrongOwner
     case undecodable
+    case badSlot
 }
 
 struct DecisionItemRejection: Error, Equatable, Sendable {
@@ -83,12 +84,27 @@ enum DecisionItemValidator {
             // Lo que sale desde el Mac solo se aprueba en el Mac. El servidor no puede relajarlo.
             if item.channel == .whatsapp && item.approveWhere != .mac { problems.append(.whatsappSendMustBeApprovedOnMac) }
             if item.batchKey != nil { problems.append(.batchNotAllowedForSend) }
+        case .schedule:
+            if item.exitsFrom != .calendarioM365 { problems.append(.exitsFromMismatch) }
+            if item.batchKey != nil { problems.append(.batchNotAllowedForSend) }
+            if let m = item.meeting {
+                if m.start >= m.end || m.start <= now { problems.append(.badSlot) }
+            } else {
+                problems.append(.emptyField("meeting"))
+            }
         case .attach, .link:
             if item.exitsFrom != .core { problems.append(.exitsFromMismatch) }
             if item.type == .link && ((item.what.linkFrom ?? "").isEmpty || (item.what.linkTo ?? "").isEmpty) {
                 problems.append(.emptyField("what.link_from/link_to"))
             }
         }
+
+        // Huecos: solo en envíos, como mucho 2, futuros y con fin después del inicio. Reunión: solo en `schedule`.
+        if let slots = item.slots {
+            if item.type != .send || slots.isEmpty || slots.count > 2 { problems.append(.badSlot) }
+            if slots.contains(where: { $0.start >= $0.end || $0.start <= now }) { problems.append(.badSlot) }
+        }
+        if item.meeting != nil && item.type != .schedule { problems.append(.badSlot) }
 
         let allowedSet = Set(item.allowed)
         if !allowedSet.isSubset(of: [.approve, .editApprove, .reject, .snooze]) || !allowedSet.contains(.approve) {

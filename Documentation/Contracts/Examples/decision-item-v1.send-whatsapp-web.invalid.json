@@ -29,7 +29,7 @@
     "ref": "seguimiento_5d v3"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "757f562f16c5dcddc4b20c15b11230ca5b974e4fabfe4997450bb8412c8e4885",
+  "payload_sha256": "11c1953cb63d1db48a05458f51621928b4ec5e86aa6788f8e148d4635f7f9b66",
   "primary_label": "Programar para las 15:30",
   "recommendation": "Enviarlo hoy: si pasa de esta semana, la regla deja de proponerlo.",
   "state": "pending",

@@ -6,7 +6,7 @@ import Foundation
 // Las claves JSON van en snake_case; el decodificador las convierte (`DecisionJSON`).
 
 enum DecisionType: String, Codable, Sendable, CaseIterable {
-    case send, attach, link
+    case send, attach, link, schedule
 }
 
 enum DecisionChannel: String, Codable, Sendable, CaseIterable {
@@ -23,6 +23,8 @@ enum ExitsFrom: String, Codable, Sendable {
     case correoD6 = "correo_d6"
     case linkedinManual = "linkedin_manual"
     case core
+    /// Reunión creada en el calendario del dueño por el módulo M365 (invitación de Exchange).
+    case calendarioM365 = "calendario_m365"
 }
 
 enum OriginKind: String, Codable, Sendable {
@@ -71,6 +73,22 @@ struct DecisionWhat: Codable, Sendable, Equatable {
     var linkTo: String?
 }
 
+/// Hueco real del calendario del dueño (solo libre/ocupado), propuesto en el texto (§3.6 de la spec).
+struct DecisionSlot: Codable, Sendable, Equatable {
+    var start: Date
+    var end: Date
+}
+
+/// Solo en `schedule`: la reunión que se creará al aprobar.
+struct DecisionMeeting: Codable, Sendable, Equatable {
+    var start: Date
+    var end: Date
+    var attendeePersonId: UUID
+    var teams: Bool
+    /// Provisionales que se liberan al crearla.
+    var releaseSlots: [DecisionSlot]
+}
+
 struct DecisionOrigin: Codable, Sendable, Equatable {
     var kind: OriginKind
     var ref: String
@@ -94,6 +112,8 @@ struct DecisionItem: Codable, Sendable, Equatable, Identifiable {
     var primaryLabel: String
     var exitsFrom: ExitsFrom
     var batchKey: String?
+    var slots: [DecisionSlot]?
+    var meeting: DecisionMeeting?
     var threadPreview: ThreadPreviewKind
     var what: DecisionWhat
     var why: String
@@ -113,12 +133,21 @@ struct DecisionItem: Codable, Sendable, Equatable, Identifiable {
     /// Forma canónica de lo que Emilio decide: si cambia algo de esto, cambia la huella.
     /// Cada campo va en NFC y con su longitud en bytes UTF-8 delante («12:texto»); un campo ausente es «-».
     /// Así no hay ambigüedad entre separadores, ni entre nulo y vacío.
+    /// Los huecos y la reunión entran como fechas ISO 8601 UTC sin fracciones («inicio/fin», separados por «,»).
     static func canonicalPayload(
-        type: DecisionType, channel: DecisionChannel, subject: DecisionSubject, what: DecisionWhat
+        type: DecisionType, channel: DecisionChannel, subject: DecisionSubject, what: DecisionWhat,
+        slots: [DecisionSlot]? = nil, meeting: DecisionMeeting? = nil
     ) -> String {
+        let iso = ISO8601DateFormatter()
+        let span: (Date, Date) -> String = { "\(iso.string(from: $0))/\(iso.string(from: $1))" }
         let fields: [String?] = [
             type.rawValue, channel.rawValue, subject.personId?.uuidString.lowercased(), subject.sourceRef,
-            what.title, what.body, what.quote, what.emailSubject, what.linkFrom, what.linkTo
+            what.title, what.body, what.quote, what.emailSubject, what.linkFrom, what.linkTo,
+            slots.map { $0.map { span($0.start, $0.end) }.joined(separator: ",") },
+            meeting.map { m in
+                [span(m.start, m.end), m.attendeePersonId.uuidString.lowercased(), m.teams ? "teams" : "sin-teams",
+                 m.releaseSlots.map { span($0.start, $0.end) }.joined(separator: ",")].joined(separator: "|")
+            }
         ]
         return fields.map { field -> String in
             guard let field else { return "-" }
@@ -132,14 +161,16 @@ struct DecisionItem: Codable, Sendable, Equatable, Identifiable {
     }
 
     var computedPayloadSha256: String {
-        Self.sha256Hex(Self.canonicalPayload(type: type, channel: channel, subject: subject, what: what))
+        Self.sha256Hex(Self.canonicalPayload(type: type, channel: channel, subject: subject, what: what,
+                                             slots: slots, meeting: meeting))
     }
 
     /// Huella del texto editado por Emilio (para el recibo; el texto no se guarda en WhatsApp ni LinkedIn).
     func payloadSha256(withBody body: String) -> String {
         var edited = what
         edited.body = body
-        return Self.sha256Hex(Self.canonicalPayload(type: type, channel: channel, subject: subject, what: edited))
+        return Self.sha256Hex(Self.canonicalPayload(type: type, channel: channel, subject: subject, what: edited,
+                                                    slots: slots, meeting: meeting))
     }
 
 }

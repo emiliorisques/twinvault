@@ -92,6 +92,8 @@ actor FakeDecisionServer: DecisionServer {
                 result = .executed; detail = "Lo envió Emilio en LinkedIn."
             case (.link, _):
                 result = .executed; detail = "MOCK: enlazado."
+            case (.schedule, _):
+                result = .executed; detail = "MOCK: reunión de Teams creada e invitación enviada; provisionales liberadas (no ha salido nada)."
             default:
                 result = .executed; detail = "MOCK: guardado en la ficha."
             }
@@ -246,7 +248,33 @@ enum FakeInboxData {
                 now: now, expiresInDays: 30, approveWhere: .macOrWeb,
                 checks: ["Coincide por identificador (correo)", "Ficha visible para ti"]))
         }
+        // Huecos reales (aquí inventados) en los dos envíos de trato personal, y una aceptación que crea la reunión.
+        list[0].slots = [slot(now, days: 2, 10, 0), slot(now, days: 3, 12, 30)]
+        list[1].slots = [slot(now, days: 7, 10, 0), slot(now, days: 8, 16, 30)]
+        var meeting = item(
+            id: 10, type: .schedule, channel: .email, person: 20, sourceRef: "mail:thread-mock-20",
+            summary: "Pedro acepta el jueves a las 12:00: crear la reunión de Teams y enviarle la invitación.",
+            recommendation: "Crearla ya: el hueco sigue libre y la provisional caduca en 3 días laborables.",
+            primary: "Crear reunión y enviar invitación", exits: .calendarioM365, thread: .approvedSummary,
+            what: DecisionWhat(title: "Reunión con Pedro Ejemplo", body: "Fondo Inventado · TMT · PWS 2027"),
+            why: "Respondió hoy en el hilo: «El jueves a las 12 me va perfecto».",
+            origin: DecisionOrigin(kind: .rule, ref: "aceptacion_hueco v1", createdBySource: .core),
+            now: now, expiresInDays: 2, approveWhere: .macOrWeb,
+            checks: ["El hueco sigue libre en tu Outlook", "Correo del invitado en su ficha", "Sin baja"])
+        let accepted = slot(now, days: 2, 12, 0)
+        meeting.meeting = DecisionMeeting(start: accepted.start, end: accepted.end, attendeePersonId: person(20),
+                                          teams: true, releaseSlots: [accepted, slot(now, days: 3, 11, 0)])
+        meeting.allowed = [.approve, .reject, .snooze]
+        list.insert(meeting, at: 5)
         return list
+    }
+
+    /// Un hueco de 30 min dentro de `days` días a la hora dada (datos inventados).
+    static func slot(_ now: Date, days: Int, _ hour: Int, _ minute: Int) -> DecisionSlot {
+        let calendar = Calendar.current
+        let day = calendar.date(byAdding: .day, value: days, to: calendar.startOfDay(for: now))!
+        let start = calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day)!
+        return DecisionSlot(start: start, end: start.addingTimeInterval(1_800))
     }
 
     static let threads: [String: ThreadPreview] = [

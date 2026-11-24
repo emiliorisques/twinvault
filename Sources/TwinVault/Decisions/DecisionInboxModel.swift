@@ -192,7 +192,7 @@ final class DecisionInboxModel {
 
     /// Grupos de lote: solo `attach` o `link`, con la misma `batch_key`, sin editar, y al menos dos.
     func batchGroups(in list: [DecisionItem]) -> [(key: String, items: [DecisionItem])] {
-        let eligible = list.filter { $0.type != .send && $0.batchKey != nil && !isEdited($0) }
+        let eligible = list.filter { ($0.type == .attach || $0.type == .link) && $0.batchKey != nil && !isEdited($0) }
         let byKey = Dictionary(grouping: eligible, by: { $0.batchKey! })
         return byKey.filter { $0.value.count >= 2 }.map { (key: $0.key, items: $0.value) }.sorted { $0.key < $1.key }
     }
@@ -223,10 +223,13 @@ final class DecisionInboxModel {
         case .correoD6: "Sale desde tu correo"
         case .linkedinManual: "Lo envías tú en LinkedIn: la app copia el texto y abre el perfil"
         case .core: "Se guarda en Company OS, privado tuyo"
+        case .calendarioM365: "Se crea en tu calendario con Teams; Outlook le envía la invitación"
         }
     }
 
-    func canEdit(_ item: DecisionItem) -> Bool { item.type != .link && item.allowed.contains(.editApprove) }
+    func canEdit(_ item: DecisionItem) -> Bool {
+        (item.type == .send || item.type == .attach) && item.allowed.contains(.editApprove)
+    }
     func allowedReasons(_ item: DecisionItem) -> [LaterReason] {
         LaterReason.allCases.filter { $0 == .masAdelante ? item.allowed.contains(.snooze) : item.allowed.contains(.reject) }
     }
@@ -243,7 +246,7 @@ final class DecisionInboxModel {
 
     func problem(for item: DecisionItem) -> String? {
         if isExpired(item) { return "Ha caducado: ya no se puede decidir." }
-        guard item.type != .link else { return nil }
+        guard item.type == .send || item.type == .attach else { return nil }
         return LiveTextCheck.problem(for: item, text: text(for: item), bridge: bridge)
     }
 
@@ -252,7 +255,7 @@ final class DecisionInboxModel {
         switch item.type {
         case .send: return item.channel == .linkedin ? "Copiar mi versión y abrir LinkedIn" : "Enviar mi versión"
         case .attach: return "Subir mi versión"
-        case .link: return item.primaryLabel
+        case .link, .schedule: return item.primaryLabel
         }
     }
 
@@ -294,7 +297,7 @@ final class DecisionInboxModel {
     func approveBatch(_ ids: [UUID]) -> Bool {
         let chosen = pending.filter { ids.contains($0.itemId) }
         guard chosen.count >= 2, chosen.count == Set(ids).count,
-              chosen.allSatisfy({ $0.type != .send && !isEdited($0) && problem(for: $0) == nil && $0.allowed.contains(.approve) }),
+              chosen.allSatisfy({ ($0.type == .attach || $0.type == .link) && !isEdited($0) && problem(for: $0) == nil && $0.allowed.contains(.approve) }),
               let key = chosen.first?.batchKey, chosen.allSatisfy({ $0.batchKey == key }) else {
             notice = "Solo se aprueban juntas las tarjetas parecidas de enlazar o subir a la ficha, sin cambios."
             return false
@@ -321,6 +324,7 @@ final class DecisionInboxModel {
         case (.send, .whatsapp): "Programado para \(bridge?.nextWindow ?? "la siguiente franja")"
         case (.send, .email): "Se enviará desde tu correo"
         case (.link, _): "Enlace aprobado"
+        case (.schedule, _): "Se creará la reunión y la invitación"
         default: "Se subirá a la ficha"
         }
     }

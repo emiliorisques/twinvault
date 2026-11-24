@@ -28,9 +28,19 @@
     "ref": "seguimiento_5d v3"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "757f562f16c5dcddc4b20c15b11230ca5b974e4fabfe4997450bb8412c8e4885",
+  "payload_sha256": "1b69f6a1d7ef794679470636c2f9d87f1f68c6ad2e3c8e66081f0de5e8d3e72e",
   "primary_label": "Programar para las 15:30",
   "recommendation": "Enviarlo hoy: si pasa de esta semana, la regla deja de proponerlo.",
+  "slots": [
+    {
+      "end": "2026-11-26T09:30:00Z",
+      "start": "2026-11-26T09:00:00Z"
+    },
+    {
+      "end": "2026-11-27T12:00:00Z",
+      "start": "2026-11-27T11:30:00Z"
+    }
+  ],
   "state": "pending",
   "subject": {
     "person_id": "00000000-0000-4000-8000-000000000001",
@@ -40,7 +50,7 @@
   "thread_preview": "local_messages",
   "type": "send",
   "what": {
-    "body": "Hola Marta, ¿te va bien que hagamos la demo el jueves o el viernes por la mañana?",
+    "body": "Hola Marta, ¿te va bien que hagamos la demo el jueves 26 a las 10:00 o el viernes 27 a las 12:30?",
     "title": "WhatsApp a Marta Ficticia"
   },
   "why": "Te respondió el 21 nov que lo veíais la semana siguiente."

@@ -26,7 +26,7 @@ final class DecisionInboxTests: XCTestCase {
     func testFakeInboxLoadsAllSignedItems() async {
         let (model, _, _, _) = makeModel()
         await model.load()
-        XCTAssertEqual(model.items.count, 9)
+        XCTAssertEqual(model.items.count, 10)
         XCTAssertEqual(model.discardedCount, 0)
         XCTAssertNotNil(model.bridge)
     }
@@ -60,7 +60,7 @@ final class DecisionInboxTests: XCTestCase {
                                                signature: try key.signature(for: junk).base64EncodedString()), as: FakeInboxData.items(now: Date())[1].withId(UUID()))
 
         await model.load()
-        XCTAssertEqual(model.items.count, 9)
+        XCTAssertEqual(model.items.count, 10)
         XCTAssertEqual(model.discardedCount, 5)
         XCTAssertTrue(DecisionItemValidator.structuralProblems(looser, now: Date()).contains(.whatsappSendMustBeApprovedOnMac))
     }
@@ -234,7 +234,7 @@ final class DecisionInboxTests: XCTestCase {
         await model.commitAll()
         let requests = await server.requests
         XCTAssertTrue(requests.isEmpty)
-        XCTAssertEqual(model.pending.count, 9)
+        XCTAssertEqual(model.pending.count, 10)
     }
 
     func testCardInCommitCannotBeDecidedTwice() async {
@@ -332,7 +332,7 @@ final class DecisionInboxTests: XCTestCase {
         model.later(item(model, 3), reason: .yaHecho)
         await model.commitAll()
         await model.load()
-        XCTAssertEqual(model.total, 9)
+        XCTAssertEqual(model.total, 10)
         XCTAssertEqual(model.decidedCount, 2)
     }
 
@@ -345,6 +345,49 @@ final class DecisionInboxTests: XCTestCase {
         model.undoLast()
         XCTAssertTrue(model.awaitingManualSend.contains(li.itemId))
         XCTAssertFalse(model.pending.contains { $0.itemId == li.itemId })
+    }
+
+    func testScheduleCardCreatesMeetingThroughCoreOnly() async {
+        let (model, server, sink, _) = makeModel()
+        await model.load()
+        let meeting = item(model, 10)
+        XCTAssertEqual(meeting.type, .schedule)
+        XCTAssertFalse(model.canEdit(meeting))
+        XCTAssertNil(model.problem(for: meeting))
+        model.approve(meeting)
+        await model.commitAll()
+        let requests = await server.requests
+        let submitted = await sink.submitted
+        XCTAssertEqual(requests.map(\.action), [.approve])
+        XCTAssertTrue(submitted.isEmpty, "La reunión no pasa por el puente de WhatsApp")
+        XCTAssertTrue(model.finished[meeting.itemId]?.contains("reunión") ?? false)
+    }
+
+    func testSlotAndMeetingRules() {
+        let now = Date()
+        var send = FakeInboxData.items(now: now)[1]
+        XCTAssertEqual(DecisionItemValidator.structuralProblems(send.hashed(), now: now), [])
+        send.slots = [FakeInboxData.slot(now, days: 2, 10, 0), FakeInboxData.slot(now, days: 3, 10, 0), FakeInboxData.slot(now, days: 4, 10, 0)]
+        XCTAssertTrue(DecisionItemValidator.structuralProblems(send.hashed(), now: now).contains(.badSlot), "Como mucho 2 huecos")
+        var past = FakeInboxData.items(now: now)[1]
+        past.slots = [FakeInboxData.slot(now, days: -1, 10, 0)]
+        XCTAssertTrue(DecisionItemValidator.structuralProblems(past.hashed(), now: now).contains(.badSlot), "Nada en el pasado")
+        var attach = FakeInboxData.items(now: now)[2]
+        attach.slots = [FakeInboxData.slot(now, days: 2, 10, 0)]
+        XCTAssertTrue(DecisionItemValidator.structuralProblems(attach.hashed(), now: now).contains(.badSlot))
+        var schedule = FakeInboxData.items(now: now)[5]
+        schedule.meeting = nil
+        XCTAssertTrue(DecisionItemValidator.structuralProblems(schedule.hashed(), now: now).contains(.emptyField("meeting")))
+        var moved = FakeInboxData.items(now: now)[0]
+        let before = moved.computedPayloadSha256
+        moved.slots = [FakeInboxData.slot(now, days: 5, 9, 30)]
+        XCTAssertNotEqual(before, moved.computedPayloadSha256, "Cambiar un hueco cambia la huella")
+    }
+
+    func testBatchNeverIncludesSchedule() async {
+        let (model, _, _, _) = makeModel()
+        await model.load()
+        XCTAssertFalse(model.approveBatch([item(model, 10).itemId, item(model, 6).itemId]))
     }
 
     func testBusinessDaysSkipWeekend() {
@@ -365,7 +408,7 @@ final class DecisionInboxTests: XCTestCase {
     func testValidContractExamplesPassStructuralChecks() throws {
         let reference = ISO8601DateFormatter().date(from: "2026-11-24T09:00:00Z")!
         for name in ["decision-item-v1.send-whatsapp.valid.json", "decision-item-v1.attach-meeting.valid.json",
-                     "decision-item-v1.link-meeting.valid.json"] {
+                     "decision-item-v1.link-meeting.valid.json", "decision-item-v1.schedule-email.valid.json"] {
             let item = try example(name)
             XCTAssertEqual(DecisionItemValidator.structuralProblems(item, now: reference), [], name)
         }
@@ -393,4 +436,5 @@ final class DecisionInboxTests: XCTestCase {
 
 extension DecisionItem {
     func withId(_ id: UUID) -> DecisionItem { var copy = self; copy.itemId = id; return copy }
+    func hashed() -> DecisionItem { var copy = self; copy.payloadSha256 = copy.computedPayloadSha256; return copy }
 }

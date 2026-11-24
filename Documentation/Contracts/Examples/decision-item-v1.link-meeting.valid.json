@@ -24,7 +24,7 @@
     "ref": "enlace_por_correo v1"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "e89f42434d68ac85b0396b41ea8d5bcec1d38e3df8048a0061a666e7ef077119",
+  "payload_sha256": "b6819d971988a35a376a47813a73de8c22d62daa50db0ddf348e5535ccd9f1f8",
   "primary_label": "Enlazar",
   "recommendation": "Enlazarlo: el correo de la invitación es exactamente el de su ficha.",
   "state": "pending",

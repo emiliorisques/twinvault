@@ -232,7 +232,18 @@ struct DecisionCardView: View {
 
     @ViewBuilder
     private var content: some View {
-        if item.type == .link {
+        if item.type == .schedule, let m = item.meeting {
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 4) {
+                GridRow { Text("Cuándo").foregroundStyle(.secondary); Text(m.start.formatted(.dateTime.weekday(.wide).day().month().hour().minute())) }
+                GridRow { Text("Dónde").foregroundStyle(.secondary); Text(m.teams ? "Teams (enlace automático)" : "Sin Teams") }
+                GridRow { Text("Asunto").foregroundStyle(.secondary); Text(item.what.body) }
+                GridRow { Text("Se libera").foregroundStyle(.secondary)
+                    Text(m.releaseSlots.filter { $0.start != m.start }.map { $0.start.formatted(.dateTime.weekday(.wide).hour().minute()) }.joined(separator: ", ")) }
+            }
+            .font(.callout)
+            .padding(10)
+            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        } else if item.type == .link {
             HStack {
                 Text(item.what.linkFrom ?? "").padding(4).background(.quaternary, in: RoundedRectangle(cornerRadius: 5))
                 Image(systemName: "arrow.right").accessibilityLabel("con")
@@ -244,6 +255,18 @@ struct DecisionCardView: View {
                 if let subject = item.what.emailSubject { Text("Asunto: \(subject)").font(.caption).foregroundStyle(.secondary) }
                 editor
                 hint
+                if let slots = item.slots, !slots.isEmpty {
+                    HStack(spacing: 6) {
+                        Text("Huecos reales de tu Outlook:").foregroundStyle(.secondary)
+                        ForEach(slots, id: \.start) { s in
+                            Text(s.start.formatted(.dateTime.weekday(.wide).day().hour().minute()))
+                                .padding(.horizontal, 8).padding(.vertical, 2)
+                                .overlay(Capsule().strokeBorder(.separator))
+                        }
+                    }
+                    .font(.caption)
+                    .accessibilityElement(children: .combine)
+                }
                 if let quote = item.what.quote { Text(quote).italic().foregroundStyle(.secondary).font(.callout) }
             }
         }
