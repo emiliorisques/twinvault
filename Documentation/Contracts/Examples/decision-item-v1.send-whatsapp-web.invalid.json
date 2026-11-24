@@ -29,10 +29,9 @@
     "ref": "seguimiento_5d v3"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "0446aded4535441719e6bb0c069020fdca1df60d6efed47f21fbb3545121dce8",
+  "payload_sha256": "757f562f16c5dcddc4b20c15b11230ca5b974e4fabfe4997450bb8412c8e4885",
   "primary_label": "Programar para las 15:30",
   "recommendation": "Enviarlo hoy: si pasa de esta semana, la regla deja de proponerlo.",
-  "signature": "TU9DSy1zaW4tZmlybWEtcmVhbA==",
   "state": "pending",
   "subject": {
     "person_id": "00000000-0000-4000-8000-000000000001",

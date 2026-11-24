@@ -5,7 +5,8 @@ import XCTest
 
 @MainActor
 final class DecisionInboxTests: XCTestCase {
-    private func makeModel(items: [DecisionItem]? = nil, bridge: BridgeStatus = FakeBridgeStatusReader.sample())
+    private func makeModel(items: [DecisionItem]? = nil, bridge: BridgeStatus = FakeBridgeStatusReader.sample(),
+                           clock: (() -> Date)? = nil)
         -> (DecisionInboxModel, FakeDecisionServer, FakeBridgeApprovalSink, FakeExternalActions) {
         let server = FakeDecisionServer(items: items)
         let status = FakeBridgeStatusReader(status: bridge)
@@ -13,8 +14,8 @@ final class DecisionInboxTests: XCTestCase {
         let external = FakeExternalActions()
         let model = DecisionInboxModel(
             server: server, verifier: Ed25519ProposalVerifier(publicKey: server.publicKey),
-            bridgeReader: status, bridgeSink: sink, threads: FakeThreadPreviewProvider(), external: external,
-            timersEnabled: false)
+            currentUser: FakeInboxData.owner, bridgeReader: status, bridgeSink: sink,
+            threads: FakeThreadPreviewProvider(), external: external, now: clock ?? Date.init, timersEnabled: false)
         return (model, server, sink, external)
     }
 
@@ -30,25 +31,53 @@ final class DecisionInboxTests: XCTestCase {
         XCTAssertNotNil(model.bridge)
     }
 
-    func testTamperedUnsignedOrLooserItemsAreDiscarded() async {
+    func testTamperedForeignLooserOrOtherOwnerItemsAreDiscarded() async throws {
         let (model, server, _, _) = makeModel()
-        let base = FakeInboxData.items(now: Date())[0]
-        // 1) Cambia el texto después de firmar: no coincide la huella.
-        var tampered = FakeDecisionServer.signed(base, key: .init())
-        tampered.itemId = UUID(); tampered.what.body = "Otro texto"
+        let key = await server.signingKeyForTests
+        var base = FakeInboxData.items(now: Date())[0]
+        base.payloadSha256 = base.computedPayloadSha256
+
+        // 1) Se cambia lo que se lee (frase y comprobaciones) después de firmar: la firma ya no vale.
+        var shown = base; shown.itemId = UUID()
+        var envelope = FakeDecisionServer.envelope(shown, key: key)
+        var tamperedItem = shown
+        tamperedItem.summaryLine = "Enviar ya, es urgente"
+        tamperedItem.checks = [DecisionCheck(name: "Sin baja", ok: true)]
+        envelope.payload = try DecisionJSON.encoder().encode(tamperedItem).base64EncodedString()
+        await server.inject(envelope, as: shown)
         // 2) Firmada con otra clave.
-        var foreign = FakeDecisionServer.signed(base, key: .init())
-        foreign.itemId = UUID()
-        // 3) Un WhatsApp que el servidor deja aprobar desde la web, aunque esté bien firmado: se descarta.
-        var looser = base
-        looser.itemId = UUID(); looser.approveWhere = .macOrWeb
-        await server.inject(tampered)
-        await server.inject(foreign)
-        await server.inject(await server.signedWithOwnKey(looser))
+        var foreign = base; foreign.itemId = UUID()
+        await server.inject(FakeDecisionServer.envelope(foreign, key: .init()), as: foreign)
+        // 3) Un WhatsApp que el servidor deja aprobar desde la web, aunque esté bien firmado.
+        var looser = base; looser.itemId = UUID(); looser.approveWhere = .macOrWeb
+        await server.inject(FakeDecisionServer.envelope(looser, key: key), as: looser)
+        // 4) De otro usuario, bien firmada.
+        var other = base; other.itemId = UUID(); other.ownerUserId = UUID()
+        await server.inject(FakeDecisionServer.envelope(other, key: key), as: other)
+        // 5) Bytes que no son una tarjeta, bien firmados: se descarta solo esa.
+        let junk = Data("{\"no\":1}".utf8)
+        await server.inject(SignedDecisionItem(contract: SignedDecisionItem.envelopeVersion, payload: junk.base64EncodedString(),
+                                               signature: try key.signature(for: junk).base64EncodedString()), as: FakeInboxData.items(now: Date())[1].withId(UUID()))
+
         await model.load()
         XCTAssertEqual(model.items.count, 9)
-        XCTAssertEqual(model.discardedCount, 3)
-        XCTAssertEqual(DecisionItemValidator.structuralProblems(looser, now: Date()).contains(.whatsappSendMustBeApprovedOnMac), true)
+        XCTAssertEqual(model.discardedCount, 5)
+        XCTAssertTrue(DecisionItemValidator.structuralProblems(looser, now: Date()).contains(.whatsappSendMustBeApprovedOnMac))
+    }
+
+    func testCanonicalHashDistinguishesNullEmptyAndSeparators() {
+        var a = FakeInboxData.items(now: Date())[0]
+        var b = a
+        a.what.quote = nil
+        b.what.quote = ""
+        XCTAssertNotEqual(a.computedPayloadSha256, b.computedPayloadSha256)
+        var c = a, d = a
+        c.what.title = "x"; c.what.body = "y\u{1F}z"
+        d.what.title = "x\u{1F}y"; d.what.body = "z"
+        XCTAssertNotEqual(c.computedPayloadSha256, d.computedPayloadSha256)
+        var e = a, f = a
+        e.what.body = "caf\u{E9}"; f.what.body = "cafe\u{301}"   // NFC: la misma huella
+        XCTAssertEqual(e.computedPayloadSha256, f.computedPayloadSha256)
     }
 
     func testGroupsByUrgencyTodayFirst() async {
@@ -184,7 +213,8 @@ final class DecisionInboxTests: XCTestCase {
 
     func testServerRefusesSecondDecision() async throws {
         let server = FakeDecisionServer()
-        let first = try await server.fetchInbox()[1]
+        let envelope = try await server.fetchInbox()[1]
+        let first = try DecisionJSON.decoder().decode(DecisionItem.self, from: Data(base64Encoded: envelope.payload)!)
         let request = DecisionRequest(itemId: first.itemId, action: .approve, payloadSha256Seen: first.payloadSha256,
                                       decidedAt: Date(), decidedWhere: "mac")
         _ = try await server.decide(request)
@@ -200,11 +230,121 @@ final class DecisionInboxTests: XCTestCase {
         let (model, server, _, _) = makeModel()
         await model.load()
         model.approve(item(model, 2))
-        model.discardHeldOnQuit()
+        model.discardHeld()
         await model.commitAll()
         let requests = await server.requests
         XCTAssertTrue(requests.isEmpty)
         XCTAssertEqual(model.pending.count, 9)
+    }
+
+    func testCardInCommitCannotBeDecidedTwice() async {
+        let (model, server, sink, _) = makeModel()
+        await server.setDecideDelay(150)
+        await model.load()
+        let wa = item(model, 1)
+        model.approve(wa)
+        let entry = model.held[0].id
+        let running = Task { await model.commit(entry) }
+        await Task.yield()
+        XCTAssertTrue(model.committing.contains(wa.itemId))
+        XCTAssertFalse(model.pending.contains { $0.itemId == wa.itemId }, "En curso no se ve como pendiente")
+        model.approve(wa)
+        XCTAssertTrue(model.held.isEmpty, "No se puede volver a aprobar mientras se confirma")
+        await running.value
+        let submitted = await sink.submitted
+        let requests = await server.requests
+        XCTAssertEqual(submitted.count, 1)
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testWhatsAppNeverReachesBridgeIfCoreFailsOrItWasDecidedElsewhere() async {
+        let (model, server, sink, _) = makeModel()
+        await server.setFailDecide(true)
+        await model.load()
+        let wa = item(model, 1)
+        model.approve(wa)
+        await model.commitAll()
+        var submitted = await sink.submitted
+        XCTAssertTrue(submitted.isEmpty, "Sin recibo de Core no sale nada")
+        XCTAssertTrue(model.pending.contains { $0.itemId == wa.itemId })
+
+        await server.setFailDecide(false)
+        await server.markDecidedElsewhere(wa.itemId)
+        model.approve(wa)
+        await model.commitAll()
+        submitted = await sink.submitted
+        XCTAssertTrue(submitted.isEmpty, "Decidida en otro sitio: no se entrega al puente")
+        XCTAssertNotNil(model.finished[wa.itemId])
+    }
+
+    func testBridgeResultIsReportedAfterRegistering() async {
+        let (model, server, _, _) = makeModel()
+        await model.load()
+        model.approve(item(model, 1))
+        await model.commitAll()
+        let results = await server.results
+        XCTAssertEqual(results.map(\.1), [.scheduled])
+    }
+
+    func testCardThatExpiresDuringTheSessionCannotBeApprovedOrSent() async {
+        var clock = Date()
+        let (model, server, sink, _) = makeModel(clock: { clock })
+        await model.load()
+        let wa = item(model, 1)
+        model.approve(wa)                       // dentro del margen…
+        clock = clock.addingTimeInterval(3 * 86_400)
+        await model.commitAll()                 // …y caduca antes de confirmarse
+        model.approve(item(model, 2))           // y otra ya caducada no se puede aprobar
+        let submitted = await sink.submitted
+        let requests = await server.requests
+        XCTAssertTrue(submitted.isEmpty)
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertTrue(model.held.isEmpty)
+    }
+
+    func testBatchRejectsEditedCards() async {
+        let (model, _, _, _) = makeModel()
+        await model.load()
+        let links = (6...9).map { item(model, $0) }
+        model.setText("   ", for: links[0])     // los enlaces no se editan: no cambia nada
+        XCTAssertFalse(model.isEdited(links[0]))
+        XCTAssertEqual(model.batchGroups(in: model.pending).first?.items.count, 4)
+    }
+
+    func testAllowedActionsAreRespected() async {
+        var items = FakeInboxData.items(now: Date())
+        items[2].allowed = [.approve]            // ni editar, ni rechazar, ni aplazar
+        let (model, _, _, _) = makeModel(items: items)
+        await model.load()
+        let attach = item(model, 3)
+        XCTAssertFalse(model.canEdit(attach))
+        model.setText("otra cosa", for: attach)
+        XCTAssertFalse(model.isEdited(attach))
+        XCTAssertTrue(model.allowedReasons(attach).isEmpty)
+        model.later(attach, reason: .yaHecho)
+        XCTAssertTrue(model.held.isEmpty)
+    }
+
+    func testReloadKeepsCounters() async {
+        let (model, _, _, _) = makeModel()
+        await model.load()
+        model.approve(item(model, 2))
+        model.later(item(model, 3), reason: .yaHecho)
+        await model.commitAll()
+        await model.load()
+        XCTAssertEqual(model.total, 9)
+        XCTAssertEqual(model.decidedCount, 2)
+    }
+
+    func testUndoAfterLinkedInConfirmationGoesBackToWaiting() async {
+        let (model, _, _, _) = makeModel()
+        await model.load()
+        let li = item(model, 4)
+        model.approve(li)
+        model.confirmManualSend(li, sent: true)
+        model.undoLast()
+        XCTAssertTrue(model.awaitingManualSend.contains(li.itemId))
+        XCTAssertFalse(model.pending.contains { $0.itemId == li.itemId })
     }
 
     func testBusinessDaysSkipWeekend() {
@@ -250,7 +390,7 @@ final class DecisionInboxTests: XCTestCase {
     }
 }
 
-extension FakeDecisionServer {
-    /// Para pruebas: firma con la clave del propio servidor falso (simula un servidor que firma algo indebido).
-    func signedWithOwnKey(_ item: DecisionItem) -> DecisionItem { Self.signed(item, key: signingKeyForTests) }
+
+extension DecisionItem {
+    func withId(_ id: UUID) -> DecisionItem { var copy = self; copy.itemId = id; return copy }
 }

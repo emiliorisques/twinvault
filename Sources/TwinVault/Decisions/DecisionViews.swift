@@ -24,8 +24,12 @@ struct DecisionsRootView: View {
         }
         .sheet(isPresented: $showingSettings) { DecisionSettingsView() }
         .task { await model.load() }
+        // Cerrar la app o la ventana durante el margen descarta lo que estaba en espera (no sale nada).
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
-            model.discardHeldOnQuit()
+            model.discardHeld()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willCloseNotification)) { _ in
+            model.discardHeld()
         }
     }
 }
@@ -47,9 +51,8 @@ private struct MockBanner: View {
 struct DecisionListView: View {
     @Environment(DecisionInboxModel.self) private var model
     let enterFocus: () -> Void
-    @State private var batchOpen = false
-    @State private var batchSelection: Set<UUID> = []
-    @AccessibilityFocusState private var focusedCard: UUID?
+    @State private var openBatchKey: String?
+    @State private var batchSelection: [String: Set<UUID>] = [:]
 
     var body: some View {
         @Bindable var model = model
@@ -108,40 +111,45 @@ struct DecisionListView: View {
                 .foregroundStyle(urgency == .today ? .orange : .secondary)
                 .accessibilityAddTraits(.isHeader)
             let batches = model.batchGroups(in: list)
-            ForEach(batches, id: \.key) { group in batchBox(group.items) }
-            let batched = batchOpen ? Set(batches.flatMap { $0.items.map(\.itemId) }) : []
+            ForEach(batches, id: \.key) { group in batchBox(group.key, group.items) }
+            let batched = Set(batches.filter { $0.key == openBatchKey }.flatMap { $0.items.map(\.itemId) })
             ForEach(list.filter { !batched.contains($0.itemId) }) { item in
                 DecisionCardView(item: item, inFocus: false)
-                    .accessibilityFocused($focusedCard, equals: item.itemId)
             }
         }
     }
 
-    private func batchBox(_ group: [DecisionItem]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+    private func batchBox(_ key: String, _ group: [DecisionItem]) -> some View {
+        let isOpen = openBatchKey == key
+        let selection = batchSelection[key] ?? Set(group.map(\.itemId))
+        return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("\(group.count) parecidas").bold()
                 Text("· misma regla (\(group.first?.origin.ref ?? ""))").foregroundStyle(.secondary)
                 Spacer()
-                Button(batchOpen ? "Ocultar" : "Revisar y aprobar juntas") {
-                    batchOpen.toggle()
-                    if batchOpen { batchSelection = Set(group.map(\.itemId)) }
+                Button(isOpen ? "Ocultar" : "Revisar y aprobar juntas") {
+                    openBatchKey = isOpen ? nil : key
+                    if !isOpen { batchSelection[key] = Set(group.map(\.itemId)) }
                 }
             }
-            if batchOpen {
+            if isOpen {
                 ForEach(group) { item in
                     Toggle(isOn: Binding(
-                        get: { batchSelection.contains(item.itemId) },
-                        set: { on in if on { batchSelection.insert(item.itemId) } else { batchSelection.remove(item.itemId) } }
+                        get: { (batchSelection[key] ?? []).contains(item.itemId) },
+                        set: { on in
+                            var current = batchSelection[key] ?? []
+                            if on { current.insert(item.itemId) } else { current.remove(item.itemId) }
+                            batchSelection[key] = current
+                        }
                     )) {
                         Text("\(item.what.linkFrom ?? item.what.title) → \(item.what.linkTo ?? item.what.body)")
                     }
                     .toggleStyle(.checkbox)
                 }
                 HStack {
-                    let n = group.filter { batchSelection.contains($0.itemId) }.count
+                    let n = group.filter { selection.contains($0.itemId) }.count
                     Button(n == group.count ? "Aprobar las \(n)" : "Aprobar las \(n) marcadas") {
-                        if model.approveBatch(Array(batchSelection)) { batchOpen = false }
+                        if model.approveBatch(Array(selection)) { openBatchKey = nil }
                     }
                     .buttonStyle(.borderedProminent)
                     .disabled(n < 2)
@@ -164,9 +172,8 @@ private struct AllDoneView: View {
     }
 }
 
-extension DecisionInboxModel {
-    var awaitingManualItems: [DecisionItem] { items.filter { awaitingManualSend.contains($0.itemId) } }
-}
+/// Dónde está el foco del teclado en el modo foco: los atajos solo actúan con el foco en el contenedor.
+enum FocusField: Hashable { case container, editor, otherReason }
 
 // MARK: Tarjeta
 
@@ -174,7 +181,7 @@ struct DecisionCardView: View {
     @Environment(DecisionInboxModel.self) private var model
     let item: DecisionItem
     let inFocus: Bool
-    var editorFocus: FocusState<Bool>.Binding?
+    var focus: FocusState<FocusField?>.Binding?
     @State private var showingLater = false
     @State private var otherNote = ""
     @State private var drawer: Drawer?
@@ -248,8 +255,8 @@ struct DecisionCardView: View {
             .scrollContentBackground(.hidden)
             .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
             .accessibilityLabel(item.type == .send ? "Texto que se enviará. Puedes cambiarlo." : "Texto que se guardará. Puedes cambiarlo.")
-            .disabled(model.awaitingManualSend.contains(item.itemId))
-        if let editorFocus { base.focused(editorFocus) } else { base }
+            .disabled(model.awaitingManualSend.contains(item.itemId) || !model.canEdit(item))
+        if let focus { base.focused(focus, equals: .editor) } else { base }
     }
 
     @ViewBuilder
@@ -348,7 +355,7 @@ struct DecisionCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("¿Por qué? Un clic y queda decidido.").font(.caption).foregroundStyle(.secondary)
             FlowRow(spacing: 6) {
-                ForEach(LaterReason.allCases) { reason in
+                ForEach(model.allowedReasons(item)) { reason in
                     Button(reason.label) {
                         if reason == .otro { showOther = true }
                         else { model.later(item, reason: reason); showingLater = false }
@@ -358,8 +365,7 @@ struct DecisionCardView: View {
             }
             if showOther {
                 HStack {
-                    TextField("Escribe el motivo y pulsa Intro", text: $otherNote)
-                        .onSubmit { saveOther() }
+                    otherField
                     Button("Guardar", action: saveOther)
                 }
             }
@@ -367,6 +373,12 @@ struct DecisionCardView: View {
     }
 
     @State private var showOther = false
+
+    @ViewBuilder
+    private var otherField: some View {
+        let field = TextField("Escribe el motivo y pulsa Intro", text: $otherNote).onSubmit { saveOther() }
+        if let focus { field.focused(focus, equals: .otherReason) } else { field }
+    }
     private func saveOther() {
         model.later(item, reason: .otro, note: otherNote)
         if !otherNote.trimmingCharacters(in: .whitespaces).isEmpty { showingLater = false; showOther = false }
@@ -420,8 +432,7 @@ struct FlowRow: Layout {
 struct DecisionFocusView: View {
     @Environment(DecisionInboxModel.self) private var model
     let exit: () -> Void
-    @FocusState private var containerFocused: Bool
-    @FocusState private var editorFocused: Bool
+    @FocusState private var focus: FocusField?
 
     var body: some View {
         let current = model.focusQueue.first
@@ -433,15 +444,15 @@ struct DecisionFocusView: View {
                         .accessibilityLabel("Decisiones de hoy")
                 }
                 Spacer()
-                Button("Salir del modo foco", action: exit).keyboardShortcut(.cancelAction)
+                Button("Salir del modo foco", action: exit)
             }
-            Text("A aprobar · E editar · N ahora no · S saltar · Z deshacer · Esc salir")
+            Text("A aprobar · E editar · N ahora no · S saltar · Z deshacer (⌥⌘Z en cualquier vista) · Esc salir")
                 .font(.caption).foregroundStyle(.secondary)
                 .accessibilityLabel("Atajos: A aprobar, E editar el texto, N ahora no, S saltar, Z deshacer, Escape salir.")
             if let current {
                 Text("\(model.urgency(of: current).title) · \(DecisionInboxModel.ChannelFilter(rawValue: current.channel.rawValue)?.title ?? "")")
                     .font(.caption).foregroundStyle(.secondary)
-                DecisionCardView(item: current, inFocus: true, editorFocus: $editorFocused)
+                DecisionCardView(item: current, inFocus: true, focus: $focus)
                     .id(current.itemId)
             } else {
                 AllDoneView(total: model.total)
@@ -454,19 +465,26 @@ struct DecisionFocusView: View {
         .frame(maxWidth: .infinity)
         .focusable()
         .focusEffectDisabled()
-        .focused($containerFocused)
-        .onAppear { containerFocused = true }
-        .onChange(of: current?.itemId) { containerFocused = true }
+        .focused($focus, equals: .container)
+        .onAppear { focus = .container }
+        .onChange(of: current?.itemId) { focus = .container }
+        .onKeyPress(.escape) {
+            // Esc primero saca del texto; con el foco en el contenedor, sale del modo foco.
+            if focus == .container { exit() } else { focus = .container }
+            return .handled
+        }
         .onKeyPress(characters: .letters, phases: .down) { press in
-            // Solo cuando el foco está en el contenedor: al escribir en el texto, las letras son texto.
-            guard !editorFocused else { return .ignored }
+            // Solo letras sin modificadores y con el foco en el contenedor: al escribir, las letras son texto,
+            // y ⌘A, ⌘Z… siguen siendo de macOS.
+            guard press.modifiers.isEmpty, focus == .container else { return .ignored }
             guard let current else { return .ignored }
             switch press.characters.lowercased() {
             case "a":
                 if model.problem(for: current) == nil { model.approve(current) }
                 return .handled
             case "e":
-                editorFocused = true; return .handled
+                if model.canEdit(current) { focus = .editor }
+                return .handled
             case "n":
                 model.laterRequestedFor = current.itemId; return .handled
             case "s":
@@ -493,8 +511,10 @@ struct UndoBar: View {
                     Text(last.message)
                     Text("· \(secs) s").monospacedDigit().foregroundStyle(.secondary).accessibilityHidden(true)
                     if model.held.count > 1 { Text("· solo puedes deshacer la última").foregroundStyle(.secondary) }
+                    // ⌥⌘Z: no se pisa con ⌘Z, que sigue deshaciendo lo escrito en el texto.
                     Button("Deshacer") { model.undoLast() }
-                        .keyboardShortcut("z", modifiers: [.command])
+                        .keyboardShortcut("z", modifiers: [.command, .option])
+                        .help("Deshacer la última decisión (⌥⌘Z)")
                 }
                 .padding(.horizontal, 16).padding(.vertical, 10)
                 .background(.regularMaterial, in: Capsule())

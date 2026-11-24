@@ -24,10 +24,9 @@
     "ref": "enlace_por_correo v1"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "289899a5d019174218147e0772959320a00aab7b43f1c98903693c72c9b14997",
+  "payload_sha256": "e89f42434d68ac85b0396b41ea8d5bcec1d38e3df8048a0061a666e7ef077119",
   "primary_label": "Enlazar",
   "recommendation": "Enlazarlo: el correo de la invitación es exactamente el de su ficha.",
-  "signature": "TU9DSy1zaW4tZmlybWEtcmVhbA==",
   "state": "pending",
   "subject": {
     "person_id": "00000000-0000-4000-8000-000000000010",

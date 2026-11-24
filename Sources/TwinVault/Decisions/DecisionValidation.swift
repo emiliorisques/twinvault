@@ -17,6 +17,12 @@ enum DecisionItemProblem: Error, Equatable, Sendable {
     case badSignature
     case notPending
     case expired
+    case wrongOwner
+    case undecodable
+}
+
+struct DecisionItemRejection: Error, Equatable, Sendable {
+    let problems: [DecisionItemProblem]
 }
 
 /// Comprueba la firma de Core sobre la tarjeta.
@@ -38,7 +44,7 @@ enum DecisionItemValidator {
     static let limits: [String: Int] = [
         "summary_line": 200, "recommendation": 300, "primary_label": 60, "why": 300,
         "what.title": 120, "what.body": 1_000, "what.quote": 200, "what.email_subject": 200,
-        "what.link_from": 200, "what.link_to": 200, "origin.ref": 200
+        "what.link_from": 200, "what.link_to": 200, "origin.ref": 200, "batch_key": 120, "check.name": 120
     ]
 
     /// Reglas de forma (sin firma). Las usan también las pruebas de los ejemplos del contrato.
@@ -51,11 +57,11 @@ enum DecisionItemValidator {
             ("primary_label", item.primaryLabel), ("why", item.why), ("what.title", item.what.title),
             ("what.body", item.what.body), ("what.quote", item.what.quote),
             ("what.email_subject", item.what.emailSubject), ("what.link_from", item.what.linkFrom),
-            ("what.link_to", item.what.linkTo), ("origin.ref", item.origin.ref)
-        ]
+            ("what.link_to", item.what.linkTo), ("origin.ref", item.origin.ref), ("batch_key", item.batchKey)
+        ] + item.checks.map { ("check.name", $0.name) }
         for (name, value) in fields {
             guard let value else { continue }
-            if let limit = limits[name], value.count > limit { problems.append(.textTooLong(field: name, limit: limit)) }
+            if let limit = limits[name], value.unicodeScalars.count > limit { problems.append(.textTooLong(field: name, limit: limit)) }
         }
         for (name, value) in [("summary_line", item.summaryLine), ("primary_label", item.primaryLabel),
                               ("what.title", item.what.title), ("what.body", item.what.body)]
@@ -94,10 +100,17 @@ enum DecisionItemValidator {
         return problems
     }
 
-    static func problems(_ item: DecisionItem, verifier: any ProposalVerifying, now: Date) -> [DecisionItemProblem] {
+    /// Abre un sobre que baja del servidor: primero la firma sobre los bytes exactos, luego se decodifica
+    /// ESA tarjeta (un fallo no tumba las demás) y después las reglas de forma y el dueño.
+    static func open(_ envelope: SignedDecisionItem, verifier: any ProposalVerifying, currentUser: UUID,
+                     now: Date) -> Result<DecisionItem, DecisionItemRejection> {
+        guard envelope.contract == SignedDecisionItem.envelopeVersion else { return .failure(DecisionItemRejection(problems: [.wrongContract(envelope.contract)])) }
+        guard let bytes = Data(base64Encoded: envelope.payload) else { return .failure(DecisionItemRejection(problems: [.undecodable])) }
+        guard verifier.isValid(signatureBase64: envelope.signature, for: bytes) else { return .failure(DecisionItemRejection(problems: [.badSignature])) }
+        guard let item = try? DecisionJSON.decoder().decode(DecisionItem.self, from: bytes) else { return .failure(DecisionItemRejection(problems: [.undecodable])) }
         var problems = structuralProblems(item, now: now)
-        if !verifier.isValid(signatureBase64: item.signature, for: item.signedBytes) { problems.append(.badSignature) }
-        return problems
+        if item.ownerUserId != currentUser { problems.append(.wrongOwner) }
+        return problems.isEmpty ? .success(item) : .failure(DecisionItemRejection(problems: problems))
     }
 }
 
@@ -107,9 +120,9 @@ enum LiveTextCheck {
     static func problem(for item: DecisionItem, text: String, bridge: BridgeStatus?) -> String? {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "El texto está vacío." }
         guard item.type == .send, item.channel == .whatsapp else {
-            return text.count > 1_000 ? "Máximo 1.000 caracteres." : nil
+            return text.unicodeScalars.count > 1_000 ? "Máximo 1.000 caracteres." : nil
         }
-        if text.count > 1_000 { return "Máximo 1.000 caracteres." }
+        if text.unicodeScalars.count > 1_000 { return "Máximo 1.000 caracteres." }
         let links = linkCount(in: text)
         let allowedLinks = bridge?.phase.allowedLinks ?? 0
         if links > allowedLinks {

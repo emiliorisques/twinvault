@@ -105,24 +105,26 @@ struct DecisionItem: Codable, Sendable, Equatable, Identifiable {
     var approveWhere: ApproveWhere
     var checks: [DecisionCheck]
     var state: DecisionState
-    /// Firma Ed25519 de Core, en Base64, sobre `DecisionItem.signedBytes`.
-    var signature: String
 
     var id: UUID { itemId }
 
     static let contractVersion = "decision-item/1"
 
     /// Forma canónica de lo que Emilio decide: si cambia algo de esto, cambia la huella.
+    /// Cada campo va en NFC y con su longitud en bytes UTF-8 delante («12:texto»); un campo ausente es «-».
+    /// Así no hay ambigüedad entre separadores, ni entre nulo y vacío.
     static func canonicalPayload(
         type: DecisionType, channel: DecisionChannel, subject: DecisionSubject, what: DecisionWhat
     ) -> String {
-        [
-            type.rawValue, channel.rawValue,
-            subject.personId?.uuidString.lowercased() ?? "",
-            subject.sourceRef ?? "",
-            what.title, what.body, what.quote ?? "", what.emailSubject ?? "",
-            what.linkFrom ?? "", what.linkTo ?? ""
-        ].joined(separator: "\u{1F}")
+        let fields: [String?] = [
+            type.rawValue, channel.rawValue, subject.personId?.uuidString.lowercased(), subject.sourceRef,
+            what.title, what.body, what.quote, what.emailSubject, what.linkFrom, what.linkTo
+        ]
+        return fields.map { field -> String in
+            guard let field else { return "-" }
+            let nfc = field.precomposedStringWithCanonicalMapping
+            return "\(nfc.utf8.count):\(nfc)"
+        }.joined()
     }
 
     static func sha256Hex(_ text: String) -> String {
@@ -140,20 +142,40 @@ struct DecisionItem: Codable, Sendable, Equatable, Identifiable {
         return Self.sha256Hex(Self.canonicalPayload(type: type, channel: channel, subject: subject, what: edited))
     }
 
-    /// Lo que firma Core: contrato, id, huella, caducidad y dónde se aprueba.
-    var signedBytes: Data {
-        let expires = ISO8601DateFormatter().string(from: expiresAt)
-        return Data([contract, itemId.uuidString.lowercased(), payloadSha256, expires, approveWhere.rawValue]
-            .joined(separator: "\u{1F}").utf8)
-    }
+}
+
+/// Sobre firmado: Core firma (Ed25519) los bytes exactos de `payload`, y la app solo enseña lo que sale de esos
+/// bytes. Así la firma cubre todo lo que Emilio lee (frase, recomendación, comprobaciones, ficha, dueño…).
+struct SignedDecisionItem: Codable, Sendable, Equatable {
+    var contract: String
+    /// JSON UTF-8 de la tarjeta `decision-item/1`, en Base64.
+    var payload: String
+    /// Firma Ed25519, en Base64, sobre los bytes de `payload` ya decodificados del Base64.
+    var signature: String
+
+    static let envelopeVersion = "decision-envelope/1"
 }
 
 enum DecisionJSON {
     static func decoder() -> JSONDecoder {
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let text = try container.decode(String.self)
+            if let date = parseDate(text) { return date }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Fecha no válida: \(text)")
+        }
         return decoder
+    }
+
+    /// Acepta ISO 8601 con o sin fracciones de segundo y con cualquier desfase.
+    static func parseDate(_ text: String) -> Date? {
+        let plain = ISO8601DateFormatter()
+        if let date = plain.date(from: text) { return date }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text)
     }
 
     static func encoder() -> JSONEncoder {

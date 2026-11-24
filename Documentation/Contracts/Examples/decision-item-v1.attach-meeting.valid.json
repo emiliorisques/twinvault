@@ -24,10 +24,9 @@
     "ref": "compromisos_reunion · modelo local"
   },
   "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
-  "payload_sha256": "3d81a0a8a02ae9c5fd7b69a753e6e255692b343443fd964d43a296bb3cce1e57",
+  "payload_sha256": "23b30dd2883fed7202849dc37e4584aed265aa61316fa3823c20f526040d99c1",
   "primary_label": "Subir a la ficha",
   "recommendation": "Subirlo: así te avisa el día antes y no se pierde.",
-  "signature": "TU9DSy1zaW4tZmlybWEtcmVhbA==",
   "state": "pending",
   "subject": {
     "person_id": "00000000-0000-4000-8000-000000000003",

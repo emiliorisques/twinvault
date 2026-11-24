@@ -64,8 +64,11 @@ enum DecisionServerError: Error, Equatable, Sendable {
 }
 
 protocol DecisionServer: Sendable {
-    func fetchInbox() async throws -> [DecisionItem]
+    func fetchInbox() async throws -> [SignedDecisionItem]
+    /// Registra la decisión. Para un WhatsApp se llama ANTES de entregarlo al puente: sin recibo no sale nada.
     func decide(_ request: DecisionRequest) async throws -> DecisionReceipt
+    /// Resultado de quien ejecuta fuera de Core (el puente): programado, bloqueado o fallido. Ruta B4 `…/result`.
+    func reportResult(itemId: UUID, result: DecisionResult, detail: String) async throws
 }
 
 // MARK: Puente de WhatsApp: solo recuentos

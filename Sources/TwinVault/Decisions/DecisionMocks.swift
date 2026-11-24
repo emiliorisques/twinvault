@@ -7,9 +7,15 @@ import Foundation
 actor FakeDecisionServer: DecisionServer {
     private let signingKey: Curve25519.Signing.PrivateKey
     private var items: [UUID: DecisionItem]
+    private var envelopes: [UUID: SignedDecisionItem]
     private var order: [UUID]
     private(set) var requests: [DecisionRequest] = []
     private(set) var receipts: [DecisionReceipt] = []
+    private(set) var results: [(UUID, DecisionResult)] = []
+    /// Para pruebas: hace fallar `decide` (como una caída de red).
+    var failDecide = false
+    /// Para pruebas: retraso de `decide` en milisegundos.
+    var decideDelayMs = 0
 
     nonisolated let publicKey: Curve25519.Signing.PublicKey
     /// Solo para pruebas (simular un servidor que firma algo indebido).
@@ -18,29 +24,48 @@ actor FakeDecisionServer: DecisionServer {
     init(now: Date = Date(), items: [DecisionItem]? = nil, signingKey: Curve25519.Signing.PrivateKey = .init()) {
         self.signingKey = signingKey
         self.publicKey = signingKey.publicKey
-        let built = (items ?? FakeInboxData.items(now: now)).map { FakeDecisionServer.signed($0, key: signingKey) }
+        let built = (items ?? FakeInboxData.items(now: now)).map { item -> DecisionItem in
+            var copy = item
+            copy.payloadSha256 = copy.computedPayloadSha256
+            return copy
+        }
         self.items = Dictionary(uniqueKeysWithValues: built.map { ($0.itemId, $0) })
+        self.envelopes = Dictionary(uniqueKeysWithValues: built.map { ($0.itemId, FakeDecisionServer.envelope($0, key: signingKey)) })
         self.order = built.map(\.itemId)
     }
 
-    static func signed(_ item: DecisionItem, key: Curve25519.Signing.PrivateKey) -> DecisionItem {
-        var copy = item
-        copy.payloadSha256 = copy.computedPayloadSha256
-        copy.signature = (try? key.signature(for: copy.signedBytes).base64EncodedString()) ?? ""
-        return copy
+    /// Firma los bytes exactos del JSON de la tarjeta (como hará Core).
+    static func envelope(_ item: DecisionItem, key: Curve25519.Signing.PrivateKey) -> SignedDecisionItem {
+        let bytes = (try? DecisionJSON.encoder().encode(item)) ?? Data()
+        let signature = (try? key.signature(for: bytes).base64EncodedString()) ?? ""
+        return SignedDecisionItem(contract: SignedDecisionItem.envelopeVersion, payload: bytes.base64EncodedString(),
+                                  signature: signature)
     }
 
-    /// Para pruebas: mete una tarjeta tal cual (por ejemplo, manipulada).
-    func inject(_ item: DecisionItem) {
+    /// Para pruebas: mete un sobre tal cual (por ejemplo, manipulado) y la tarjeta que representa.
+    func inject(_ envelope: SignedDecisionItem, as item: DecisionItem) {
         items[item.itemId] = item
+        envelopes[item.itemId] = envelope
         order.append(item.itemId)
     }
 
-    func fetchInbox() async throws -> [DecisionItem] {
-        order.compactMap { items[$0] }.filter { $0.state == .pending }
+    func setFailDecide(_ value: Bool) { failDecide = value }
+    func setDecideDelay(_ ms: Int) { decideDelayMs = ms }
+
+    /// Para pruebas: simula que alguien la decidió en la web.
+    func markDecidedElsewhere(_ id: UUID) { items[id]?.state = .rejected }
+
+    func fetchInbox() async throws -> [SignedDecisionItem] {
+        order.compactMap { id in items[id].flatMap { $0.state == .pending ? envelopes[id] : nil } }
+    }
+
+    func reportResult(itemId: UUID, result: DecisionResult, detail: String) async throws {
+        results.append((itemId, result))
     }
 
     func decide(_ request: DecisionRequest) async throws -> DecisionReceipt {
+        if decideDelayMs > 0 { try? await Task.sleep(for: .milliseconds(decideDelayMs)) }
+        if failDecide { throw URLError(.notConnectedToInternet) }
         guard var item = items[request.itemId] else { throw DecisionServerError.unknownItem }
         guard item.state == .pending else { throw DecisionServerError.alreadyDecided }
         guard item.payloadSha256 == request.payloadSha256Seen else { throw DecisionServerError.changedSinceSeen }
@@ -61,8 +86,8 @@ actor FakeDecisionServer: DecisionServer {
             case (.send, .email):
                 result = .executed; detail = "MOCK: enviado desde tu correo (no ha salido nada)."
             case (.send, .whatsapp):
-                // El envío real lo hace el puente; Core solo apunta el recibo que la app le pasa.
-                result = .scheduled; detail = "MOCK: programado por el puente (no ha salido nada)."
+                // Core registra la aprobación; la app la entrega después al puente y le pasa el resultado.
+                result = .scheduled; detail = "Registrado. Lo entrega el puente (MOCK: no sale nada)."
             case (.send, .linkedin):
                 result = .executed; detail = "Lo envió Emilio en LinkedIn."
             case (.link, _):
@@ -151,7 +176,7 @@ enum FakeInboxData {
             expiresAt: now.addingTimeInterval(expiresInDays * 86_400),
             payloadSha256: "", allowed: type == .link ? [.approve, .reject, .snooze] : [.approve, .editApprove, .reject, .snooze],
             approveWhere: approveWhere, checks: checks.map { DecisionCheck(name: $0, ok: true) },
-            state: .pending, signature: "")
+            state: .pending)
     }
 
     static func items(now: Date) -> [DecisionItem] {

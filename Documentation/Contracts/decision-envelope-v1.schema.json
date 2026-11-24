@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://os.solutionpuzzle.com/contracts/decision-envelope-v1.schema.json",
+  "title": "decision-envelope/1 — sobre firmado de una tarjeta de la bandeja",
+  "description": "payload = Base64 de los bytes UTF-8 del JSON de una tarjeta decision-item/1. signature = Ed25519 (Base64) de Core sobre esos bytes exactos. La app verifica la firma antes de decodificar, y descarta el sobre si falla; un sobre que falla no afecta a los demás.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "payload",
+    "signature"
+  ],
+  "properties": {
+    "contract": {
+      "const": "decision-envelope/1"
+    },
+    "payload": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "contentMediaType": "application/json"
+    },
+    "signature": {
+      "type": "string",
+      "contentEncoding": "base64"
+    }
+  }
+}
