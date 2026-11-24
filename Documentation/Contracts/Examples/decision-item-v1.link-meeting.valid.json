@@ -1,0 +1,46 @@
+{
+  "allowed": [
+    "approve",
+    "reject",
+    "snooze"
+  ],
+  "approve_where": "mac_or_web",
+  "batch_key": "enlace_por_correo v1",
+  "channel": "meeting",
+  "checks": [
+    {
+      "name": "Coincide por identificador (correo)",
+      "ok": true
+    }
+  ],
+  "contract": "decision-item/1",
+  "created_at": "2026-11-24T08:00:00Z",
+  "exits_from": "core",
+  "expires_at": "2026-11-27T18:00:00Z",
+  "item_id": "20000000-0000-4000-8000-000000000003",
+  "origin": {
+    "created_by_source": "local",
+    "kind": "rule",
+    "ref": "enlace_por_correo v1"
+  },
+  "owner_user_id": "00000000-0000-4000-8000-0000000000e1",
+  "payload_sha256": "289899a5d019174218147e0772959320a00aab7b43f1c98903693c72c9b14997",
+  "primary_label": "Enlazar",
+  "recommendation": "Enlazarlo: el correo de la invitación es exactamente el de su ficha.",
+  "signature": "TU9DSy1zaW4tZmlybWEtcmVhbA==",
+  "state": "pending",
+  "subject": {
+    "person_id": "00000000-0000-4000-8000-000000000010",
+    "source_ref": "meet:ejemplo-21nov"
+  },
+  "summary_line": "Enlazar al asistente jordi@clubdelta.example de la reunión del 21 nov con la ficha de Jordi Inventado.",
+  "thread_preview": "none",
+  "type": "link",
+  "what": {
+    "body": "Asistente de la reunión → ficha",
+    "link_from": "Asistente: jordi@clubdelta.example",
+    "link_to": "Ficha: Jordi Inventado · Director deportivo · Club Pádel Delta",
+    "title": "Enlace de asistente"
+  },
+  "why": "Coincide por correo, no por nombre."
+}

@@ -2,9 +2,16 @@ import SwiftUI
 
 @main
 struct TwinVaultApplication: App {
-    @State private var model: AppModel
+    @State private var model: AppModel?
+    // F1 de la bandeja de decisiones: solo MOCK (servidor y puente falsos, datos inventados).
+    @State private var decisions = DecisionInboxModel.mock()
 
     init() {
+        // Modo demo de la bandeja (F1): no abre el almacén de reuniones ni ningún servicio de audio.
+        if ProcessInfo.processInfo.environment["TWINVAULT_DECISIONS_DEMO"] == "1" {
+            _model = State(initialValue: nil)
+            return
+        }
         do {
             let paths = try VaultPaths.applicationDefault()
             let repository = try SQLiteMeetingRepository(paths: paths)
@@ -81,7 +88,18 @@ struct TwinVaultApplication: App {
     }
 
     var body: some Scene {
-        WindowGroup { MeetingsListView().environment(model) }
+        WindowGroup {
+            TabView {
+                Tab("Decisiones", systemImage: "tray.full") {
+                    DecisionsRootView().environment(decisions)
+                }
+                if let model {
+                    Tab("Reuniones", systemImage: "waveform") {
+                        MeetingsListView().environment(model)
+                    }
+                }
+            }
+        }
             .defaultSize(width: 980, height: 680)
     }
 }
